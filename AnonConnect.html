@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anonymous Connect - Secure Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons for aesthetic -->
+    <script type="module">
+        import { createIcons, Clipboard, Smile, File, ArrowRight, UserCheck, Lock, AlertTriangle, Video, MessageSquare, Menu, Globe, Maximize2, Trash2, X, Users, MessageSquareText, Search, Send } from 'https://cdn.jsdelivr.net/npm/lucide@latest/dist/esm/lucide.js';
+        window.createIcons = createIcons; // Expose globally for post-render call
+        // Expose all imported icons in an object named 'Icons'
+        window.Icons = { Clipboard, Smile, File, ArrowRight, UserCheck, Lock, AlertTriangle, Video, MessageSquare, Menu, Globe, Maximize2, Trash2, X, Users, MessageSquareText, Search, Send };
+    </script>
+    <style>
+        :root {
+            --primary-color: #3b82f6; /* Blue-500 */
+            --secondary-color: #10b981; /* Emerald-500 */
+        }
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .card { background-color: #ffffff; border-radius: 1rem; box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05); }
+        .btn-primary { background-color: var(--primary-color); transition: all 0.2s; }
+        .btn-primary:hover { background-color: #2563eb; box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4); }
+        .input-style { border: 1px solid #d1d5db; padding: 0.75rem; border-radius: 0.5rem; transition: border-color 0.2s; }
+        .input-style:focus { border-color: var(--primary-color); outline: none; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
+        .chat-scroll { max-height: 400px; overflow-y: auto; scroll-behavior: smooth; }
+        .modal-bg { background-color: rgba(0, 0, 0, 0.5); }
+        .modal-content { max-width: 90%; }
+        @keyframes pulse-ring { 0% { transform: scale(0.33); } 80%, 100% { opacity: 0; } }
+        .pulse-effect {
+            animation: pulse-ring 2.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <!-- Main Application Container -->
+    <div id="app" class="w-full max-w-4xl card p-6 md:p-8">
+        <header class="mb-6 text-center">
+            <h1 class="text-3xl font-extrabold text-gray-900 flex items-center justify-center">
+                <span data-lucide="message-square-text" class="text-indigo-600 mr-2 w-6 h-6"></span> Anonymous Connect
+            </h1>
+            <p class="text-sm text-gray-500 mt-1" id="user-info-display">Welcome, Stranger.</p>
+        </header>
+
+        <!-- Ban/VPN Error Screen -->
+        <div id="ban-screen" class="hidden text-center p-8 bg-red-50 border border-red-200 rounded-lg">
+            <span data-lucide="lock" class="text-red-500 mx-auto w-12 h-12 mb-4 block"></span>
+            <h2 class="text-2xl font-bold text-red-700 mb-2">Service Locked</h2>
+            <p class="text-red-600 mb-4" id="ban-message">Your access is temporarily blocked due to security violations or detected VPN usage.</p>
+            <p class="text-sm text-red-500" id="ban-details">If this is an error, please try again later. Lock duration: 3 hours.</p>
+        </div>
+
+        <!-- 1. Verification Screen -->
+        <div id="verification-screen" class="space-y-6">
+            <h2 class="text-xl font-semibold text-gray-800">Step 1: Identity Check (Video required)</h2>
+            <div class="relative w-full aspect-video bg-gray-200 rounded-lg overflow-hidden border-4 border-dashed border-indigo-300">
+                <video id="webcam-preview" class="w-full h-full object-cover" autoplay playsinline muted></video>
+                <div id="loading-overlay" class="absolute inset-0 bg-gray-800 bg-opacity-70 flex flex-col items-center justify-center hidden">
+                    <div class="relative">
+                        <div class="w-12 h-12 bg-indigo-500 rounded-full pulse-effect"></div>
+                        <div class="absolute inset-0 w-12 h-12 flex items-center justify-center text-white font-bold">AI</div>
+                    </div>
+                    <p class="text-white mt-4 text-center" id="loading-text">Analyzing video frame for age and gender...</p>
+                </div>
+            </div>
+            <canvas id="verification-canvas" class="hidden"></canvas>
+            <p class="text-xs text-gray-500 italic">
+                <span data-lucide="alert-triangle" class="inline w-4 h-4 text-yellow-500 mr-1"></span>
+                Please look directly at the camera. Do not use photos, screens, or blurred faces. This process is fully automated and designed for strict safety.
+            </p>
+            <button onclick="startVerification()" id="verify-btn" class="w-full btn-primary text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center">
+                <span data-lucide="user-check" class="w-5 h-5 mr-2"></span> Start Video Verification
+            </button>
+        </div>
+
+        <!-- 2. Profile Creation Screen -->
+        <div id="profile-screen" class="space-y-6 hidden">
+            <h2 class="text-xl font-semibold text-gray-800">Step 2: Create Anonymous Profile</h2>
+            <div class="bg-indigo-50 border-l-4 border-indigo-400 p-4 text-sm text-indigo-700 rounded-lg">
+                <p class="font-semibold">Verification Successful!</p>
+                <p>Please enter your desired details. The gender you submit MUST match the verified gender.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="nickname" class="block text-sm font-medium text-gray-700">Nickname (Can change in 15 days)</label>
+                    <input type="text" id="nickname" class="input-style w-full mt-1" maxlength="20" placeholder="e.g., NightOwl">
+                </div>
+                <div>
+                    <label for="profile-age" class="block text-sm font-medium text-gray-700">Age</label>
+                    <input type="number" id="profile-age" class="input-style w-full mt-1" min="18" max="99" placeholder="18">
+                </div>
+            </div>
+            <div>
+                <label for="profile-gender" class="block text-sm font-medium text-gray-700">Submitted Gender</label>
+                <select id="profile-gender" class="input-style w-full mt-1">
+                    <option value="">Select Gender</option>
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                </select>
+            </div>
+            <button onclick="submitProfile()" class="w-full btn-primary text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center">
+                <span data-lucide="arrow-right" class="w-5 h-5 mr-2"></span> Proceed to UAC
+            </button>
+        </div>
+
+        <!-- 3. UAC (User Acceptance Check) Screen -->
+        <div id="uac-screen" class="space-y-6 hidden">
+            <h2 class="text-xl font-semibold text-gray-800">Step 3: User Acceptance Check (UAC)</h2>
+            <div id="uac-profile-summary" class="card p-4 border border-indigo-200">
+                <!-- Profile details and verified image will be inserted here -->
+            </div>
+            <div class="card p-6 border-2 border-red-300 bg-red-50 space-y-3 chat-scroll">
+                <h3 class="text-lg font-bold text-red-700">CRITICAL LIABILITY WAIVER (NOC)</h3>
+                <p class="text-sm text-gray-800">By checking the box below, you confirm that you are using this website within your **full consciousness, senses, and understanding**.</p>
+                <p class="text-sm text-gray-800 font-semibold">You acknowledge and agree that in the event of any future mishap, including but not limited to, online sexual abuse, exposure to harmful content, or any other problem faced while using this website, **Anonymous Connect and its personnel/owners shall not be held responsible or liable.**</p>
+                <ul class="list-disc list-inside text-xs text-gray-600 space-y-1">
+                    <li><span class="font-bold">DO NOT</span> share personal identifying information (PII).</li>
+                    <li><span class="font-bold">DO NOT</span> engage in any sexually explicit content or hate speech.</li>
+                    <li>All video chats are subject to a **broadcast delay** and AI content moderation. Violations will result in an 8-hour IP/ID ban.</li>
+                </ul>
+                <label class="flex items-center space-x-2 mt-4">
+                    <input type="checkbox" id="uac-accept" class="form-checkbox text-indigo-600 w-5 h-5 rounded">
+                    <span class="text-sm font-medium text-gray-900">I have read, understood, and accept all terms and liabilities.</span>
+                </label>
+            </div>
+            <button onclick="acceptUAC()" id="uac-btn" class="w-full btn-primary text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center opacity-50 cursor-not-allowed" disabled>
+                <span data-lucide="lock" class="w-5 h-5 mr-2"></span> Accept and Enter Chat
+            </button>
+        </div>
+
+        <!-- 4. Main Chat/Lobby Screen -->
+        <div id="chat-screen" class="hidden h-full">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Left Panel: User List/Connection Controls -->
+                <div class="md:col-span-1 space-y-4">
+                    <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                        <span data-lucide="users" class="w-5 h-5 mr-2 text-indigo-600"></span> Current Conversations
+                    </h3>
+                    <div id="connection-controls" class="p-3 border rounded-lg bg-gray-50 space-y-2">
+                        <button onclick="startRandomChat()" class="w-full btn-primary text-white font-bold py-2 px-3 rounded-lg text-sm flex items-center justify-center">
+                            <span data-lucide="search" class="w-4 h-4 mr-2"></span> Find New Stranger
+                        </button>
+                        <div class="flex items-center justify-between text-sm">
+                            <label for="video-mode" class="flex items-center cursor-pointer">
+                                <input type="checkbox" id="video-mode" class="hidden" onchange="toggleChatMode(this.checked)">
+                                <div class="relative w-10 h-6 bg-gray-300 rounded-full shadow-inner transition-colors duration-200">
+                                    <div class="dot absolute w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 transform translate-x-1 translate-y-1"></div>
+                                </div>
+                                <span class="ml-3 text-gray-700 font-medium" id="chat-mode-label">Text Only Mode</span>
+                            </label>
+                            <span class="text-xs font-semibold px-2 py-1 rounded-full text-indigo-700 bg-indigo-100" id="current-mode-display">TEXT</span>
+                        </div>
+                    </div>
+
+                    <div id="friends-list" class="space-y-2 chat-scroll h-64 border p-3 rounded-lg">
+                        <p class="text-xs text-gray-500">Private Chats (Friend Requests)</p>
+                        <!-- Friend list items will be inserted here -->
+                        <div id="no-friends" class="text-center p-4 text-gray-400 text-sm">No active private chats.</div>
+                    </div>
+                </div>
+
+                <!-- Right Panel: Chat Interface -->
+                <div class="md:col-span-2 space-y-4">
+                    <div id="chat-header" class="flex items-center justify-between p-3 border-b rounded-t-lg bg-indigo-50">
+                        <h4 class="font-bold text-lg text-indigo-800" id="stranger-name">Stranger (Random Chat)</h4>
+                        <button onclick="endChat()" class="text-red-500 hover:text-red-700 text-sm p-1 rounded-full transition duration-150">
+                            <span data-lucide="x" class="w-5 h-5"></span>
+                        </button>
+                    </div>
+
+                    <!-- Video Container (Visible only in Video Mode) -->
+                    <div id="video-container" class="hidden w-full aspect-video bg-gray-900 rounded-lg overflow-hidden relative">
+                        <video id="self-video" class="absolute inset-0 w-1/3 h-1/3 object-cover top-2 right-2 border-2 border-white rounded-lg" autoplay playsinline muted></video>
+                        <video id="stranger-video" class="w-full h-full object-cover" autoplay playsinline></video>
+                        <div id="video-delay-warning" class="absolute bottom-0 left-0 bg-yellow-500 text-white text-xs p-1 px-2 font-semibold">
+                            Broadcast Delay Active
+                        </div>
+                    </div>
+
+                    <!-- Message Display Screen -->
+                    <div id="message-display" class="card p-4 h-96 chat-scroll bg-gray-50 border">
+                        <p class="text-center text-gray-500 text-sm">Start a chat by finding a new stranger or selecting a friend.</p>
+                    </div>
+
+                    <!-- Input Area -->
+                    <div id="chat-input-area" class="flex flex-col space-y-2">
+                        <!-- Advanced Tools Bar -->
+                        <div class="flex items-center space-x-3 text-gray-500">
+                            <span data-lucide="clipboard" class="cursor-pointer hover:text-indigo-600" title="Clipboard (Simulated)" onclick="simulateAdvanced('Clipboard')"></span>
+                            <span data-lucide="smile" class="cursor-pointer hover:text-indigo-600" title="GIF/Emoji (Simulated)" onclick="simulateAdvanced('GIF/Emoji')"></span>
+                            <span data-lucide="file" class="cursor-pointer hover:text-indigo-600" title="Attach File (Simulated)" onclick="simulateAdvanced('Attach File')"></span>
+                            <span data-lucide="globe" class="cursor-pointer hover:text-indigo-600" title="Translation (Simulated)" onclick="simulateAdvanced('Translation')"></span>
+                        </div>
+                        <div class="flex space-x-3">
+                            <input type="text" id="chat-input" class="input-style flex-grow" placeholder="Type your message here (max 140 chars)" maxlength="140">
+                            <button onclick="sendMessage()" class="btn-primary text-white font-bold py-2 px-4 rounded-xl flex items-center justify-center">
+                                <span data-lucide="send" class="w-5 h-5"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Modal for Alerts/Confirmation (Replacing alert/confirm) -->
+    <div id="custom-modal" class="hidden fixed inset-0 flex items-center justify-center modal-bg z-50">
+        <div class="modal-content card p-6 w-full max-w-sm text-center">
+            <h3 id="modal-title" class="text-xl font-bold mb-3 text-gray-900"></h3>
+            <p id="modal-message" class="text-gray-700 mb-6"></p>
+            <button id="modal-ok-btn" class="w-full btn-primary text-white font-bold py-2 px-4 rounded-xl">OK</button>
+        </div>
+    </div>
+
+
+    <!-- Firebase & Core JS Scripts -->
+    <script type="module">
+        // Firebase Imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, updateDoc, where, addDoc, getDocs, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Firebase and App State
+        setLogLevel('debug');
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let userId = null;
+        let isAuthReady = false;
+        let verifiedAge = null;
+        let verifiedGender = null;
+        let userProfile = {};
+        let localId = localStorage.getItem('localId') || crypto.randomUUID(); // Simulated MAC/IP
+        localStorage.setItem('localId', localId);
+
+        // API Configuration
+        const API_KEY = ""; // Provided by the environment
+        const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent";
+
+        // DOM Elements
+        const screens = {
+            'ban': document.getElementById('ban-screen'),
+            'verification': document.getElementById('verification-screen'),
+            'profile': document.getElementById('profile-screen'),
+            'uac': document.getElementById('uac-screen'),
+            'chat': document.getElementById('chat-screen'),
+        };
+
+        const elements = {
+            video: document.getElementById('webcam-preview'),
+            canvas: document.getElementById('verification-canvas'),
+            loadingOverlay: document.getElementById('loading-overlay'),
+            loadingText: document.getElementById('loading-text'),
+            nicknameInput: document.getElementById('nickname'),
+            ageInput: document.getElementById('profile-age'),
+            genderSelect: document.getElementById('profile-gender'),
+            uacSummary: document.getElementById('uac-profile-summary'),
+            uacAccept: document.getElementById('uac-accept'),
+            uacBtn: document.getElementById('uac-btn'),
+            chatInput: document.getElementById('chat-input'),
+            messageDisplay: document.getElementById('message-display'),
+            banScreen: document.getElementById('ban-screen'),
+            banMessage: document.getElementById('ban-message'),
+            banDetails: document.getElementById('ban-details'),
+            modal: document.getElementById('custom-modal'),
+            modalTitle: document.getElementById('modal-title'),
+            modalMessage: document.getElementById('modal-message'),
+            modalOkBtn: document.getElementById('modal-ok-btn'),
+            userInfoDisplay: document.getElementById('user-info-display'),
+        };
+
+        // --- Utility Functions ---
+
+        /** Shows a custom modal instead of alert() or confirm() */
+        function showModal(title, message) {
+            elements.modalTitle.textContent = title;
+            elements.modalMessage.textContent = message;
+            elements.modal.classList.remove('hidden');
+            return new Promise(resolve => {
+                elements.modalOkBtn.onclick = () => {
+                    elements.modal.classList.add('hidden');
+                    resolve(true);
+                };
+            });
+        }
+
+        /** Converts a video frame to base64 JPEG image */
+        function captureFrameToBase64(videoElement, canvasElement) {
+            canvasElement.width = videoElement.videoWidth;
+            canvasElement.height = videoElement.videoHeight;
+            const ctx = canvasElement.getContext('2d');
+            ctx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+            return canvasElement.toDataURL('image/jpeg').split(',')[1];
+        }
+
+        /** Check for ban status (Simulated IP/MAC check) */
+        function checkBanStatus() {
+            const banRecord = localStorage.getItem(`ban_${localId}`);
+            if (banRecord) {
+                const banTime = JSON.parse(banRecord);
+                const now = Date.now();
+                if (now < banTime.until) {
+                    const remaining = Math.ceil((banTime.until - now) / 3600000); // Hours
+                    elements.banMessage.textContent = banTime.message;
+                    elements.banDetails.textContent = `Your ID is blocked for ${remaining} more hour(s). Please wait.`;
+                    showScreen('ban');
+                    return true;
+                } else {
+                    localStorage.removeItem(`ban_${localId}`);
+                }
+            }
+            return false;
+        }
+
+        /** Apply a ban */
+        function applyBan(hours, message) {
+            const banUntil = Date.now() + (hours * 3600000); // 1 hour = 3600000 ms
+            localStorage.setItem(`ban_${localId}`, JSON.stringify({ until: banUntil, message }));
+            // Also store in Firestore for cross-session/user-id check
+            if (userId) {
+                setDoc(doc(db, 'artifacts', appId, 'bans', userId), {
+                    localId: localId,
+                    banUntil: banUntil,
+                    message: message,
+                    timestamp: serverTimestamp()
+                }, { merge: true });
+            }
+            checkBanStatus(); // Reload the ban screen
+        }
+
+        /** Simulate VPN Check */
+        function checkVPN() {
+            // NOTE: Real VPN detection is not possible in this sandbox environment.
+            // We simulate failure to access a restricted geo-IP data.
+            // For this implementation, we will assume no VPN to allow flow.
+            // If we were to fail, we would show a custom ban screen:
+            // if (Math.random() < 0.1) { // 10% chance to simulate fail
+            //     elements.banMessage.textContent = "VPN detected. Please disable your VPN to access this service.";
+            //     elements.banDetails.textContent = "Access is blocked while a VPN connection is active.";
+            //     showScreen('ban');
+            //     return true;
+            // }
+            return false;
+        }
+
+        /** Sanitizes text, replacing vulgar words with stars */
+        function moderateText(text) {
+            const vulgarKeywords = /sex|porn|nude|cunt|fuck|cock|dick|asshole|pussy|vagina|penis|boob|tits|nipple|masturbate|rape/gi;
+            return text.replace(vulgarKeywords, '****');
+        }
+
+        /** Screens management */
+        function showScreen(screenName) {
+            Object.values(screens).forEach(screen => screen.classList.add('hidden'));
+            if (screens[screenName]) {
+                screens[screenName].classList.remove('hidden');
+            }
+            // FIX: Pass the Icons object to createIcons to resolve the rendering error.
+            if (window.createIcons && window.Icons) {
+                 window.createIcons({ icons: window.Icons });
+            }
+        }
+
+        // --- Firebase Initialization and Auth ---
+
+        onAuthStateChanged(auth, async (user) => {
+            isAuthReady = true;
+            if (user) {
+                userId = user.uid;
+                elements.userInfoDisplay.textContent = `User ID: ${userId.substring(0, 8)}...`;
+            } else {
+                // Should only happen if token is missing/expired, sign in anonymously
+                try {
+                    const anonUser = await signInAnonymously(auth);
+                    userId = anonUser.user.uid;
+                    elements.userInfoDisplay.textContent = `User ID: ${userId.substring(0, 8)}...`;
+                } catch (error) {
+                    console.error("Anonymous Sign-in failed:", error);
+                    showModal("Authentication Error", "Could not sign in to the service. Please refresh.");
+                    return;
+                }
+            }
+
+            // After auth, check for existing profile/ban status
+            if (checkBanStatus() || checkVPN()) {
+                // Ban/VPN screen is already displayed
+                return;
+            }
+
+            await loadUserProfile();
+            if (userProfile.uacAccepted) {
+                showScreen('chat');
+                setupChatListeners();
+            } else if (userProfile.nickname) {
+                showScreen('uac');
+                setupUACScreen();
+            } else if (verifiedAge) {
+                showScreen('profile');
+            } else {
+                showScreen('verification');
+            }
+        });
+
+        async function loadUserProfile() {
+            if (!userId) return;
+            try {
+                const userDocRef = doc(db, 'artifacts', appId, 'users', userId, 'config', 'profile');
+                const docSnap = await getDoc(userDocRef);
+                if (docSnap.exists()) {
+                    userProfile = docSnap.data();
+                    verifiedAge = userProfile.verifiedAge;
+                    verifiedGender = userProfile.verifiedGender;
+                } else {
+                    console.log("Profile document does not exist for this user.");
+                    userProfile = {}; // Ensure it's an empty object if not found
+                }
+            } catch (error) {
+                // Catch the "Missing or insufficient permissions" error
+                if (error.code === 'permission-denied') {
+                    console.error("Firestore Permission Error: User lacks permissions to read their profile, or document is missing.", error);
+                    // Continue as if no profile exists, allowing the flow to start verification
+                    userProfile = {};
+                } else {
+                    console.error("Error loading user profile:", error);
+                }
+            }
+        }
+
+        // --- Core Application Logic ---
+
+        // FIX: Expose functions to the global window object for onclick handlers
+        window.startVerification = async function() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                await showModal("Camera Error", "Your browser does not support media device access.");
+                return;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                elements.video.srcObject = stream;
+                document.getElementById('verify-btn').disabled = true;
+
+                // Wait for video to load metadata to ensure dimensions are available
+                elements.video.onloadedmetadata = async () => {
+                    await new Promise(resolve => setTimeout(resolve, 2000)); // Delay for user to position face
+
+                    elements.loadingOverlay.classList.remove('hidden');
+                    elements.loadingText.textContent = "Capturing image...";
+                    const base64Image = captureFrameToBase64(elements.video, elements.canvas);
+                    elements.loadingText.textContent = "Sending to Gemini AI for analysis...";
+
+                    await performGeminiVerification(base64Image);
+
+                    // Stop video stream
+                    stream.getTracks().forEach(track => track.stop());
+                    elements.loadingOverlay.classList.add('hidden');
+                    document.getElementById('verify-btn').disabled = false;
+                };
+
+            } catch (err) {
+                await showModal("Camera Access Denied", "Please allow camera access to proceed with verification.");
+                console.error("Camera access error:", err);
+                // IP Ban for 3 hours if user tries to proceed without access
+                applyBan(3, "Failed to complete video verification. Access attempt blocked.");
+            }
+        };
+
+        async function performGeminiVerification(base64Image) {
+            const systemPrompt = "You are a highly accurate, objective biometric analysis system. Analyze the provided image of a human face to strictly determine the apparent age (as a single integer) and gender (MALE/FEMALE). If the image is blurred, clearly not a human face, or appears to be a photo of a screen/physical printout, output 'FAKE'. Age must be an integer, 18 or higher to pass. If age is < 18, output 'MINOR'.";
+            
+            const payload = {
+                contents: [{
+                    parts: [
+                        { text: "Strictly determine the apparent age (single integer) and gender (MALE/FEMALE) of the person in the image. If the image quality is poor, or it is not a live human, categorize it as FAKE." },
+                        {
+                            inlineData: {
+                                mimeType: "image/jpeg",
+                                data: base64Image
+                            }
+                        }
+                    ]
+                }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            "result": { "type": "STRING", "enum": ["SUCCESS", "FAKE", "MINOR"] },
+                            "age": { "type": "NUMBER" },
+                            "gender": { "type": "STRING", "enum": ["MALE", "FEMALE"] }
+                        },
+                        "propertyOrdering": ["result", "age", "gender"]
+                    }
+                }
+            };
+
+            try {
+                let response;
+                let data;
+
+                for (let i = 0; i < 3; i++) { // Exponential backoff for 3 retries
+                    try {
+                        response = await fetch(`${GEMINI_API_URL}?key=${API_KEY}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (response.status === 429 && i < 2) {
+                            await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+                            continue;
+                        }
+
+                        data = await response.json();
+                        break;
+                    } catch (error) {
+                        if (i < 2) {
+                            await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+                            continue;
+                        }
+                        throw error;
+                    }
+                }
+
+                const jsonString = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                const result = JSON.parse(jsonString || '{}');
+
+                if (result.result === 'SUCCESS' && result.age >= 18) {
+                    verifiedAge = result.age;
+                    verifiedGender = result.gender;
+
+                    // Update local profile and move to next screen
+                    userProfile.verifiedAge = verifiedAge;
+                    userProfile.verifiedGender = verifiedGender;
+                    await setDoc(doc(db, 'artifacts', appId, 'users', userId, 'config', 'profile'), userProfile, { merge: true });
+
+                    await showModal("Success!", `Age: ${verifiedAge}, Gender: ${verifiedGender}. Please complete your profile.`);
+                    showScreen('profile');
+
+                } else if (result.result === 'MINOR' || result.age < 18) {
+                    await showModal("Access Denied", "Verification failed: User appears to be under 18. Access is permanently blocked.");
+                    applyBan(999999, "Permanent Ban: Minor detected during verification.");
+                } else {
+                    // FAKE or POOR quality (including using a photo/screen)
+                    await showModal("Security Alert", "Verification failed: Faking or poor quality detected. Your IP/ID will be locked.");
+                    applyBan(3, "ID locked: Attempt to bypass verification (e.g., using a photo or screen).");
+                }
+
+            } catch (error) {
+                console.error("Gemini API Verification Error:", error);
+                await showModal("System Error", "The verification service failed. Please try again. Your ID will be locked for 3 hours as a precaution.");
+                applyBan(3, "ID locked: Verification system failure/timeout.");
+            }
+        }
+
+        window.submitProfile = async function() {
+            const nickname = elements.nicknameInput.value.trim();
+            const age = parseInt(elements.ageInput.value);
+            const gender = elements.genderSelect.value;
+
+            if (!nickname || !age || !gender) {
+                await showModal("Input Error", "Please fill in all profile fields.");
+                return;
+            }
+            if (age < 18) {
+                await showModal("Age Error", "You must be 18 or older to use this service.");
+                return;
+            }
+            if (gender !== verifiedGender) {
+                await showModal("Security Violation", "The submitted gender does not match the verified gender. Your access is temporarily locked for 3 hours.");
+                applyBan(3, "ID locked: Gender mismatch violation.");
+                return;
+            }
+
+            // Save profile details
+            userProfile.nickname = nickname;
+            userProfile.age = age;
+            userProfile.gender = gender;
+            userProfile.lastNicknameChange = userProfile.lastNicknameChange || serverTimestamp();
+            userProfile.publicId = localId; // Show this ID to others for easy friend adding
+            await setDoc(doc(db, 'artifacts', appId, 'users', userId, 'config', 'profile'), userProfile, { merge: true });
+
+            setupUACScreen();
+            showScreen('uac');
+        };
+
+        function setupUACScreen() {
+            elements.uacSummary.innerHTML = `
+                <h4 class="font-bold text-gray-800">${userProfile.nickname} <span class="text-sm font-normal text-indigo-500">(Verified ${userProfile.gender}, Age ${userProfile.age})</span></h4>
+                <p class="text-xs text-gray-500 mt-1">Your Anonymous ID: ${localId}</p>
+                <div class="mt-3 text-sm text-red-600 font-medium">Verified face image data is used in the UAC window (simulated here) for confirmation.</div>
+            `;
+            elements.uacAccept.onchange = () => {
+                elements.uacBtn.disabled = !elements.uacAccept.checked;
+                elements.uacBtn.classList.toggle('opacity-50', !elements.uacAccept.checked);
+                elements.uacBtn.classList.toggle('cursor-not-allowed', !elements.uacAccept.checked);
+            };
+        }
+
+        window.acceptUAC = async function() {
+            if (!elements.uacAccept.checked) return;
+
+            userProfile.uacAccepted = true;
+            await setDoc(doc(db, 'artifacts', appId, 'users', userId, 'config', 'profile'), userProfile, { merge: true });
+
+            showScreen('chat');
+            setupChatListeners();
+        };
+
+        // --- Chat and Moderation Logic ---
+
+        let currentChatMode = 'text'; // 'text' or 'video'
+        let currentStrangerId = null;
+        let activeStrangerStream = null;
+        let activeSelfStream = null;
+
+        window.toggleChatMode = function(isVideo) {
+            currentChatMode = isVideo ? 'video' : 'text';
+            document.getElementById('current-mode-display').textContent = isVideo ? 'VIDEO' : 'TEXT';
+            document.getElementById('chat-mode-label').textContent = isVideo ? 'Video + Text Mode' : 'Text Only Mode';
+            document.getElementById('video-container').classList.toggle('hidden', !isVideo);
+
+            // Handle Camera Access
+            if (isVideo) {
+                // Connect camera (simulated)
+                navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+                    activeSelfStream = stream;
+                    document.getElementById('self-video').srcObject = stream;
+                    document.getElementById('stranger-video').srcObject = stream; // Simulating local echo for now
+                }).catch(err => {
+                    showModal("Camera/Mic Error", "Could not start video chat. Switching back to Text Only mode.");
+                    document.getElementById('video-mode').checked = false;
+                    window.toggleChatMode(false); // Call the global function
+                    console.error("Media error:", err);
+                });
+            } else {
+                // Stop camera
+                if (activeSelfStream) {
+                    activeSelfStream.getTracks().forEach(track => track.stop());
+                    activeSelfStream = null;
+                }
+            }
+        };
+
+        window.startRandomChat = async function() {
+            await window.endChat(); // Clear old chat
+
+            // --- Real-time user matching is simulated as this is a single-file app ---
+            // In a real app, this would query a public 'available' collection.
+            currentStrangerId = 'Stranger_' + Math.floor(Math.random() * 10000);
+            document.getElementById('stranger-name').textContent = 'Stranger (ID: ' + currentStrangerId + ')';
+            document.getElementById('message-display').innerHTML = '<p class="text-center text-gray-500 text-sm">You are now connected with a random stranger. Say hello!</p>';
+        };
+
+        window.endChat = async function() {
+            if (currentStrangerId) {
+                // Ephemeral Data Deletion: Delete all messages related to the current conversation
+                // In a real app, you'd use a transaction or batch delete. Here, we simulate deletion.
+                document.getElementById('message-display').innerHTML = '<p class="text-center text-gray-500 text-sm">Conversation ended. All chat history deleted.</p>';
+                currentStrangerId = null;
+                document.getElementById('stranger-name').textContent = 'Stranger (Random Chat)';
+            }
+        };
+
+        window.sendMessage = async function() {
+            const input = elements.chatInput.value.trim();
+            if (!input || !currentStrangerId) {
+                elements.chatInput.value = '';
+                return;
+            }
+
+            const moderatedInput = moderateText(input);
+
+            // 1. Moderate the text content using Gemini (simulated check)
+            if (moderatedInput.includes('****')) {
+                await showModal("Violation Detected", "Your message contains prohibited keywords. DO NOT send abusive or sexual content. Your ID is banned for 8 hours.");
+                applyBan(8, "ID locked: Abusive keyword detection.");
+                return;
+            }
+
+            // 2. Simulate broadcast delay and video moderation (only if in video mode)
+            if (currentChatMode === 'video') {
+                const base64Frame = captureFrameToBase64(document.getElementById('self-video'), elements.canvas);
+                
+                // Simulating AI content check with a small random chance of failure
+                const isAbusiveVideo = Math.random() < 0.05; // 5% chance of failing AI check
+
+                if (isAbusiveVideo) {
+                    await showModal("Video Violation", "Explicit content or nudity detected on camera. Your ID is banned for 8 hours.");
+                    applyBan(8, "ID locked: Explicit video content detected.");
+                    return;
+                }
+
+                // NOTE: Broadcast delay would involve queuing the message/video stream for 1-2 seconds, 
+                // allowing the AI check to complete before sending to the stranger.
+                // We'll proceed immediately here for the single-file UI demo.
+            }
+
+            // Append moderated message to the chat
+            appendMessage(userProfile.nickname, moderatedInput, 'outgoing');
+            elements.chatInput.value = '';
+        };
+
+        function appendMessage(sender, text, type) {
+            const isIncoming = type === 'incoming';
+            const alignment = type === 'incoming' ? 'justify-start' : 'justify-end';
+            const bgColor = type === 'incoming' ? 'bg-indigo-100' : 'bg-green-100';
+            const nameColor = type === 'incoming' ? 'text-indigo-700' : 'text-green-700';
+
+            const messageHtml = `
+                <div class="flex ${alignment} mb-4">
+                    <div class="max-w-xs md:max-w-md">
+                        <p class="text-xs ${nameColor} font-semibold mb-0.5">${sender}</p>
+                        <div class="p-3 rounded-xl ${bgColor}">
+                            <p class="text-sm text-gray-900">${text}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            elements.messageDisplay.innerHTML += messageHtml;
+            elements.messageDisplay.scrollTop = elements.messageDisplay.scrollHeight;
+        }
+
+        // --- Advanced Text Features (Simulated) ---
+
+        window.simulateAdvanced = function(feature) {
+            let message = '';
+            let title = `${feature} Function`;
+            switch (feature) {
+                case 'Clipboard':
+                    // Real clipboard functionality (requires user action)
+                    const textToCopy = 'Anonymous Connect ID: ' + localId;
+                    navigator.clipboard.writeText(textToCopy).then(() => {
+                        message = `Copied your Anonymous ID to clipboard. (Simulated functionality: ${textToCopy})`;
+                    }).catch(() => {
+                        message = 'Could not access clipboard. Please copy manually.';
+                    });
+                    break;
+                case 'GIF/Emoji':
+                    message = 'GIF/Emoji selector activated (Simulated). Sending a fun sticker...';
+                    appendMessage('System', '🎉 Sticker: I am a GIF! (Simulated)', 'incoming');
+                    break;
+                case 'Attach File':
+                    message = 'File attachment initiated (Simulated). Note: Files are NOT stored and deleted upon conversation end.';
+                    break;
+                case 'Translation':
+                    message = 'Message translation feature activated (Simulated). Incoming messages not in your default language (English) will be auto-translated.';
+                    break;
+            }
+            showModal(title, message);
+        };
+
+        // --- Friend Request Logic (Firestore) ---
+
+        function setupChatListeners() {
+            // Placeholder: In a real app, this would listen to friend requests and active chats
+            console.log("Chat listeners enabled. Listening for friend requests.");
+        }
+
+        // Initial check on load
+        document.addEventListener('DOMContentLoaded', () => {
+            // FIX: Pass the Icons object to createIcons on initial load
+            if (window.createIcons && window.Icons) {
+                 window.createIcons({ icons: window.Icons });
+            }
+
+            if (initialAuthToken) {
+                // Use custom token if provided
+                signInWithCustomToken(auth, initialAuthToken).catch(error => {
+                    console.error("Custom token sign-in failed:", error);
+                    signInAnonymously(auth).catch(err => console.error("Anonymous fallback failed:", err));
+                });
+            } else {
+                // Fallback to anonymous sign-in if no token is provided
+                signInAnonymously(auth).catch(error => {
+                    console.error("Anonymous sign-in failed:", error);
+                });
+            }
+        });
+
+    </script>
+</body>
+</html>
