@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anonymous Connect: Dual Mode</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for a dark, engaging theme */
+        :root {
+            --primary-color: #4f46e5; /* Indigo-600 */
+            --background-color: #1f2937; /* Gray-800 */
+            --card-color: #374151; /* Gray-700 */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            color: #f3f4f6; /* Gray-100 */
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .video-container {
+            width: 100%;
+            height: 40vh; /* Responsive height for mobile/desktop */
+            background-color: #111827; /* Gray-900 */
+            border-radius: 0.75rem;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.5);
+        }
+        .video-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror local video */
+        }
+        /* Style for the local video overlay on mobile/small screens */
+        #localVideo {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 150px;
+            height: 110px;
+            object-fit: cover;
+            z-index: 10;
+            border: 3px solid var(--primary-color);
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        #remoteVideo {
+            width: 100%;
+            height: 100%;
+        }
+        .chat-input-controls button {
+            transition: transform 0.1s ease;
+        }
+        .chat-input-controls button:hover:not(:disabled) {
+            transform: scale(1.1);
+        }
+
+        /* Adjustments for large screens */
+        @media (min-width: 1024px) {
+            .main-grid {
+                display: grid;
+                grid-template-columns: 2fr 1fr; /* Video area and Chat panel */
+                gap: 2rem;
+            }
+            .video-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 2rem;
+            }
+            .video-container {
+                height: 50vh;
+            }
+            /* Local video moves into grid on desktop */
+            .video-grid #localVideo {
+                position: relative; 
+                width: 100%;
+                height: 100%;
+            }
+        }
+        
+        #messageArea {
+            height: 300px;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        .btn-action {
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            border-radius: 0.75rem;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+        .btn-start {
+            background-color: #10b981; /* Emerald-500 */
+        }
+        .btn-start:hover {
+            background-color: #059669; /* Emerald-600 */
+        }
+        .btn-stop {
+            background-color: #ef4444; /* Red-500 */
+        }
+        .btn-stop:hover {
+            background-color: #dc2626; /* Red-600 */
+        }
+        .btn-request {
+            background-color: #f59e0b; /* Amber-500 */
+        }
+        .btn-request:hover {
+            background-color: #d97706; /* Amber-600 */
+        }
+
+        /* Age Gate specific styles */
+        #ageGateVideo, #ageGateCanvas {
+            max-width: 100%;
+            border-radius: 0.75rem;
+            transform: scaleX(-1); /* Mirror view */
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        #ageGateCanvas {
+            z-index: 10;
+        }
+        #ageGateVideo {
+            object-fit: cover;
+            z-index: 5;
+            filter: brightness(0.8);
+        }
+        .age-gate-container {
+            position: relative;
+            width: 300px;
+            height: 225px;
+            margin: 0 auto;
+            overflow: hidden;
+            border: 2px solid #10b981; /* Emerald */
+            border-radius: 0.75rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 💥 AGE GATE MODAL (Updated to Video Recognition Simulation) 💥 -->
+    <div id="ageGate" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-95 backdrop-blur-sm">
+        <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl max-w-lg w-full text-center border-4 border-indigo-500">
+            <!-- UPDATED HEADING -->
+            <h2 class="text-3xl font-extrabold text-white mb-4">Identity Verification Scan</h2>
+            <!-- UPDATED LEGAL AGE CONFIRMATION TEXT -->
+            <p id="ageGateStatus" class="text-gray-300 mb-6 font-medium">
+                By continuing, you confirm you are of legal age. Please ensure your face is clearly visible in the frame for scanning...
+            </p>
+
+            <!-- Video and Canvas Container -->
+            <div class="age-gate-container mb-6">
+                <video id="ageGateVideo" autoplay muted playsinline style="display:none;"></video>
+                <canvas id="ageGateCanvas" width="300" height="225"></canvas>
+            </div>
+            
+            <p id="ageGateResult" class="text-xl font-bold text-yellow-400">Scanning...</p>
+            
+            <button id="confirmAgeBtn" class="w-full py-3 mt-4 bg-gray-600 text-white font-bold text-xl rounded-xl transition duration-200 shadow-lg cursor-not-allowed" disabled>
+                Waiting for Verification...
+            </button>
+            <p class="text-xs text-red-400 mt-2">
+                Note: This is a **simulation** for demonstration. Real-world applications require secure, compliant, and dedicated ML infrastructure.
+            </p>
+        </div>
+    </div>
+
+    <!-- Firebase Imports (Required for Firestore and Auth) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, query, limit, getDocs, deleteDoc, getDoc, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Setting Firebase log level to Debug for visibility in console
+        setLogLevel('Debug');
+        
+        // --- Global Firebase/App Configuration (MANDATORY USE) ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        const apiKey = ""; // API key for Gemini API calls
+
+        let app;
+        let db;
+        let auth;
+        let userId = null;
+        let localNickname = "Anonymous";
+
+        // --- Dual Mode Globals ---
+        let currentMode = 'video'; // 'video' or 'text'
+
+        // --- WebRTC Globals ---
+        let localStream = null;
+        let peerConnection = null;
+        let currentSessionId = null;
+        let remoteUserId = null;
+        let isCaller = false;
+        
+        // --- Friendship Globals ---
+        let currentFriendshipId = null;
+        let currentFriendshipStatus = null; // PENDING, ACCEPTED, REJECTED
+        let unsubscribeFriendship = null;
+        let unsubscribeChat = null;
+
+        // Public STUN server for ICE negotiation
+        const iceServers = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+            ],
+        };
+
+        // --- Constants for Nickname Cooldown ---
+        const COOLDOWN_DAYS = 15;
+        const COOLDOWN_MS = COOLDOWN_DAYS * 24 * 60 * 60 * 1000; // 15 days in milliseconds
+
+
+        // --- UI Elements ---
+        const statusEl = document.getElementById('status');
+        const startBtn = document.getElementById('startConnectBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+        const mainContent = document.getElementById('mainContent');
+        const remotePlaceholder = document.getElementById('remotePlaceholder');
+        
+        // Mode Switch Elements
+        const modeStatusEl = document.getElementById('modeStatus');
+        const videoModeBtn = document.getElementById('videoModeBtn');
+        const textModeBtn = document.getElementById('textModeBtn');
+
+        // Age Gate Elements
+        const ageGate = document.getElementById('ageGate');
+        const ageGateVideo = document.getElementById('ageGateVideo');
+        const ageGateCanvas = document.getElementById('ageGateCanvas');
+        const ageContext = ageGateCanvas.getContext('2d');
+        const ageGateStatus = document.getElementById('ageGateStatus');
+        const ageGateResult = document.getElementById('ageGateResult');
+        const confirmAgeBtn = document.getElementById('confirmAgeBtn');
+        let ageGateStream = null;
+        let ageInterval = null;
+
+
+        // Nickname Elements
+        const nicknameInput = document.getElementById('nicknameInput');
+        const setNicknameBtn = document.getElementById('setNicknameBtn');
+        const nicknameStatusEl = document.getElementById('nicknameStatus');
+        const currentNicknameEl = document.getElementById('currentNickname');
+
+        // Chat Elements
+        const chatPanel = document.getElementById('chatPanel');
+        const chatStatus = document.getElementById('chatStatus');
+        const friendRequestControls = document.getElementById('friendRequestControls');
+        const requestFriendBtn = document.getElementById('requestFriendBtn');
+        const acceptRequestBtn = document.getElementById('acceptRequestBtn');
+        const rejectRequestBtn = document.getElementById('rejectRequestBtn');
+        const messageArea = document.getElementById('messageArea');
+        const messageInput = document.getElementById('messageInput');
+        const sendMessageBtn = document.getElementById('sendMessageBtn');
+        const translateInfo = document.getElementById('translateInfo');
+        const clipboardBtn = document.getElementById('clipboardBtn');
+        
+        // --- Utility Functions ---
+
+        function getDefaultLanguage() {
+            // Mock system default language setting for demonstration
+            return 'English'; 
+        }
+        
+        function setMode(mode) {
+            currentMode = mode;
+            if (mode === 'video') {
+                videoModeBtn.classList.add('bg-indigo-600', 'text-white');
+                videoModeBtn.classList.remove('bg-gray-700', 'text-gray-400');
+                textModeBtn.classList.remove('bg-indigo-600', 'text-white');
+                textModeBtn.classList.add('bg-gray-700', 'text-gray-400');
+                modeStatusEl.textContent = "Mode: Video Chat (Matching with Video Users)";
+            } else {
+                textModeBtn.classList.add('bg-indigo-600', 'text-white');
+                textModeBtn.classList.remove('bg-gray-700', 'text-gray-400');
+                videoModeBtn.classList.remove('bg-indigo-600', 'text-white');
+                videoModeBtn.classList.add('bg-gray-700', 'text-gray-400');
+                modeStatusEl.textContent = "Mode: Text Only (Matching with Text Users)";
+            }
+            // Ensure UI/permissions are ready for the next connection attempt
+            startBtn.disabled = false;
+        }
+
+        // --- Age Gate Simulation Logic ---
+        async function startAgeDetectionStream() {
+            try {
+                ageGateStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                ageGateVideo.srcObject = ageGateStream;
+                ageGateVideo.play();
+                ageGateVideo.style.display = 'block';
+
+                // Initial text reflects the legal confirmation and scanning start
+                ageGateStatus.textContent = "By continuing, you confirm you are of legal age. Face detected! Analyzing features and estimating age...";
+                
+                // Start drawing the detection box
+                ageGateVideo.onloadedmetadata = () => {
+                    ageInterval = setInterval(drawFaceSimulation, 30);
+                    // Start the simulation timer
+                    setTimeout(finalizeAgeVerification, 4000);
+                };
+
+            } catch (e) {
+                console.error("Age verification camera error:", e);
+                ageGateStatus.textContent = "Camera access denied or failed. Please allow camera access and refresh.";
+                ageGateResult.textContent = "Verification Failed";
+                confirmAgeBtn.textContent = "Verification Failed";
+                ageGateCanvas.style.display = 'none';
+            }
+        }
+        
+        function drawFaceSimulation() {
+            const width = ageGateCanvas.width;
+            const height = ageGateCanvas.height;
+            
+            // 1. Draw video frame (mirrored)
+            ageContext.save();
+            ageContext.scale(-1, 1);
+            ageContext.drawImage(ageGateVideo, 0, 0, -width, height);
+            ageContext.restore();
+
+            // 2. Draw Geometric Structure (Bounding Box)
+            ageContext.strokeStyle = '#10b981'; // Emerald
+            ageContext.lineWidth = 3;
+            ageContext.beginPath();
+            
+            // Main Bounding Box (simulated face position)
+            const boxX = width * 0.2;
+            const boxY = height * 0.2;
+            const boxW = width * 0.6;
+            const boxH = height * 0.6;
+
+            // Draw Corners (Simulating feature points)
+            const cornerSize = 15;
+            
+            // Top-Left
+            ageContext.moveTo(boxX + cornerSize, boxY);
+            ageContext.lineTo(boxX, boxY);
+            ageContext.lineTo(boxX, boxY + cornerSize);
+            
+            // Top-Right
+            ageContext.moveTo(boxX + boxW - cornerSize, boxY);
+            ageContext.lineTo(boxX + boxW, boxY);
+            ageContext.lineTo(boxX + boxW, boxY + cornerSize);
+
+            // Bottom-Left
+            ageContext.moveTo(boxX + cornerSize, boxY + boxH);
+            ageContext.lineTo(boxX, boxY + boxH);
+            ageContext.lineTo(boxX, boxY + boxH - cornerSize);
+            
+            // Bottom-Right
+            ageContext.moveTo(boxX + boxW - cornerSize, boxY + boxH);
+            ageContext.lineTo(boxX + boxW, boxY + boxH);
+            ageContext.lineTo(boxX + boxW, boxY + boxH - cornerSize);
+            
+            ageContext.stroke();
+
+            // 3. Draw Simulated Key Points
+            ageContext.fillStyle = '#f59e0b'; // Amber
+            ageContext.fillRect(boxX + boxW * 0.3, boxY + boxH * 0.3, 5, 5); // Eye 1
+            ageContext.fillRect(boxX + boxW * 0.7, boxY + boxH * 0.3, 5, 5); // Eye 2
+            ageContext.fillRect(boxX + boxW * 0.5, boxY + boxH * 0.65, 5, 5); // Nose
+
+            // 4. Update Status Text (flashing effect)
+            ageContext.fillStyle = 'rgba(255, 255, 255, ' + (Math.sin(Date.now() / 100) * 0.2 + 0.7) + ')';
+            ageContext.font = '14px Inter';
+            ageContext.textAlign = 'center';
+            ageContext.fillText('FACE LOCK', width / 2, boxY - 10);
+        }
+
+        function finalizeAgeVerification() {
+            clearInterval(ageInterval);
+            
+            // Generate a random age to simulate success/failure
+            const simulatedAge = Math.floor(Math.random() * (45 - 16 + 1) + 16); 
+            
+            if (simulatedAge >= 18) {
+                ageGateStatus.textContent = "Verification Complete. Access Granted.";
+                ageGateResult.textContent = `Status: Legal Age Verified`; // Updated success text
+                confirmAgeBtn.textContent = "Proceed to Connect";
+                confirmAgeBtn.classList.remove('bg-gray-600', 'cursor-not-allowed');
+                confirmAgeBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                confirmAgeBtn.disabled = false;
+                
+                // Allow user to click to dismiss
+                confirmAgeBtn.addEventListener('click', verifyAge);
+
+            } else {
+                ageGateStatus.textContent = "Verification Failed. Legal age requirement not met.";
+                ageGateResult.textContent = `Status: Age Requirement Failed`; // Updated failure text
+                confirmAgeBtn.textContent = "Verification Failed";
+            }
+        }
+
+        function verifyAge() {
+            // Stop camera and intervals
+            if (ageGateStream) {
+                ageGateStream.getTracks().forEach(track => track.stop());
+                ageGateStream = null;
+            }
+            if (ageInterval) {
+                clearInterval(ageInterval);
+                ageInterval = null;
+            }
+
+            // Show main content
+            ageGate.classList.add('hidden');
+            mainContent.classList.remove('hidden');
+            setMode(currentMode); // Initialize mode UI
+            statusEl.textContent = "Ready to connect. Select mode and click Start.";
+        }
+
+
+        // --- Initialization and Authentication ---
+
+        async function initializeFirebase() {
+            try {
+                if (Object.keys(firebaseConfig).length === 0) {
+                    console.error("Firebase config is missing. Cannot initialize Firestore.");
+                    statusEl.textContent = "Error: Firebase configuration missing.";
+                    return;
+                }
+
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Sign in using the custom token or anonymously if the token is missing
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        document.getElementById('userIdDisplay').textContent = `User ID: ${userId}`;
+                        console.log("Firebase initialized. User ID:", userId);
+                        
+                        loadNickname();
+                        
+                        // Start age verification on successful auth
+                        startAgeDetectionStream();
+                        
+                    } else {
+                        console.log("Not signed in.");
+                        statusEl.textContent = "Error: Authentication failed.";
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                statusEl.textContent = `Init Error: ${error.message}`;
+            }
+        }
+
+        // --- Nickname Management ---
+
+        function getProfileRef(uid) {
+            return doc(db, 'artifacts', appId, 'users', uid, 'settings', 'profile');
+        }
+
+        async function loadNickname() {
+            if (!userId) return;
+
+            try {
+                const profileSnap = await getDoc(getProfileRef(userId));
+                const data = profileSnap.exists() ? profileSnap.data() : {};
+                
+                const defaultNickname = userId.substring(0, 8);
+                localNickname = data.nickname || defaultNickname; 
+                const lastChange = data.lastNicknameChange || 0;
+
+                currentNicknameEl.textContent = localNickname;
+                nicknameInput.value = localNickname;
+
+                const now = Date.now();
+                const nextChangeTime = lastChange + COOLDOWN_MS;
+                const timeRemaining = nextChangeTime - now;
+
+                if (timeRemaining > 0) {
+                    setNicknameBtn.disabled = true;
+                    const days = Math.floor(timeRemaining / COOLDOWN_MS * COOLDOWN_DAYS);
+                    const hours = Math.floor((timeRemaining % COOLDOWN_MS) / (60 * 60 * 1000));
+                    const minutes = Math.floor((timeRemaining % (60 * 60 * 1000)) / (60 * 1000));
+
+                    const displayTime = `${days}d ${hours}h ${minutes}m`;
+
+                    nicknameStatusEl.textContent = `Current Nickname: ${localNickname}. Change available in: ${displayTime}`;
+                } else {
+                    setNicknameBtn.disabled = false;
+                    nicknameStatusEl.textContent = `Current Nickname: ${localNickname}. Ready to change!`;
+                }
+
+            } catch (e) {
+                console.error("Error loading nickname:", e);
+                nicknameStatusEl.textContent = "Error loading profile data.";
+            }
+        }
+
+        async function saveNickname() {
+            if (!userId || setNicknameBtn.disabled) return;
+
+            const newNickname = nicknameInput.value.trim();
+            if (newNickname.length < 3 || newNickname.length > 20) {
+                nicknameStatusEl.textContent = "Nickname must be between 3 and 20 characters.";
+                return;
+            }
+
+            setNicknameBtn.disabled = true;
+            
+            try {
+                const profileRef = getProfileRef(userId);
+                const profileSnap = await getDoc(profileRef);
+                const data = profileSnap.exists() ? profileSnap.data() : {};
+                
+                const lastChange = data.lastNicknameChange || 0;
+                const now = Date.now();
+                
+                if (now < lastChange + COOLDOWN_MS) {
+                    nicknameStatusEl.textContent = "Error: You must wait 15 days between changes.";
+                    loadNickname();
+                    return;
+                }
+
+                if (data.nickname === newNickname) {
+                     nicknameStatusEl.textContent = `Nickname is already set to "${newNickname}".`;
+                     loadNickname();
+                     return;
+                }
+
+                await setDoc(profileRef, {
+                    nickname: newNickname,
+                    lastNicknameChange: now 
+                }, { merge: true });
+
+                localNickname = newNickname; // Update local variable immediately
+                nicknameStatusEl.textContent = `Nickname updated to "${newNickname}"! Next change allowed in 15 days.`;
+                loadNickname();
+
+            } catch (e) {
+                console.error("Error saving nickname:", e);
+                nicknameStatusEl.textContent = "Error saving nickname. Try again.";
+                setNicknameBtn.disabled = false;
+            }
+        }
+
+
+        // --- Friendship and Chat Logic ---
+
+        function getFriendshipId(id1, id2) {
+            const sortedIds = [id1, id2].sort();
+            return `${sortedIds[0]}_${sortedIds[1]}`;
+        }
+
+        function startChatListeners() {
+            if (!currentFriendshipId || !userId) return;
+
+            const friendshipRef = doc(db, 'artifacts', appId, 'public', 'data', 'friendships', currentFriendshipId);
+            const chatCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'friendships', currentFriendshipId, 'chat');
+
+            // 1. Listen for Friendship Status Changes
+            if (unsubscribeFriendship) unsubscribeFriendship();
+            unsubscribeFriendship = onSnapshot(friendshipRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    currentFriendshipStatus = data.status;
+                    const requesterId = data.requesterId;
+                    
+                    // Reset UI controls
+                    friendRequestControls.classList.remove('hidden');
+                    requestFriendBtn.classList.add('hidden');
+                    acceptRequestBtn.classList.add('hidden');
+                    rejectRequestBtn.classList.add('hidden');
+                    messageInput.disabled = true;
+                    sendMessageBtn.disabled = true;
+                    
+                    if (currentFriendshipStatus === 'ACCEPTED') {
+                        chatStatus.textContent = "Chat enabled! You are now friends.";
+                        messageInput.disabled = false;
+                        sendMessageBtn.disabled = false;
+                        friendRequestControls.classList.add('hidden');
+                        startChatListener(); // Start chat message listener
+                    } else if (currentFriendshipStatus === 'PENDING') {
+                        if (requesterId === userId) {
+                            // I sent the request
+                            chatStatus.textContent = "Friend request sent. Waiting for remote user to accept...";
+                            requestFriendBtn.classList.remove('hidden'); 
+                            requestFriendBtn.textContent = "Request Sent (Pending)";
+                            requestFriendBtn.disabled = true;
+                        } else {
+                            // I received the request
+                            chatStatus.textContent = "Incoming Friend Request! Accept to chat.";
+                            acceptRequestBtn.classList.remove('hidden');
+                            rejectRequestBtn.classList.remove('hidden');
+                        }
+                    } else if (currentFriendshipStatus === 'REJECTED') {
+                        chatStatus.textContent = "Friend request rejected. Cannot send messages.";
+                    }
+                } else {
+                    // No friendship document exists (initial state or just deleted)
+                    currentFriendshipStatus = null;
+                    chatStatus.textContent = "Send a friend request to start chatting.";
+                    requestFriendBtn.classList.remove('hidden');
+                    requestFriendBtn.textContent = "Send Friend Request";
+                    requestFriendBtn.disabled = false;
+                }
+            }, (error) => {
+                console.error("Error listening to friendship status:", error);
+            });
+            
+            // 2. Start Chat Message Listener (will be re-called if status changes to ACCEPTED)
+            function startChatListener() {
+                if (unsubscribeChat) unsubscribeChat();
+                // Note: using client-side sorting instead of Firestore orderBy for compliance
+                unsubscribeChat = onSnapshot(query(chatCollectionRef), (snapshot) => {
+                    messageArea.innerHTML = ''; // Clear existing messages
+                    let messages = [];
+                    snapshot.forEach(doc => messages.push(doc.data()));
+                    
+                    // Sort by timestamp in memory
+                    messages.sort((a, b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
+
+                    messages.forEach(msg => displayMessage(msg));
+                    messageArea.scrollTop = messageArea.scrollHeight; // Scroll to bottom
+                }, (error) => {
+                    console.error("Error listening to chat messages:", error);
+                });
+            }
+        }
+
+        async function translateMessage(messageId, originalText) {
+            const defaultLang = getDefaultLanguage();
+            const translateBtn = document.getElementById(`translateBtn_${messageId}`);
+            
+            if (!translateBtn) return;
+            translateBtn.textContent = 'Translating...';
+            translateBtn.disabled = true;
+
+            const userQuery = `Translate the following text into ${defaultLang}. If the text is already ${defaultLang}, please state 'Original text is already in ${defaultLang}.': "${originalText}"`;
+            
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: "You are a professional language translator. Provide only the translated text or the confirmation that no translation is needed." }] },
+            };
+
+            try {
+                // Implementing exponential backoff for fetch
+                let response = null;
+                for (let i = 0; i < 3; i++) {
+                    response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (response.ok) break;
+                    await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+                }
+                
+                const result = await response.json();
+                const translatedText = result.candidates?.[0]?.content?.parts?.[0]?.text || "Translation failed.";
+                
+                const messageEl = document.getElementById(`messageText_${messageId}`);
+                if (messageEl) {
+                    messageEl.innerHTML = `<span class="italic text-gray-300">Translated (${defaultLang}):</span> ${translatedText} 
+                                            <br><span class="text-sm text-gray-400">Original: ${originalText}</span>`;
+                    translateBtn.textContent = 'Translated';
+                    translateBtn.disabled = true;
+                }
+
+            } catch (error) {
+                console.error("Translation API error:", error);
+                translateBtn.textContent = 'Translation Failed';
+            }
+        }
+
+        function displayMessage(msg) {
+            const isLocal = msg.senderId === userId;
+            const alignment = isLocal ? 'justify-end' : 'justify-start';
+            const bgColor = isLocal ? 'bg-indigo-600' : 'bg-gray-600';
+            const senderText = isLocal ? localNickname : 'Remote User'; 
+            const messageId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`; // Unique ID for translation
+
+            // Translation UI is added only for remote messages
+            const translateButton = isLocal ? '' : `
+                <button id="translateBtn_${messageId}" 
+                        onclick="translateMessage('${messageId}', '${msg.text.replace(/'/g, "\\'")}')"
+                        class="mt-1 text-xs text-yellow-300 hover:text-yellow-100 font-semibold transition">
+                    Translate to ${getDefaultLanguage()}
+                </button>
+            `;
+            
+            const msgHtml = `
+                <div class="flex ${alignment} mb-2">
+                    <div class="${bgColor} p-3 rounded-xl max-w-xs shadow-md">
+                        <p class="font-bold text-sm">${senderText}</p>
+                        <p id="messageText_${messageId}" class="text-white break-words">${msg.text}</p>
+                        ${translateButton}
+                    </div>
+                </div>
+            `;
+            messageArea.innerHTML += msgHtml;
+        }
+
+        async function sendFriendRequest() {
+            if (!currentFriendshipId || !remoteUserId) return;
+            
+            requestFriendBtn.disabled = true;
+            chatStatus.textContent = "Sending request...";
+
+            try {
+                const friendshipRef = doc(db, 'artifacts', appId, 'public', 'data', 'friendships', currentFriendshipId);
+                await setDoc(friendshipRef, {
+                    userA: userId,
+                    userB: remoteUserId,
+                    status: 'PENDING',
+                    requesterId: userId,
+                    timestamp: serverTimestamp()
+                }, { merge: true });
+            } catch (e) {
+                console.error("Error sending friend request:", e);
+                chatStatus.textContent = "Error sending request. Try again.";
+                requestFriendBtn.disabled = false;
+            }
+        }
+
+        async function updateFriendshipStatus(status) {
+             if (!currentFriendshipId) return;
+
+             try {
+                const friendshipRef = doc(db, 'artifacts', appId, 'public', 'data', 'friendships', currentFriendshipId);
+                await setDoc(friendshipRef, {
+                    status: status,
+                    timestamp: serverTimestamp()
+                }, { merge: true });
+            } catch (e) {
+                console.error(`Error setting status to ${status}:`, e);
+                chatStatus.textContent = `Error setting status to ${status}.`;
+            }
+        }
+        
+        async function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text || currentFriendshipStatus !== 'ACCEPTED') return;
+
+            messageInput.value = ''; 
+            sendMessageBtn.disabled = true;
+
+            try {
+                const chatCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'friendships', currentFriendshipId, 'chat');
+                
+                await setDoc(doc(chatCollectionRef), {
+                    senderId: userId,
+                    nickname: localNickname,
+                    text: text,
+                    timestamp: serverTimestamp() 
+                });
+
+            } catch (e) {
+                console.error("Error sending message:", e);
+            } finally {
+                sendMessageBtn.disabled = false;
+            }
+        }
+
+
+        // --- WebRTC Functions ---
+
+        async function startLocalStream() {
+            const constraints = {
+                video: currentMode === 'video',
+                audio: true // Always need audio for P2P connection, even if video is off
+            };
+
+            try {
+                if (localStream) {
+                    localStream.getTracks().forEach(track => track.stop());
+                }
+                localStream = await navigator.mediaDevices.getUserMedia(constraints);
+                localVideo.srcObject = localStream;
+                console.log("Local stream started in mode:", currentMode);
+                
+                // Hide video element and show placeholder if in text mode
+                if (currentMode === 'text') {
+                    localVideo.style.display = 'none';
+                    remoteVideo.style.display = 'none';
+                    remotePlaceholder.textContent = "Text Mode Connection: Video/Audio disabled.";
+                } else {
+                    localVideo.style.display = 'block';
+                    remoteVideo.style.display = 'block';
+                    remotePlaceholder.textContent = "Waiting for remote connection...";
+                }
+
+            } catch (e) {
+                console.error("Error starting local stream:", e);
+                statusEl.textContent = "Error: Check camera/mic permissions. Switching to Text Mode might resolve this.";
+                startBtn.disabled = true;
+            }
+        }
+
+        function createPeerConnection(remoteStreamRef) {
+            peerConnection = new RTCPeerConnection(iceServers);
+
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+            });
+
+            peerConnection.ontrack = (event) => {
+                console.log("Received remote track.");
+                remoteStreamRef.srcObject = event.streams[0];
+            };
+
+            peerConnection.onicecandidate = async (event) => {
+                if (event.candidate) {
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'signals', currentSessionId), {
+                        candidate: event.candidate.toJSON(),
+                        type: 'candidate',
+                        senderId: userId
+                    }, { merge: true });
+                }
+            };
+            
+            peerConnection.onconnectionstatechange = () => {
+                console.log("Connection state:", peerConnection.connectionState);
+                if (peerConnection.connectionState === 'connected') {
+                    statusEl.textContent = `Connected! Mode: ${currentMode.toUpperCase()}. Chatting with a stranger.`;
+                    chatPanel.classList.remove('opacity-50', 'pointer-events-none');
+                    currentFriendshipId = getFriendshipId(userId, remoteUserId);
+                    startChatListeners(); 
+                } else if (peerConnection.connectionstate === 'disconnected' || peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'closed') {
+                    handleConnectionEnd("Peer disconnected.");
+                }
+            };
+
+            return peerConnection;
+        }
+
+        // --- Firestore Matching & Signaling ---
+
+        async function findAndStartCall() {
+            if (!userId || !localStream) {
+                statusEl.textContent = "Error: Local stream not started. Try starting camera/mic first.";
+                return;
+            }
+
+            startBtn.disabled = true;
+            nextBtn.disabled = false;
+            statusEl.textContent = `Looking for a match in ${currentMode.toUpperCase()} mode...`;
+            
+            const waitingQueueRef = collection(db, 'artifacts', appId, 'public', 'data', 'matchQueue');
+            // Query for users waiting in the SAME mode
+            const q = query(waitingQueueRef, where('mode', '==', currentMode), limit(1));
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+                // FOUND A WAITING USER (Caller)
+                const waitingDoc = querySnapshot.docs[0];
+                remoteUserId = waitingDoc.id; 
+                currentSessionId = remoteUserId; 
+                isCaller = true;
+
+                statusEl.textContent = "Match found! Connecting...";
+
+                await deleteDoc(waitingDoc.ref);
+
+                peerConnection = createPeerConnection(remoteVideo);
+
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'signals', currentSessionId), {
+                    offer: peerConnection.localDescription.toJSON(),
+                    partnerId: userId,
+                    isReady: true,
+                    mode: currentMode
+                });
+
+                listenForSignaling(currentSessionId);
+
+            } else {
+                // NO WAITING USER FOUND (Callee)
+                remoteUserId = null; 
+                currentSessionId = userId; 
+                isCaller = false;
+                
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'matchQueue', userId), {
+                    mode: currentMode,
+                    timestamp: Date.now()
+                });
+
+                statusEl.textContent = `Waiting for a match in ${currentMode.toUpperCase()} mode...`;
+
+                listenForSignaling(currentSessionId);
+            }
+        }
+
+        function listenForSignaling(sessionId) {
+            const signalRef = doc(db, 'artifacts', appId, 'public', 'data', 'signals', sessionId);
+
+            onSnapshot(signalRef, async (docSnap) => {
+                if (docSnap.exists() && peerConnection) {
+                    const data = docSnap.data();
+
+                    if (data.offer && !isCaller) {
+                        // Received Offer (I am Callee)
+                        if (data.mode !== currentMode) {
+                            console.error("Mode mismatch. Cannot connect.");
+                            handleConnectionEnd("Mode mismatch detected. Disconnecting.");
+                            return;
+                        }
+
+                        remoteUserId = data.partnerId; 
+                        peerConnection = createPeerConnection(remoteVideo);
+
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                        const answer = await peerConnection.createAnswer();
+                        await peerConnection.setLocalDescription(answer);
+
+                        await setDoc(signalRef, {
+                            answer: peerConnection.localDescription.toJSON(),
+                            isReady: true 
+                        }, { merge: true });
+                        
+                        // Clean up offer after processing
+                        await setDoc(signalRef, { offer: deleteDoc() }, { merge: true });
+
+                    } else if (data.answer && isCaller) {
+                        // Received Answer (I am Caller)
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                        
+                        // Clean up answer after processing
+                        await setDoc(signalRef, { answer: deleteDoc() }, { merge: true });
+                    }
+                    
+                    if (data.candidate && data.senderId !== userId) {
+                        try {
+                            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                            // Clean up candidate after processing
+                            await setDoc(signalRef, { candidate: deleteDoc() }, { merge: true });
+                        } catch (e) {
+                            console.error("Error adding received ICE candidate:", e);
+                        }
+                    }
+                } else if (docSnap.exists() && !peerConnection && data.partnerId) {
+                    // This handles the Callee receiving the partner ID before PC is created
+                    if (!isCaller && data.partnerId && !remoteUserId) {
+                        remoteUserId = data.partnerId;
+                    }
+                }
+            });
+        }
+        
+        // --- Connection Cleanup and Data Deletion (MANDATORY POLICY) ---
+
+        async function handleConnectionEnd(message) {
+            // Stop listeners
+            if (unsubscribeFriendship) unsubscribeFriendship();
+            if (unsubscribeChat) unsubscribeChat();
+            currentFriendshipId = null;
+            currentFriendshipStatus = null;
+            
+            // WebRTC cleanup
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            remoteVideo.srcObject = null;
+            currentSessionId = null;
+            remoteUserId = null;
+            isCaller = false;
+            
+            // UI cleanup
+            messageArea.innerHTML = '';
+            chatStatus.textContent = "Disconnected. Chat session ended.";
+            chatPanel.classList.add('opacity-50', 'pointer-events-none');
+            localVideo.style.display = 'block'; // Reset display state
+            remoteVideo.style.display = 'block';
+            remotePlaceholder.textContent = "Waiting for remote connection...";
+
+
+            if (userId) {
+                 try {
+                    // Clean up match queue and signaling doc
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'matchQueue', userId));
+                    if (currentSessionId) {
+                         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'signals', currentSessionId));
+                    }
+                    
+                    // --- ⚠️ CRITICAL STEP: DELETE ALL NON-PERSISTENT SESSION DATA ⚠️ ---
+                    if (currentFriendshipId) {
+                        const friendshipRef = doc(db, 'artifacts', appId, 'public', 'data', 'friendships', currentFriendshipId);
+                        const chatCollectionRef = collection(friendshipRef, 'chat');
+
+                        // 1. Delete all chat messages (must be done before deleting the parent document)
+                        const chatSnapshot = await getDocs(query(chatCollectionRef));
+                        chatSnapshot.forEach(async (chatDoc) => {
+                            await deleteDoc(chatDoc.ref);
+                        });
+                        console.log(`Deleted chat history for friendship: ${currentFriendshipId}`);
+
+                        // 2. Delete the friendship document itself
+                        await deleteDoc(friendshipRef);
+                        console.log(`Deleted friendship document: ${currentFriendshipId}`);
+                    }
+
+
+                } catch (e) {
+                    console.warn("Could not clean up Firestore documents:", e);
+                }
+            }
+
+            statusEl.textContent = message || "Disconnected. Click Start to find a new person.";
+            startBtn.disabled = false; // Re-enable start
+            nextBtn.disabled = true;
+        }
+
+        // --- Event Listeners ---
+        
+        // confirmAgeBtn listener is now added in finalizeAgeVerification()
+        setNicknameBtn.addEventListener('click', saveNickname);
+        requestFriendBtn.addEventListener('click', sendFriendRequest);
+        acceptRequestBtn.addEventListener('click', () => updateFriendshipStatus('ACCEPTED'));
+        rejectRequestBtn.addEventListener('click', () => updateFriendshipStatus('REJECTED'));
+        
+        sendMessageBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        // Mode Toggles
+        videoModeBtn.addEventListener('click', () => setMode('video'));
+        textModeBtn.addEventListener('click', () => setMode('text'));
+
+        // Advanced Chat Controls Placeholders
+        clipboardBtn.addEventListener('click', () => {
+            // Custom modal used instead of alert()
+            const msg = "Clipboard functionality (copy/paste) is handled by your browser's native features. Use Ctrl+C/Ctrl+V or right-click context menu.";
+            const modalEl = document.createElement('div');
+            modalEl.className = 'fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-75';
+            modalEl.innerHTML = `<div class="bg-gray-700 p-6 rounded-lg shadow-xl max-w-sm w-full"><h4 class="text-white text-lg font-bold mb-3">Feature Info</h4><p class="text-gray-300 mb-4">${msg}</p><button class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg" onclick="this.closest('.fixed').remove()">Close</button></div>`;
+            document.body.appendChild(modalEl);
+        });
+
+        document.getElementById('gifBtn').addEventListener('click', () => {
+            // Custom modal used instead of alert()
+            const msg = "GIF integration requires external API access (like GIPHY), which is outside the scope of this self-contained demo. This button is a placeholder.";
+            const modalEl = document.createElement('div');
+            modalEl.className = 'fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-75';
+            modalEl.innerHTML = `<div class="bg-gray-700 p-6 rounded-lg shadow-xl max-w-sm w-full"><h4 class="text-white text-lg font-bold mb-3">Feature Info</h4><p class="text-gray-300 mb-4">${msg}</p><button class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg" onclick="this.closest('.fixed').remove()">Close</button></div>`;
+            document.body.appendChild(modalEl);
+        });
+        document.getElementById('attachFileBtn').addEventListener('click', () => {
+             // Custom modal used instead of alert()
+            const msg = "File attachment requires access to the user's local storage and backend file hosting, which is disabled for security reasons in this environment. This button is a placeholder.";
+            const modalEl = document.createElement('div');
+            modalEl.className = 'fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-75';
+            modalEl.innerHTML = `<div class="bg-gray-700 p-6 rounded-lg shadow-xl max-w-sm w-full"><h4 class="text-white text-lg font-bold mb-3">Feature Info</h4><p class="text-gray-300 mb-4">${msg}</p><button class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg" onclick="this.closest('.fixed').remove()">Close</button></div>`;
+            document.body.appendChild(modalEl);
+        });
+        
+        startBtn.addEventListener('click', async () => {
+            await startLocalStream();
+            if (localStream) {
+                findAndStartCall();
+            }
+        });
+
+        nextBtn.addEventListener('click', () => {
+            handleConnectionEnd("Searching for a new connection...");
+            // findAndStartCall() is called within handleConnectionEnd for "next"
+            startLocalStream().then(() => findAndStartCall());
+        });
+
+        // Expose function globally for use in HTML onclick attributes
+        window.translateMessage = translateMessage;
+        window.updateFriendshipStatus = updateFriendshipStatus;
+
+        // Initialize on window load
+        window.onload = initializeFirebase;
+    </script>
+
+
+    <!-- MAIN CONTENT CONTAINER (Starts hidden until age gate is passed) -->
+    <main id="mainContent" class="flex-grow p-4 lg:p-8 hidden">
+        <div class="max-w-7xl mx-auto">
+            <!-- HEADER -->
+            <header class="text-center mb-6">
+                <h1 class="text-4xl font-extrabold text-white">
+                    <span class="text-indigo-400">Connect</span> Anonymously
+                </h1>
+                <p id="userIdDisplay" class="text-sm text-gray-400 mt-2 mb-4">User ID: Loading...</p>
+                
+                <!-- NICKNAME AND MODE CONTROLS -->
+                <div class="bg-gray-700/50 p-3 rounded-lg mb-4">
+                    <!-- Nickname Controls -->
+                    <div id="nicknameControls" class="mb-4 border-b border-gray-600 pb-3">
+                        <div class="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-4">
+                            <input type="text" id="nicknameInput" class="flex-grow w-full sm:w-auto p-2 rounded-md bg-gray-900 text-white border border-gray-600 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Set your nickname (3-20 chars)" maxlength="20">
+                            <button id="setNicknameBtn" class="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition disabled:opacity-50" disabled>Set Nickname</button>
+                        </div>
+                        <p id="nicknameStatus" class="text-sm mt-2 text-center text-gray-400">Current Nickname: <span id="currentNickname" class="font-bold text-white">N/A</span></p>
+                    </div>
+
+                    <!-- Mode Selection -->
+                    <div class="flex flex-col space-y-2">
+                        <p id="modeStatus" class="text-base font-semibold text-yellow-300">Mode: Video Chat (Matching with Video Users)</p>
+                        <div class="flex justify-center space-x-2">
+                            <button id="videoModeBtn" class="px-3 py-1 rounded-full text-sm font-medium transition bg-indigo-600 text-white">
+                                Video + Text Chat
+                            </button>
+                            <button id="textModeBtn" class="px-3 py-1 rounded-full text-sm font-medium transition bg-gray-700 text-gray-400 hover:bg-gray-600">
+                                Text Only Chat
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <!-- END NICKNAME AND MODE CONTROLS -->
+
+                <div id="status" class="text-lg font-medium text-yellow-400 p-2 bg-gray-700/50 rounded-lg">
+                    Initializing connection...
+                </div>
+            </header>
+
+            <!-- ⚠️ EXTREME SAFETY WARNING BANNER ⚠️ -->
+            <div class="bg-red-900 border-2 border-red-500 p-4 rounded-xl mb-6 shadow-2xl">
+                <p class="text-xl font-bold text-red-100 uppercase text-center">
+                    ⚠️ MANDATORY SAFETY & AGE WARNING ⚠️
+                </p>
+                <p class="text-sm text-red-200 mt-2 text-center">
+                    This platform requires users to be of **legal age**. Report illegal content immediately to authorities.
+                    **Robust age verification and content moderation are mandatory** for any deployment.
+                </p>
+            </div>
+            
+            <!-- MAIN GRID: VIDEO + CHAT -->
+            <div class="main-grid">
+                <!-- VIDEO AREA -->
+                <div>
+                    <div class="video-grid">
+                        <!-- Remote Video Container -->
+                        <div class="video-container relative" id="remoteContainer">
+                            <video id="remoteVideo" autoplay playsinline></video>
+                            <p id="remotePlaceholder" class="text-gray-500 absolute inset-0 flex items-center justify-center pointer-events-none">
+                                Waiting for remote connection...
+                            </p>
+                        </div>
+
+                        <!-- Local Video Container -->
+                        <div class="video-container relative hidden lg:block">
+                            <video id="localVideo" autoplay muted playsinline></video>
+                            <p class="text-gray-500 absolute inset-0 flex items-center justify-center pointer-events-none">
+                                Your Local Camera Feed
+                            </p>
+                        </div>
+                        <!-- Local video overlay for mobile/small screens -->
+                        <video id="localVideo" class="lg:hidden" autoplay muted playsinline></video>
+                    </div>
+
+                    <!-- CONTROLS -->
+                    <div class="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-6 mt-6">
+                        <button id="startConnectBtn" class="btn-action btn-start text-white disabled:opacity-50" disabled>
+                            1. Start & Find Match
+                        </button>
+                        <button id="nextBtn" class="btn-action btn-stop text-white disabled:opacity-50" disabled>
+                            2. Next / Disconnect
+                        </button>
+                    </div>
+                </div>
+
+                <!-- CHAT PANEL -->
+                <div id="chatPanel" class="bg-gray-700 rounded-xl p-4 flex flex-col mt-6 lg:mt-0 opacity-50 pointer-events-none transition-opacity duration-300 shadow-xl">
+                    <h3 class="text-xl font-bold text-white mb-1">Private Chat</h3>
+                    <p id="translateInfo" class="text-xs text-indigo-300 mb-3">Default Language: <span class="font-bold">English</span>. Click 'Translate' on remote messages.</p>
+                    
+                    <!-- Chat Status -->
+                    <p id="chatStatus" class="text-sm text-yellow-300 mb-3">Disconnected. Waiting for connection...</p>
+
+                    <!-- Friendship Controls -->
+                    <div id="friendRequestControls" class="flex justify-center space-x-2 mb-4">
+                        <button id="requestFriendBtn" class="btn-action btn-request text-white px-3 py-2 text-sm">Send Friend Request</button>
+                        <button id="acceptRequestBtn" onclick="updateFriendshipStatus('ACCEPTED')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm hidden">Accept</button>
+                        <button id="rejectRequestBtn" onclick="updateFriendshipStatus('REJECTED')" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm hidden">Reject</button>
+                    </div>
+
+                    <!-- Message Display Area -->
+                    <div id="messageArea" class="flex-grow bg-gray-800 p-3 rounded-lg mb-3 overflow-y-auto border border-gray-600">
+                        <!-- Messages will be appended here -->
+                    </div>
+
+                    <!-- Message Input -->
+                    <div class="flex flex-col space-y-2">
+                        <!-- Advanced Controls -->
+                        <div class="chat-input-controls flex space-x-3 text-gray-400">
+                            <button id="clipboardBtn" title="Copy/Paste is browser native" class="p-1 hover:text-white transition duration-150">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path fill-rule="evenodd" d="M19.988 3.5a1 1 0 0 0-1-1H16.5A.5.5 0 0 1 16 2h-4a.5.5 0 0 1-.5-.5H8a1 1 0 0 0-1 1V6.5a.5.5 0 0 1-.5.5H3.5a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V4.5a1 1 0 0 0-1-1H19.988ZM18 10h-2.5a.5.5 0 0 1-.5-.5V7h-4V5h4a1 1 0 0 1 1 1v4Zm-1.5-6H16.5a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5H8.5a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5H11V3h5.5Z" clip-rule="evenodd" /></svg>
+                            </button>
+                            <button id="gifBtn" title="GIFs are disabled for this demo" class="p-1 hover:text-white transition duration-150">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                            </button>
+                            <button id="attachFileBtn" title="File attachment is disabled" class="p-1 hover:text-white transition duration-150">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M21 9V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v3h18zM3 11v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8H3zm13 5H8v-2h8v2z"/></svg>
+                            </button>
+                        </div>
+                        
+                        <!-- Input and Send -->
+                        <div class="flex space-x-2">
+                            <input type="text" id="messageInput" class="flex-grow p-2 rounded-lg bg-gray-900 text-white border border-gray-600" placeholder="Type a message..." disabled>
+                            <button id="sendMessageBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50" disabled>Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- END MAIN GRID -->
+
+            <p class="text-xs text-center text-gray-500 mt-4">
+                **Data Policy:** Conversation history (friendship status & messages) is **not stored**. It is deleted upon disconnection/change of user.
+            </p>
+        </div>
+    </main>
+
+</body>
+</html>
