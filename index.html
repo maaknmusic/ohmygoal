@@ -16,7 +16,14 @@
     -->
     <script>
         window.APP_CONFIG = {
-            firebase: null,
+            firebase: {
+                apiKey: 'AIzaSyDTgaX2GRn7n9Zo_b-TyU3bmWfOvJpXlps',
+                authDomain: 'ohmygoal-c8a4a.firebaseapp.com',
+                projectId: 'ohmygoal-c8a4a',
+                storageBucket: 'ohmygoal-c8a4a.firebasestorage.app',
+                messagingSenderId: '719459235525',
+                appId: '1:719459235525:web:5886e6a4a5d5ee2ab122ac',
+            },
             appId: 'anon-connect',
             iceServers: [
                 { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
@@ -1779,7 +1786,11 @@
         } catch (e) {
             console.error('transport init failed', e);
             el.startBtn.textContent = 'Service unavailable';
-            toast('Could not connect to the matching service. Please refresh.', true);
+            const hint = e.code === 'auth/configuration-not-found' || e.code === 'auth/operation-not-allowed'
+                ? ' (Firebase: enable Anonymous sign-in in Authentication)'
+                : e.code === 'auth/unauthorized-domain' ? ' (Firebase: add this site to Authentication → Settings → Authorized domains)'
+                : e.code ? ` (${e.code})` : '';
+            toast('Could not connect to the matching service' + hint + '. Please refresh.', true);
         }
         refreshStart();
     </script>
