@@ -1447,7 +1447,7 @@
 
         function detectFaces(input) {
             const fa = V.faceapi;
-            return fa.detectAllFaces(input, new fa.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.6 }))
+            return fa.detectAllFaces(input, new fa.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.45 }))
                 .withFaceLandmarks()
                 .withAgeAndGender();
         }
@@ -1543,11 +1543,14 @@
             await vEl.video.play().catch(() => {});
             while (!vEl.video.videoWidth && run === V.run) await sleep(50);
 
-            const st = { step: 'face', steady: 0, yaws: [], base: 0, sideA: false, sideB: false, ages: [], last: null, started: Date.now() };
+            const st = { step: 'face', steady: 0, yaws: [], base: 0, sideA: false, sideB: false, ages: [], last: null, lost: 0, crowd: 0, jumps: 0, started: Date.now() };
             const NEED_SAMPLES = 15;
+            // Detection flickers, especially while the head is turned. Only restart when a problem persists
+            // for this many consecutive frames (~1.5-2 s), never on a single glitch.
+            const GRACE_FRAMES = 15;
             const TIMEOUT_MS = 60000;
             const restart = why => {
-                Object.assign(st, { step: 'face', steady: 0, yaws: [], base: 0, sideA: false, sideB: false, ages: [], last: null });
+                Object.assign(st, { step: 'face', steady: 0, yaws: [], base: 0, sideA: false, sideB: false, ages: [], last: null, lost: 0, crowd: 0, jumps: 0 });
                 ['live', 'age'].forEach(s => setStep(s, ''));
                 setStep('face', 'active');
                 vEl.liveHint.textContent = '';
@@ -1560,17 +1563,36 @@
                 let faces;
                 try { faces = await detectFaces(vEl.video); } catch (e) { console.warn(e); await sleep(150); continue; }
                 if (run !== V.run) return;
-                drawVerify(faces, faces.length === 1 ? '#10b981' : '#f59e0b');
+                // Weak detections (e.g. a turned head) are kept, but only confident ones count as extra people.
+                faces.sort((a, b) => b.detection.score - a.detection.score);
+                const strong = faces.filter(x => x.detection.score >= 0.6);
+                drawVerify(faces.slice(0, Math.max(1, strong.length)), strong.length > 1 ? '#f59e0b' : '#10b981');
                 await sleep(30);
 
-                if (faces.length === 0) { if (st.step !== 'face') restart('Face lost — let’s start over'); else msg('No face detected — face the camera in good light'); continue; }
-                if (faces.length > 1) { restart('Only one person should be in the frame'); continue; }
+                if (faces.length === 0) {
+                    if (st.step === 'face') { st.steady = 0; msg('No face detected — face the camera in good light'); }
+                    else if (++st.lost > GRACE_FRAMES) restart('Face lost — let’s start over');
+                    else msg('Keep your face in view');
+                    continue;
+                }
+                st.lost = 0;
+                if (strong.length > 1) {
+                    if (++st.crowd > GRACE_FRAMES) restart('Only one person should be in the frame');
+                    else msg('Only one person should be in the frame');
+                    continue;
+                }
+                st.crowd = 0;
                 const f = faces[0];
                 const box = f.detection.box;
-                if (box.width < vEl.video.videoWidth * 0.18) { msg('Move a little closer'); continue; }
-                // Guard against swapping people mid-check: the face must move continuously.
+                if (box.width < vEl.video.videoWidth * 0.14) { msg('Move a little closer'); continue; }
+                // Guard against swapping people mid-check: the face must move continuously. A single jumpy
+                // box is ignored; only a sustained jump (a different face elsewhere in frame) restarts.
                 const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
-                if (st.last && Math.hypot(cx - st.last.x, cy - st.last.y) > box.width * 0.6) { restart('Please keep your face in view'); continue; }
+                if (st.last && Math.hypot(cx - st.last.x, cy - st.last.y) > box.width * 1.2) {
+                    if (++st.jumps > 5) restart('Please keep your face in view');
+                    continue;
+                }
+                st.jumps = 0;
                 st.last = { x: cx, y: cy };
                 const yaw = yawOf(f.landmarks);
                 if (AGE_DEBUG) vEl.liveHint.dataset.debug = `yaw ${yaw.toFixed(2)} base ${st.base.toFixed(2)} age ${f.age.toFixed(1)} score ${f.detection.score.toFixed(2)}`;
@@ -1581,13 +1603,13 @@
                     st.yaws.push(yaw);
                     if (++st.steady >= 5) { st.base = median(st.yaws); st.step = 'live'; setStep('face', 'done'); setStep('live', 'active'); }
                 } else if (st.step === 'live') {
-                    if (yaw > st.base + 0.2) st.sideA = true;
-                    if (yaw < st.base - 0.2) st.sideB = true;
+                    if (yaw > st.base + 0.16) st.sideA = true;
+                    if (yaw < st.base - 0.16) st.sideB = true;
                     vEl.liveHint.textContent = `(${(st.sideA ? 1 : 0) + (st.sideB ? 1 : 0)}/2)`;
                     msg(st.sideA || st.sideB ? 'Now slowly turn to the other side' : 'Slowly turn your head to one side');
                     if (st.sideA && st.sideB) { st.step = 'age'; setStep('live', 'done'); setStep('age', 'active'); }
                 } else if (st.step === 'age') {
-                    if (Math.abs(yaw - st.base) > 0.12) { msg('Look straight at the camera'); continue; }
+                    if (Math.abs(yaw - st.base) > 0.15) { msg('Look straight at the camera'); continue; }
                     st.ages.push(f.age);
                     vEl.progress.style.width = `${Math.round((st.ages.length / NEED_SAMPLES) * 100)}%`;
                     msg('Estimating age… hold still');
