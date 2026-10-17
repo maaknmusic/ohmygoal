@@ -28,21 +28,41 @@ export class Premium {
 
     entitlementRef(uid) { return this.fs.doc(this.db, ...this.base, 'entitlements', uid); }
 
-    /** Follow the signed-in user's entitlement doc. */
+    /** Follow the signed-in user's entitlement doc. `ready` resolves after the first answer. */
     watch() {
         this.unsub?.();
         this.unsub = null;
         this.premiumUntil = 0;
         const uid = this.auth.currentUser?.uid;
         this.watchedKey = `${uid}|${this.friends.signedIn}`;
+        let markReady;
+        this.ready = new Promise(r => { markReady = r; });
         if (uid && this.friends.signedIn) {
             this.unsub = this.fs.onSnapshot(this.entitlementRef(uid), snap => {
-                this.premiumUntil = snap.data()?.premiumUntil || 0;
-                this.emit();
-            }, e => console.warn('entitlement listener', e));
+                // Only trust what the server confirmed: clients never write entitlements, so a pending
+                // local write is a tampering attempt that the rules will reject.
+                if (snap.metadata.hasPendingWrites) return;
+                const until = snap.data()?.premiumUntil;
+                this.setUntil(Number.isFinite(until) ? until : 0);
+                markReady();
+            }, e => { console.warn('entitlement listener', e); markReady(); });
+        } else {
+            markReady();
         }
         this.emit();
     }
+
+    /** Update the pass end time and schedule a refresh for the moment it expires. */
+    setUntil(until) {
+        this.premiumUntil = until;
+        clearTimeout(this.expiryTimer);
+        const left = until - Date.now();
+        if (left > 0) this.expiryTimer = setTimeout(() => this.setUntil(this.premiumUntil), Math.min(left + 1000, 2 ** 31 - 1));
+        this.emit();
+    }
+
+    /** Wait (briefly) for the first entitlement answer, e.g. right after signing in. */
+    waitReady(ms = 4000) { return Promise.race([this.ready, new Promise(r => setTimeout(r, ms))]); }
 
     /** Is another user's Premium badge real? */
     async verify(uid) {
@@ -86,6 +106,7 @@ export class Premium {
         const { data: order } = await createOrder({ plan: planId });
         const user = this.auth.currentUser;
         const response = await new Promise((resolve, reject) => {
+            let lastError = null;
             const rzp = new Razorpay({
                 key: order.keyId,
                 order_id: order.orderId,
@@ -96,18 +117,37 @@ export class Premium {
                 prefill: { name: user?.displayName || '', email: user?.email || '' },
                 theme: { color: '#4f46e5' },
                 handler: resolve,
-                modal: { ondismiss: () => reject(Object.assign(new Error('Payment cancelled'), { code: 'cancelled' })) },
+                // The checkout stays open after a failed attempt so the buyer can retry; only give up
+                // when they close it (reporting the last failure, if any).
+                modal: {
+                    ondismiss: () => reject(lastError
+                        ? Object.assign(new Error(lastError), { code: 'failed' })
+                        : Object.assign(new Error('Payment cancelled'), { code: 'cancelled' })),
+                },
             });
-            rzp.on?.('payment.failed', r => reject(Object.assign(new Error(r?.error?.description || 'Payment failed'), { code: 'failed' })));
+            rzp.on?.('payment.failed', r => { lastError = r?.error?.description || 'Payment failed'; });
             rzp.open();
         });
-        const { data } = await verifyPayment({
+        // The money has moved: retry verification on temporary errors. If it still can't be confirmed,
+        // the Razorpay webhook grants the pass in the background and the listener picks it up.
+        const payload = {
             orderId: response.razorpay_order_id,
             paymentId: response.razorpay_payment_id,
             signature: response.razorpay_signature,
-        });
-        this.premiumUntil = Math.max(this.premiumUntil, data.premiumUntil || 0);
-        this.emit();
-        return data.premiumUntil;
+        };
+        let lastErr;
+        for (const wait of [0, 1500, 4000]) {
+            if (wait) await new Promise(r => setTimeout(r, wait));
+            try {
+                const { data } = await verifyPayment(payload);
+                this.setUntil(Math.max(this.premiumUntil, data.premiumUntil || 0));
+                return data.premiumUntil;
+            } catch (e) {
+                lastErr = e;
+                if (/permission-denied|invalid-argument|failed-precondition/.test(e.code || '')) throw e;
+            }
+        }
+        console.warn('verifyPayment failed after retries', lastErr);
+        throw Object.assign(new Error(`Your payment went through (ID ${payload.paymentId}). Premium will activate within a minute; if it doesn’t, contact support with that ID.`), { code: 'pending' });
     }
 }

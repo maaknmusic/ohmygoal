@@ -42,10 +42,29 @@ const orderRef = orderId => db.doc(`artifacts/${APP_ID.value()}/private/data/ord
 
 function requireGoogleUser(request) {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Please sign in.');
-    if (request.auth.token.firebase?.sign_in_provider === 'anonymous') {
+    if (request.auth.token.firebase?.sign_in_provider !== 'google.com') {
         throw new HttpsError('failed-precondition', 'Sign in with Google to buy Premium.');
     }
     return request.auth.uid;
+}
+
+const ORDER_LIMIT = 10;          // orders per user...
+const ORDER_WINDOW_MS = 3600000; // ...per hour
+const limitRef = uid => db.doc(`artifacts/${APP_ID.value()}/private/data/orderLimits/${uid}`);
+
+/** Simple per-user rate limit on order creation (stops order spam). */
+async function takeOrderSlot(uid) {
+    await db.runTransaction(async t => {
+        const snap = await t.get(limitRef(uid));
+        const now = Date.now();
+        const d = snap.data();
+        const fresh = !d || now - d.windowStart > ORDER_WINDOW_MS;
+        const count = fresh ? 0 : d.count;
+        if (count >= ORDER_LIMIT) {
+            throw new HttpsError('resource-exhausted', 'Too many payment attempts. Please try again in an hour.');
+        }
+        t.set(limitRef(uid), { windowStart: fresh ? now : d.windowStart, count: count + 1 });
+    });
 }
 
 function hmacHex(secret, data) {
@@ -87,10 +106,12 @@ async function grantOrder(orderId, paymentId) {
         if (order.status === 'paid') {
             return { uid: order.uid, premiumUntil: eSnap.data()?.premiumUntil || 0, alreadyGranted: true };
         }
-        const plan = PLANS[order.plan];
+        // Use the days recorded when the order was created, so later plan changes can't lose a paid grant.
+        const days = order.days || PLANS[order.plan]?.days;
+        if (!days) throw new HttpsError('internal', 'Order has no plan length.');
         const now = Date.now();
-        const premiumUntil = Math.max(now, eSnap.data()?.premiumUntil || 0) + plan.days * DAY_MS;
-        t.set(eRef, { premiumUntil, plan: order.plan, updatedAt: now }, { merge: true });
+        const premiumUntil = Math.max(now, eSnap.data()?.premiumUntil || 0) + days * DAY_MS;
+        t.set(eRef, { premiumUntil, updatedAt: now });
         t.update(orderRef(orderId), { status: 'paid', paymentId, paidAt: now });
         return { uid: order.uid, premiumUntil, alreadyGranted: false };
     });
@@ -118,6 +139,7 @@ export const createOrder = onCall({ secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SECR
     const planId = request.data?.plan;
     const plan = Object.hasOwn(PLANS, planId) ? PLANS[planId] : null;
     if (!plan) throw new HttpsError('invalid-argument', 'Unknown plan.');
+    await takeOrderSlot(uid);
 
     const order = await razorpay('/v1/orders', {
         method: 'POST',
@@ -132,7 +154,7 @@ export const createOrder = onCall({ secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SECR
         throw new HttpsError('internal', 'Unexpected order from the payment provider.');
     }
     await orderRef(order.id).set({
-        uid, plan: planId, amount: plan.amount, currency: CURRENCY, status: 'created', createdAt: Date.now(),
+        uid, plan: planId, days: plan.days, amount: plan.amount, currency: CURRENCY, status: 'created', createdAt: Date.now(),
     });
     return {
         orderId: order.id, amount: plan.amount, currency: CURRENCY, plan: planId, label: plan.label,

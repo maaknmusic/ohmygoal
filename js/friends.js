@@ -12,6 +12,26 @@ const ONLINE_MS = 75000;
 
 export const pairIdOf = (a, b) => [a, b].sort().join('_');
 
+/** Normalise a friendship doc defensively: fields come from another user. */
+function parseFriendship(id, x, uid) {
+    if (!Array.isArray(x?.users) || x.users.length !== 2 || !x.users.includes(uid)) return null;
+    const other = x.users.find(u => u !== uid);
+    const rawName = x.names && typeof x.names === 'object' ? x.names[other] : '';
+    const c = x.call;
+    const call = c && typeof c === 'object' && typeof c.from === 'string' && typeof c.roomId === 'string' && Number.isFinite(c.ts)
+        ? { from: c.from, roomId: c.roomId, ts: c.ts } : null;
+    return {
+        id, users: x.users, other,
+        status: x.status === 'accepted' ? 'accepted' : 'pending',
+        requestedBy: typeof x.requestedBy === 'string' ? x.requestedBy : '',
+        name: (typeof rawName === 'string' && rawName.trim().slice(0, 30)) || 'Friend',
+        call,
+        lastMessage: typeof x.lastMessage === 'string' ? x.lastMessage.slice(0, 80) : '',
+        lastMessageAt: Number.isFinite(x.lastMessageAt) ? x.lastMessageAt : 0,
+        acceptedAt: Number.isFinite(x.acceptedAt) ? x.acceptedAt : 0,
+    };
+}
+
 export class Friends {
     constructor(transport) {
         this.t = transport;
@@ -23,7 +43,17 @@ export class Friends {
         this.listeners = new Set();
         this.unsub = null;
         this.presenceTimer = null;
+        // Follow sign-in/sign-out from any tab.
+        this.authKey = this.key();
+        authMod.onAuthStateChanged(auth, () => {
+            if (this.key() === this.authKey) return;
+            this.authKey = this.key();
+            this.start();
+            this.emit();
+        });
     }
+
+    key() { return `${this.uid}|${this.signedIn}`; }
 
     get uid() { return this.auth.currentUser?.uid; }
     get signedIn() { const u = this.auth.currentUser; return !!u && !u.isAnonymous; }
@@ -67,11 +97,8 @@ export class Friends {
         const { query, where, onSnapshot } = this.fs;
         const uid = this.uid;
         this.unsub = onSnapshot(query(this.col, where('users', 'array-contains', uid)), snap => {
-            this.list = snap.docs.map(d => {
-                const x = d.data();
-                const other = x.users.find(u => u !== uid);
-                return { id: d.id, ...x, other, name: x.names?.[other] || 'Friend' };
-            }).sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
+            this.list = snap.docs.map(d => parseFriendship(d.id, d.data(), uid)).filter(Boolean)
+                .sort((a, b) => b.lastMessageAt - a.lastMessageAt);
             this.emit();
             this.refreshPresence();
         }, e => console.warn('friends listener', e));
@@ -125,12 +152,14 @@ export class Friends {
         await deleteDoc(doc(this.col, pairId));
     }
 
-    /** Subscribe to the last 100 messages of a friend chat. */
-    watchMessages(pairId, fn) {
+    /** Subscribe to the last 100 messages of a friend chat (only those since you became friends). */
+    watchMessages(pairId, since, fn) {
         const { collection, query, orderBy, limit, onSnapshot } = this.fs;
         const q = query(collection(this.col, pairId, 'messages'), orderBy('ts', 'desc'), limit(100));
-        return onSnapshot(q, snap => fn(snap.docs.map(d => ({ id: d.id, ...d.data() })).reverse()),
-            e => console.warn('messages listener', e));
+        return onSnapshot(q, snap => fn(snap.docs
+            .map(d => ({ id: d.id, from: d.data().from, text: String(d.data().text ?? ''), ts: Number(d.data().ts) || 0 }))
+            .filter(m => m.ts >= since)
+            .reverse()), e => console.warn('messages listener', e));
     }
 
     async send(pairId, text) {

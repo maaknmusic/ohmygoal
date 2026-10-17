@@ -24,7 +24,7 @@ const profileFields = p => ({
     country: p?.country || '',
     genderFilter: p?.genderFilter || 'any',
     countryFilter: p?.countryFilter || 'any',
-    premium: !!p?.premium,
+    premium: p?.premium === true,
 });
 
 export async function createFirebaseTransport({ firebaseConfig, appId, initialAuthToken, emulators }) {
@@ -102,7 +102,7 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
                     && compatible(profile, x);
             })
             // Premium (priority) entries are matched first, then shared interests, then longest waiting.
-            .sort((a, b) => (b.data().premium ? 1 : 0) - (a.data().premium ? 1 : 0)
+            .sort((a, b) => (b.data().premium === true ? 1 : 0) - (a.data().premium === true ? 1 : 0)
                 || shared(b.data()) - shared(a.data()) || a.data().ts - b.data().ts);
 
         const queueRef = myQueueRef();
@@ -129,15 +129,22 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
     }
 
     async function findMatch(opts, signal) {
-        const first = await tryClaim(opts);
-        if (first) return first;
-        if (signal.aborted) throw new DOMException('aborted', 'AbortError');
-
+        // Queue ourselves first: the rules only let queued users claim someone (so they can check
+        // mode, block lists and the other person's filters against our entry).
         const queueRef = myQueueRef();
-        await setDoc(queueRef, {
-            mode: opts.mode, interests: opts.interests, blocked: opts.blocked.slice(-100),
+        const entry = () => ({
+            mode: opts.mode, interests: opts.interests.slice(0, 5), blocked: opts.blocked.slice(-100),
             ...profileFields(opts.profile), ts: Date.now(), roomId: null,
         });
+        try {
+            await setDoc(queueRef, entry());
+        } catch (e) {
+            // A leftover entry (e.g. after a crash) may not be overwritable under older rules: replace it.
+            if (e?.code !== 'permission-denied') throw e;
+            await deleteDoc(queueRef).catch(() => {});
+            await setDoc(queueRef, entry());
+        }
+        if (signal.aborted) { deleteDoc(queueRef).catch(() => {}); throw new DOMException('aborted', 'AbortError'); }
 
         return new Promise((resolve, reject) => {
             let done = false;
@@ -173,6 +180,14 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
                 finish(null, new DOMException('aborted', 'AbortError'));
             };
             signal.addEventListener('abort', onAbort);
+            // Try to claim someone straight away.
+            (async () => {
+                claiming = true;
+                try {
+                    const m = await tryClaim(opts);
+                    if (m) { if (done) m.bus.close(); else finish(m); }
+                } catch (e) { console.warn('claim failed', e); } finally { claiming = false; }
+            })();
         });
     }
 

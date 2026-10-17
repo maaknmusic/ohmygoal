@@ -285,7 +285,13 @@ el.fullBtn.onclick = () => {
 // =====================================================================
 // Video effects
 // =====================================================================
-const fxActive = () => S.fx.background !== 'none' || S.fx.mask !== 'none' || S.fx.filter !== 'none';
+/** The effects actually applied: the user's saved choice minus anything their plan doesn't include. */
+function effectiveFx() {
+    const fx = { ...S.fx };
+    for (const kind of Object.keys(FREE_FX)) if (fxLocked(kind, fx[kind])) fx[kind] = 'none';
+    return fx;
+}
+const fxActive = () => { const fx = effectiveFx(); return fx.background !== 'none' || fx.mask !== 'none' || fx.filter !== 'none'; };
 const videoSender = () => S.session?.pc.getSenders().find(s => s.track?.kind === 'video');
 /** The video track that is previewed and sent: processed when effects are on, raw camera otherwise. */
 const outVideoTrack = () => S.effects?.track || S.localStream?.getVideoTracks()[0] || null;
@@ -296,8 +302,7 @@ let fxChain = Promise.resolve();
 /** Update effect settings. Changes are applied one at a time, always using the latest settings. */
 function applyEffects(partial) {
     S.fx = { ...S.fx, ...partial };
-    for (const kind of Object.keys(FREE_FX)) if (fxLocked(kind, S.fx[kind])) S.fx[kind] = 'none';
-    store.set('fx', S.fx);
+    store.set('fx', S.fx); // keep the saved choice even if it's locked right now (e.g. before Premium loads)
     renderFxPanel();
     fxChain = fxChain.then(syncEffects, syncEffects);
     return fxChain;
@@ -306,16 +311,17 @@ function applyEffects(partial) {
 async function syncEffects() {
     if (!S.localStream) return;
     const fx = S.effects ||= new Effects(CFG.effects);
-    const needsModels = S.fx.background !== 'none' || S.fx.mask !== 'none';
+    const wanted = effectiveFx();
+    const needsModels = wanted.background !== 'none' || wanted.mask !== 'none';
     if (needsModels) el.fxStatus.textContent = 'Loading…';
     try {
-        await fx.set({ ...S.fx });
+        await fx.set(wanted);
     } catch (e) {
         console.warn('effects failed to load', e);
         toast('Backgrounds and masks aren’t available on this device.', true);
         S.fx = { ...S.fx, background: 'none', mask: 'none' };
         store.set('fx', S.fx);
-        await fx.set({ ...S.fx }).catch(() => {});
+        await fx.set(effectiveFx()).catch(() => {});
         renderFxPanel();
     }
     el.fxStatus.textContent = '';
@@ -338,7 +344,7 @@ function renderFxPanel() {
         const kind = box.dataset.kind;
         box.replaceChildren(...lists[kind].map(opt => {
             const locked = fxLocked(kind, opt.id);
-            const b = h('button', (opt.emoji ? 'emoji' : '') + (S.fx[kind] === opt.id ? ' active' : '') + (locked ? ' locked' : ''), opt.label);
+            const b = h('button', (opt.emoji ? 'emoji' : '') + (effectiveFx()[kind] === opt.id ? ' active' : '') + (locked ? ' locked' : ''), opt.label);
             b.type = 'button';
             b.title = locked ? `${opt.id} (Premium)` : opt.id;
             b.dataset.id = opt.id;
@@ -529,10 +535,20 @@ async function startSearch(note) {
     }, 25000);
     ac.signal.addEventListener('abort', () => clearTimeout(slowHint));
     let match;
+    const search = profile => S.transport.findMatch({
+        mode: S.mode, interests: S.interests, blocked: [...S.blocked], profile,
+    }, ac.signal);
     try {
-        match = await S.transport.findMatch({
-            mode: S.mode, interests: S.interests, blocked: [...S.blocked], profile: myProfile(),
-        }, ac.signal);
+        const profile = myProfile();
+        try {
+            match = await search(profile);
+        } catch (e) {
+            // The database refused Premium options (pass expired, clock skew...): search as a free user.
+            if (e?.code !== 'permission-denied' || !(profile.premium || profile.genderFilter !== 'any' || profile.countryFilter !== 'any')) throw e;
+            console.warn('premium search refused; retrying without premium options', e);
+            sys('Premium options aren’t active right now, so you’re searching everyone.');
+            match = await search({ ...profile, premium: false, genderFilter: 'any', countryFilter: 'any' });
+        }
         clearTimeout(slowHint);
     } catch (e) {
         clearTimeout(slowHint);
@@ -752,6 +768,8 @@ function endSession({ notify }) {
     clearInterval(sess.roundTimer);
     clearInterval(sess.safetyTimer);
     clearInterval(sess.selfTimer);
+    if (sess.friend && sess.role === 'offerer') friends?.clearCall(sess.friend.id); // stop the friend's phone ringing
+    el.partnerBadge.classList.add('hidden');
     clearTimeout(sess.safetyFailOpen);
     setShield('off');
     el.round.classList.add('hidden');
@@ -1437,7 +1455,15 @@ function initFriends() {
     friends = new Friends(S.transport);
     el.friendsBtn.classList.remove('hidden');
     el.addFriendBtn.classList.remove('hidden');
-    friends.onChange(() => { renderDrawer(); checkIncomingCalls(); });
+    let lastUid = friends.uid;
+    friends.onChange(() => {
+        renderDrawer();
+        checkIncomingCalls();
+        if (friends.uid !== lastUid) {
+            lastUid = friends.uid;
+            if (S.phase === 'searching') startSearch(); // re-queue under the new account
+        }
+    });
     friends.start();
     renderDrawer();
     if (PREMIUM_CFG.enabled) {
@@ -1458,6 +1484,7 @@ const PAYWALL_REASONS = {
     menu: 'Get more out of every chat.',
 };
 let selectedPlan = null;
+let purchasing = false;
 
 function renderPremium() {
     const pro = isPremium();
@@ -1473,7 +1500,7 @@ function renderPremium() {
         el.genderFilter.value = S.genderFilter;
         el.countryFilter.value = S.countryFilter;
     }
-    if (Object.keys(FREE_FX).some(k => fxLocked(k, S.fx[k]))) applyEffects({});
+    if (S.localStream) applyEffects({}); // re-apply: Premium effects switch on/off with the plan
     renderFxPanel();
     renderPaywall();
 }
@@ -1491,6 +1518,11 @@ function renderPaywall() {
         return card;
     }));
     const plan = plans.find(p => p.id === selectedPlan);
+    if (purchasing) {
+        el.paywallCta.disabled = true;
+        el.paywallCta.textContent = 'Processing payment…';
+        return;
+    }
     if (isPremium()) {
         el.paywallCta.textContent = `Extend Premium · ${plan?.price || ''}`;
     } else {
@@ -1512,13 +1544,16 @@ el.premiumBtn.onclick = () => openPaywall('menu');
 el.paywallClose.onclick = () => el.paywall.classList.add('hidden');
 
 el.paywallCta.onclick = async () => {
+    if (purchasing) return;
     if (!friends.signedIn) {
         if (await signInFlow()) {
+            await premium.waitReady(); // a returning Premium user may already have a pass
             renderPaywall();
             if (isPremium()) { el.paywall.classList.add('hidden'); toast('👑 Welcome back! Your Premium is active.'); }
         }
         return;
     }
+    purchasing = true;
     el.paywallCta.disabled = true;
     el.paywallCta.textContent = 'Opening secure checkout…';
     try {
@@ -1527,7 +1562,10 @@ el.paywallCta.onclick = async () => {
         toast(`👑 Premium is active until ${new Date(until).toLocaleDateString()}. Thank you!`);
         SOUND.match();
     } catch (e) {
-        if (e.code !== 'cancelled') {
+        if (e.code === 'pending') {
+            el.paywallReason.textContent = e.message; // charged; the webhook will activate it
+            toast(e.message);
+        } else if (e.code !== 'cancelled') {
             console.warn('purchase failed', e);
             const msg = /not-found|internal|unavailable/.test(e.code || '') && /not found|NOT_FOUND|internal/i.test(e.message || '')
                 ? 'Premium payments aren’t set up yet. Please try again later.'
@@ -1535,6 +1573,7 @@ el.paywallCta.onclick = async () => {
             toast(msg, true);
         }
     } finally {
+        purchasing = false;
         renderPaywall();
     }
 };
@@ -1576,16 +1615,18 @@ async function onFriendMessage(sess, msg) {
     const name = sess.partner?.nick || 'Stranger';
     switch (msg.t) {
         case 'friend-req': {
-            if (typeof msg.uid !== 'string') return;
+            // Only the person we're actually connected to, and only once per chat.
+            if (msg.uid !== sess.partnerId || sess.friendReqFrom) return;
             sess.friendReqFrom = msg.uid;
             const banner = h('div', 'friend-banner');
             banner.append(h('span', '', `👋 ${name} wants to add you as a friend.`));
             const no = h('button', 'btn btn-ghost btn-sm', 'No thanks');
             const yes = h('button', 'btn btn-primary btn-sm', 'Accept');
-            no.onclick = () => { banner.remove(); sendData({ t: 'friend-no' }); };
+            no.onclick = () => { banner.remove(); sess.friendAccepted = false; sendData({ t: 'friend-no' }); };
             yes.onclick = async () => {
                 if (!friends.signedIn && !(await signInFlow())) return;
                 if (sess.ended) return;
+                sess.friendAccepted = true; // the only thing that lets 'friend-created' be accepted
                 banner.replaceChildren(h('span', '', 'Accepted. Adding…'));
                 sendData({ t: 'friend-ok', uid: friends.uid, nick: S.nick });
             };
@@ -1599,7 +1640,8 @@ async function onFriendMessage(sess, msg) {
             break;
         case 'friend-ok':
             // They agreed: create the pending friendship; they confirm it on their side.
-            if (!sess.friendReqSent || typeof msg.uid !== 'string') return;
+            if (!sess.friendReqSent || sess.friendOkHandled || msg.uid !== sess.partnerId) return;
+            sess.friendOkHandled = true;
             try {
                 const pairId = await friends.createPending(msg.uid, S.nick);
                 sendData({ t: 'friend-created', pairId });
@@ -1609,7 +1651,8 @@ async function onFriendMessage(sess, msg) {
             }
             break;
         case 'friend-created':
-            if (!sess.friendReqFrom || msg.pairId !== pairIdOf(friends.uid, sess.friendReqFrom)) return;
+            if (!sess.friendAccepted || !sess.friendReqFrom || msg.pairId !== pairIdOf(friends.uid, sess.friendReqFrom)) return;
+            sess.friendAccepted = false;
             try {
                 await friends.accept(msg.pairId, S.nick);
                 sendData({ t: 'friend-done' });
@@ -1710,7 +1753,7 @@ function openFriendChat(pairId) {
     renderFriendHeader();
     drawer.unsubMessages?.();
     el.fcMessages.replaceChildren();
-    drawer.unsubMessages = friends.watchMessages(pairId, msgs => {
+    drawer.unsubMessages = friends.watchMessages(pairId, currentFriend()?.acceptedAt || 0, msgs => {
         el.fcMessages.replaceChildren(...msgs.map(m => {
             const mine = m.from === friends.uid;
             const wrap = h('div', 'msg ' + (mine ? 'me' : 'them'));
@@ -1779,6 +1822,8 @@ el.fcCall.onclick = async () => {
 };
 
 let ringTimer = null;
+// Re-check while friends exist so a ring that expires (or is cancelled) stops on its own.
+setInterval(() => { if (friends) checkIncomingCalls(); }, 3000);
 function checkIncomingCalls() {
     const call = friends.incomingCalls().find(f => !handledCalls.has(f.call.roomId));
     if (!call || S.session?.friend) {
