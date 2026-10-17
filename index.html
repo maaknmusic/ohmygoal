@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Anonymous Connect</title>
+    <meta name="description" content="Random video and text chat with people around the world. Free, no sign-up, age-verified and private by design.">
+    <meta name="theme-color" content="#4f46e5">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icons/icon-192.png" type="image/png">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
@@ -18,7 +23,9 @@
             Anonymous Connect
         </div>
         <div class="topbar-actions">
+            <span id="onlineChip" class="chip online hidden"><span class="live-dot"></span><span id="onlineChipCount">0</span> online</span>
             <span id="modeChip" class="chip hidden"></span>
+            <button id="installBtn" class="btn btn-ghost btn-sm hidden" title="Install as an app"><i class="icon" data-icon="download"></i><span>Install</span></button>
             <button id="soundBtn" class="icon-btn" title="Toggle sounds"><i class="icon" data-icon="volume"></i></button>
             <button id="themeBtn" class="icon-btn" title="Toggle theme"><i class="icon" data-icon="moon"></i></button>
             <button id="leaveBtn" class="btn btn-ghost hidden" title="Leave and go back">Leave</button>
@@ -27,51 +34,92 @@
 
     <!-- ===================== WELCOME ===================== -->
     <main id="welcome">
-        <div class="welcome-card">
-            <h1>Talk to <span>strangers</span>, safely.</h1>
-            <p class="lead">Random one‑on‑one video or text chat. No account, no history. Messages travel peer‑to‑peer and vanish when the chat ends.</p>
-
-            <div class="field">
-                <label class="lbl" for="nickInput">Nickname (optional)</label>
-                <input id="nickInput" class="input" maxlength="20" placeholder="Stranger" autocomplete="off">
-            </div>
-
-            <div class="field">
-                <label class="lbl" for="tagInput">Interests (optional)</label>
-                <div class="tags" id="tags">
-                    <input id="tagInput" maxlength="24" placeholder="music, gaming, travel…" autocomplete="off">
-                </div>
-                <div class="hint">Press Enter or comma to add. You’ll be matched with people who share them first. Up to 5.</div>
-            </div>
-
-            <div class="field">
-                <label class="lbl">Mode</label>
-                <div class="segmented">
-                    <button class="seg active" data-mode="video"><i class="icon" data-icon="video"></i>Video + Text</button>
-                    <button class="seg" data-mode="text"><i class="icon" data-icon="chat"></i>Text only</button>
-                </div>
-            </div>
-
-            <div class="rules">
-                <strong style="color: var(--text)">Community rules</strong>
-                <ul>
-                    <li>You must be <strong>18 or older</strong>. A quick face age check runs on your device; nothing is uploaded.</li>
-                    <li>No nudity, sexual content, harassment or hate speech.</li>
-                    <li>Don’t share personal info (phone, address, socials).</li>
-                    <li>Report anyone who breaks the rules or appears to be a minor.</li>
+        <section class="hero">
+            <div class="hero-copy">
+                <div class="online-pill"><span class="live-dot"></span><b id="onlineCount">…</b>&nbsp;<span id="onlineLabel">people online now</span></div>
+                <h1>Meet new people,<br><span>face to face.</span></h1>
+                <p class="lead">Random video and text chat with people around the world. Free, no sign‑up, age‑verified and private by design.</p>
+                <ul class="features">
+                    <li><i class="icon" data-icon="video"></i><div><b>HD video or text</b><span>Peer‑to‑peer. Nothing is recorded.</span></div></li>
+                    <li><i class="icon" data-icon="globe"></i><div><b>Country &amp; gender filters</b><span>Choose who you meet.</span></div></li>
+                    <li><i class="icon" data-icon="tag"></i><div><b>Shared interests</b><span>Get matched on what you love.</span></div></li>
+                    <li><i class="icon" data-icon="clock"></i><div><b>Quick rounds</b><span>60 seconds. Both tap +1 min to keep going.</span></div></li>
+                    <li><i class="icon" data-icon="shield"></i><div><b>Safer by design</b><span>Face age check, reporting and blocking.</span></div></li>
+                    <li><i class="icon" data-icon="download"></i><div><b>Works like an app</b><span>Install it on your phone or desktop.</span></div></li>
                 </ul>
-                <label class="check">
-                    <input type="checkbox" id="ageCheck">
-                    <span>I confirm I am 18 or older and agree to follow these rules.</span>
-                </label>
             </div>
 
-            <button id="startBtn" class="btn btn-primary btn-block" disabled>Start chatting</button>
-            <div id="ageStatus" class="hint" style="text-align:center"></div>
-            <div id="demoNote" class="demo-note hidden">
-                <strong>Local demo mode:</strong> no Firebase config found, so matching only works between tabs of this browser. Open this page in a second tab to test. Set <code>APP_CONFIG.firebase</code> to go live.
+            <div class="welcome-card">
+                <h2>Start a chat</h2>
+                <div class="field-row">
+                    <div class="field">
+                        <label class="lbl" for="nickInput">Nickname</label>
+                        <input id="nickInput" class="input" maxlength="20" placeholder="Stranger" autocomplete="off">
+                    </div>
+                    <div class="field">
+                        <label class="lbl" for="genderSelect">I am</label>
+                        <select id="genderSelect" class="input">
+                            <option value="x">Prefer not to say</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label class="lbl" for="tagInput">Interests</label>
+                    <div class="tags" id="tags">
+                        <input id="tagInput" maxlength="24" placeholder="music, gaming, travel…" autocomplete="off">
+                    </div>
+                    <div class="hint">Press Enter to add, up to 5. People who share them are matched first.</div>
+                </div>
+
+                <div class="field">
+                    <label class="lbl">Mode</label>
+                    <div class="segmented">
+                        <button class="seg active" data-mode="video"><i class="icon" data-icon="video"></i>Video + Text</button>
+                        <button class="seg" data-mode="text"><i class="icon" data-icon="chat"></i>Text only</button>
+                    </div>
+                </div>
+
+                <div class="field-row">
+                    <div class="field">
+                        <label class="lbl" for="genderFilter">Talk to</label>
+                        <select id="genderFilter" class="input">
+                            <option value="any">Everyone</option>
+                            <option value="female">Women</option>
+                            <option value="male">Men</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label class="lbl" for="countryFilter">From</label>
+                        <select id="countryFilter" class="input">
+                            <option value="any">🌐 Anywhere</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="hint filter-hint" id="filterHint">Filters work both ways and can make waits longer.</div>
+
+                <label class="toggle">
+                    <input type="checkbox" id="timedCheck">
+                    <span class="switch"></span>
+                    <span><b>Quick rounds</b> · 60 s per chat, both tap “+1 min” to keep talking</span>
+                </label>
+
+                <div class="rules">
+                    <label class="check">
+                        <input type="checkbox" id="ageCheck">
+                        <span>I’m <b>18 or older</b> and agree to the rules: no nudity or sexual content, no harassment or hate, don’t share personal info, and report anyone who seems under 18.</span>
+                    </label>
+                </div>
+
+                <button id="startBtn" class="btn btn-primary btn-block" disabled>Start chatting</button>
+                <div id="ageStatus" class="hint" style="text-align:center"></div>
+                <div id="demoNote" class="demo-note hidden">
+                    <strong>Local demo mode:</strong> no Firebase config found, so matching only works between tabs of this browser. Open this page in a second tab to test. Set <code>firebase</code> in <code>config.js</code> to go live.
+                </div>
             </div>
-        </div>
+        </section>
     </main>
 
     <!-- ===================== AGE VERIFICATION ===================== -->
@@ -126,7 +174,7 @@
                 <div class="partner">
                     <div class="avatar" id="avatar">?</div>
                     <div style="min-width:0">
-                        <div class="partner-name" id="partnerName">Searching…</div>
+                        <div class="partner-name"><span id="partnerName">Searching…</span> <span id="partnerFlag" class="flag"></span></div>
                         <div class="partner-sub"><span class="status-dot wait" id="statusDot"></span><span id="partnerSub">Finding a match</span></div>
                     </div>
                 </div>
@@ -134,6 +182,13 @@
                     <button id="reportBtn" class="icon-btn" title="Report" disabled><i class="icon" data-icon="flag"></i></button>
                     <button id="blockBtn" class="icon-btn" title="Block (never match again)" disabled><i class="icon" data-icon="ban"></i></button>
                 </div>
+            </div>
+
+            <div class="round hidden" id="round">
+                <div class="round-bar"><div id="roundFill"></div></div>
+                <span class="round-time" id="roundTime">1:00</span>
+                <span class="round-note" id="roundNote"></span>
+                <button class="btn btn-sm btn-primary" id="extendBtn">+1 min</button>
             </div>
 
             <div id="messages" aria-live="polite"></div>

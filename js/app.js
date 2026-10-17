@@ -1,3 +1,6 @@
+import { createFirebaseTransport, createLocalTransport } from './transport.js';
+import { COUNTRIES, flagOf, countryName, detectCountry } from './geo.js';
+
 // =====================================================================
 // Config
 // =====================================================================
@@ -11,7 +14,8 @@ const canTranslate = Boolean(CFG.geminiApiKey) || typeof __app_id !== 'undefined
 
 const MAX_INTERESTS = 5;
 const CONNECT_TIMEOUT_MS = 20000;
-const QUEUE_STALE_MS = 30000;
+const ROUND_SECONDS = 60;
+const ONLINE_REFRESH_MS = 30000;
 
 // =====================================================================
 // Icons (inline, no external dependency)
@@ -31,6 +35,11 @@ const ICONS = {
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
     moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
     volume: '<path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>',
+    globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+    tag: '<path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    shield: '<path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.7 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+    download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
     volumeOff: '<path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/>',
 };
 function setIcon(el, name) {
@@ -57,6 +66,11 @@ const el = {
     nextBtn: $('nextBtn'), emojiBtn: $('emojiBtn'), emojiPop: $('emojiPop'),
     reportModal: $('reportModal'), reportCancel: $('reportCancel'), reportSubmit: $('reportSubmit'),
     toasts: $('toasts'),
+    genderSelect: $('genderSelect'), genderFilter: $('genderFilter'), countryFilter: $('countryFilter'),
+    filterHint: $('filterHint'), timedCheck: $('timedCheck'), partnerFlag: $('partnerFlag'),
+    onlineCount: $('onlineCount'), onlineChip: $('onlineChip'), onlineChipCount: $('onlineChipCount'),
+    installBtn: $('installBtn'),
+    round: $('round'), roundFill: $('roundFill'), roundTime: $('roundTime'), roundNote: $('roundNote'), extendBtn: $('extendBtn'),
 };
 
 function h(tag, cls, text) {
@@ -87,6 +101,11 @@ const S = {
     interests: store.get('interests', []),
     blocked: new Set(store.get('blocked', [])),
     sound: store.get('sound', true),
+    gender: store.get('gender', 'x'),
+    genderFilter: store.get('genderFilter', 'any'),
+    countryFilter: store.get('countryFilter', 'any'),
+    timed: store.get('timed', false),
+    country: '',
     phase: 'idle', // idle | searching | connecting | connected | ended
     localStream: null,
     videoDevices: [],
@@ -153,237 +172,6 @@ const PROFANITY = /\b(f+u+c+k+\w*|sh[i1]t+\w*|bitch\w*|cunt\w*|dick\w*|cock\w*|p
 const PII = /([\w.+-]+@[\w-]+\.[\w.]+)|(\+?\d[\d\s().-]{7,}\d)|(https?:\/\/\S+)|(\b(insta(gram)?|snap(chat)?|telegram|whatsapp|discord)\b)/i;
 const maskProfanity = text => text.replace(PROFANITY, m => m[0] + '*'.repeat(m.length - 1));
 const EMOJI_ONLY = /^(?=.*\p{Extended_Pictographic})(?:\p{Extended_Pictographic}|‍|️|[\u{1F3FB}-\u{1F3FF}]|\s){1,12}$/u;
-
-// =====================================================================
-// Transport: Firebase (production) — matchmaking + signaling only.
-// Chat itself goes over a WebRTC data channel and is never stored.
-// =====================================================================
-async function createFirebaseTransport() {
-    const v = '11.6.1';
-    const [{ initializeApp }, authMod, fs] = await Promise.all([
-        import(`https://www.gstatic.com/firebasejs/${v}/firebase-app.js`),
-        import(`https://www.gstatic.com/firebasejs/${v}/firebase-auth.js`),
-        import(`https://www.gstatic.com/firebasejs/${v}/firebase-firestore.js`),
-    ]);
-    const { getAuth, signInAnonymously, signInWithCustomToken } = authMod;
-    const { getFirestore, collection, doc, setDoc, getDocs, query, where, limit, runTransaction,
-        onSnapshot, deleteDoc, addDoc, updateDoc, serverTimestamp } = fs;
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken);
-    else await signInAnonymously(auth);
-    const uid = auth.currentUser.uid;
-
-    const base = ['artifacts', appId, 'public', 'data'];
-    const queueCol = collection(db, ...base, 'queue');
-    const roomsCol = collection(db, ...base, 'rooms');
-    const reportsCol = collection(db, ...base, 'reports');
-    const myQueueRef = doc(queueCol, uid);
-
-    function roomBus(roomId) {
-        const sigCol = collection(db, ...base, 'rooms', roomId, 'signals');
-        const handlers = [];
-        const mine = [];
-        let closed = false;
-        const unsub = onSnapshot(sigCol, snap => {
-            snap.docChanges().forEach(ch => {
-                if (ch.type !== 'added') return;
-                const d = ch.doc.data();
-                if (d.from !== uid) handlers.forEach(fn => fn(d));
-            });
-        }, err => console.warn('signal listener error', err));
-        return {
-            send(type, data) {
-                if (closed) return;
-                addDoc(sigCol, { from: uid, type, data: data ?? null, ts: Date.now() })
-                    .then(ref => mine.push(ref)).catch(e => console.warn('signal send failed', e));
-            },
-            onMessage(fn) { handlers.push(fn); },
-            close() {
-                if (closed) return;
-                closed = true;
-                unsub();
-                // Give the final "bye" time to be delivered, then remove our signaling docs.
-                setTimeout(() => mine.forEach(ref => deleteDoc(ref).catch(() => {})), 4000);
-            },
-        };
-    }
-
-    async function tryClaim({ mode, interests, blocked }) {
-        const snap = await getDocs(query(queueCol, where('mode', '==', mode), limit(30)));
-        const now = Date.now();
-        const shared = d => (d.interests || []).filter(i => interests.includes(i)).length;
-        const candidates = snap.docs
-            .filter(d => {
-                const x = d.data();
-                return d.id !== uid && !x.roomId && now - (x.ts || 0) < QUEUE_STALE_MS
-                    && !blocked.includes(d.id) && !(x.blocked || []).includes(uid);
-            })
-            .sort((a, b) => shared(b.data()) - shared(a.data()) || a.data().ts - b.data().ts);
-
-        for (const cand of candidates) {
-            const roomRef = doc(roomsCol);
-            try {
-                const ok = await runTransaction(db, async t => {
-                    const theirs = await t.get(cand.ref);
-                    const mine = await t.get(myQueueRef);
-                    if (!theirs.exists() || theirs.data().roomId) return false;
-                    if (mine.exists() && mine.data().roomId) return false; // someone already claimed us
-                    t.update(cand.ref, { roomId: roomRef.id, partnerId: uid });
-                    t.set(roomRef, { mode, users: [cand.id, uid], created: serverTimestamp() });
-                    if (mine.exists()) t.delete(myQueueRef);
-                    return true;
-                });
-                if (ok) return { roomId: roomRef.id, role: 'offerer', partnerId: cand.id, bus: roomBus(roomRef.id) };
-            } catch (e) {
-                console.warn('claim failed', e);
-            }
-        }
-        return null;
-    }
-
-    async function findMatch(opts, signal) {
-        const first = await tryClaim(opts);
-        if (first) return first;
-        if (signal.aborted) throw new DOMException('aborted', 'AbortError');
-
-        await setDoc(myQueueRef, {
-            mode: opts.mode, interests: opts.interests, blocked: opts.blocked.slice(-100),
-            ts: Date.now(), roomId: null,
-        });
-
-        return new Promise((resolve, reject) => {
-            let done = false;
-            let claiming = false;
-            const finish = (value, error) => {
-                if (done) return;
-                done = true;
-                unsub();
-                clearInterval(heartbeat);
-                clearInterval(retry);
-                signal.removeEventListener('abort', onAbort);
-                error ? reject(error) : resolve(value);
-            };
-            const unsub = onSnapshot(myQueueRef, snap => {
-                const x = snap.data();
-                if (x?.roomId) {
-                    deleteDoc(myQueueRef).catch(() => {});
-                    finish({ roomId: x.roomId, role: 'answerer', partnerId: x.partnerId, bus: roomBus(x.roomId) });
-                }
-            });
-            const heartbeat = setInterval(() => updateDoc(myQueueRef, { ts: Date.now() }).catch(() => {}), 10000);
-            // Keep trying to claim others too, so two people who enqueue at the same moment still meet.
-            const retry = setInterval(async () => {
-                if (claiming || done) return;
-                claiming = true;
-                try {
-                    const m = await tryClaim(opts);
-                    if (m) { if (done) m.bus.close(); else finish(m); }
-                } finally { claiming = false; }
-            }, 4000 + Math.random() * 2000);
-            const onAbort = () => {
-                deleteDoc(myQueueRef).catch(() => {});
-                finish(null, new DOMException('aborted', 'AbortError'));
-            };
-            signal.addEventListener('abort', onAbort);
-        });
-    }
-
-    async function report({ partnerId, roomId, reason }) {
-        await addDoc(reportsCol, { reporter: uid, reported: partnerId, roomId, reason, ts: serverTimestamp() });
-    }
-
-    function leaveQueue() { deleteDoc(myQueueRef).catch(() => {}); }
-
-    return { kind: 'firebase', uid, findMatch, report, leaveQueue };
-}
-
-// =====================================================================
-// Transport: local demo (BroadcastChannel between tabs of one browser)
-// =====================================================================
-function createLocalTransport() {
-    const uid = 'local-' + crypto.randomUUID().slice(0, 8);
-    const lobby = new BroadcastChannel('anon-connect-lobby');
-    const post = msg => lobby.postMessage({ ...msg, from: uid });
-    let search = null;
-
-    function roomBus(roomId) {
-        const ch = new BroadcastChannel('anon-connect-room-' + roomId);
-        const handlers = [];
-        let closed = false;
-        ch.onmessage = ({ data }) => { if (data.from !== uid) handlers.forEach(fn => fn(data)); };
-        return {
-            send(type, data) { if (!closed) ch.postMessage({ from: uid, type, data: data ?? null }); },
-            onMessage(fn) { handlers.push(fn); },
-            close() { closed = true; ch.close(); },
-        };
-    }
-
-    // Handshake: lower id proposes -> higher id accepts -> proposer confirms.
-    lobby.onmessage = ({ data: m }) => {
-        const s = search;
-        if (!s || m.from === uid || (m.to && m.to !== uid)) return;
-        switch (m.k) {
-            case 'here':
-                if (m.mode !== s.mode || s.pending || s.awaiting) return;
-                if (s.blocked.includes(m.from) || (m.blocked || []).includes(uid)) return;
-                if (uid < m.from) {
-                    const roomId = crypto.randomUUID();
-                    s.pending = { to: m.from, roomId };
-                    post({ k: 'propose', to: m.from, roomId });
-                    setTimeout(() => { if (s.pending?.roomId === roomId) s.pending = null; }, 1500);
-                }
-                break;
-            case 'propose':
-                if (s.pending || s.awaiting) { post({ k: 'decline', to: m.from, roomId: m.roomId }); return; }
-                s.awaiting = { roomId: m.roomId, bus: roomBus(m.roomId) };
-                post({ k: 'accept', to: m.from, roomId: m.roomId });
-                setTimeout(() => {
-                    if (search === s && s.awaiting?.roomId === m.roomId) { s.awaiting.bus.close(); s.awaiting = null; }
-                }, 2000);
-                break;
-            case 'accept':
-                if (s.pending?.roomId === m.roomId) {
-                    post({ k: 'confirm', to: m.from, roomId: m.roomId });
-                    s.finish({ roomId: m.roomId, role: 'offerer', partnerId: m.from, bus: roomBus(m.roomId) });
-                } else {
-                    post({ k: 'decline', to: m.from, roomId: m.roomId });
-                }
-                break;
-            case 'confirm':
-                if (s.awaiting?.roomId === m.roomId) {
-                    const bus = s.awaiting.bus;
-                    s.awaiting = null;
-                    s.finish({ roomId: m.roomId, role: 'answerer', partnerId: m.from, bus });
-                }
-                break;
-            case 'decline':
-                if (s.awaiting?.roomId === m.roomId) { s.awaiting.bus.close(); s.awaiting = null; }
-                if (s.pending?.roomId === m.roomId) s.pending = null;
-                break;
-        }
-    };
-
-    function findMatch({ mode, blocked }, signal) {
-        return new Promise((resolve, reject) => {
-            const s = { mode, blocked, pending: null, awaiting: null };
-            const announce = () => post({ k: 'here', mode, blocked });
-            const timer = setInterval(announce, 700);
-            announce();
-            const end = () => { clearInterval(timer); if (search === s) search = null; signal.removeEventListener('abort', onAbort); };
-            s.finish = value => { end(); resolve(value); };
-            const onAbort = () => { s.awaiting?.bus.close(); end(); reject(new DOMException('aborted', 'AbortError')); };
-            signal.addEventListener('abort', onAbort);
-            search = s;
-        });
-    }
-
-    async function report(payload) { console.info('[demo] report', payload); }
-
-    return { kind: 'local', uid, findMatch, report, leaveQueue() {} };
-}
 
 // =====================================================================
 // Media
@@ -480,6 +268,7 @@ function setPhase(phase, info = {}) {
         el.partnerName.textContent = 'Searching…';
         el.partnerSub.textContent = 'Finding a match';
         el.avatar.textContent = '?';
+        el.partnerFlag.textContent = '';
         el.nextBtn.textContent = 'Stop';
         el.nextBtn.title = 'Stop searching';
     } else if (phase === 'connecting') {
@@ -515,12 +304,14 @@ function sys(text, kind = '') {
 
 function scrollMessages() { el.messages.scrollTop = el.messages.scrollHeight; }
 
-async function startSearch() {
+/** note: optional message carried over from the chat that just ended (e.g. "Time's up"). */
+async function startSearch(note) {
     clearTimeout(S.autoNextTimer);
     endSession({ notify: true });
     S.searchAbort?.abort();
     clearMessages();
     setPhase('searching');
+    if (typeof note === 'string') sys(note);
     sys('Looking for someone to talk to…');
 
     if (S.mode === 'video' && !(await ensureMedia())) {
@@ -529,12 +320,19 @@ async function startSearch() {
 
     const ac = new AbortController();
     S.searchAbort = ac;
+    const filtered = S.genderFilter !== 'any' || S.countryFilter !== 'any';
+    const slowHint = setTimeout(() => {
+        if (S.searchAbort === ac && filtered) sys('Still looking… your filters may be limiting matches. Try “Everyone” or “Anywhere” for faster chats.');
+    }, 25000);
+    ac.signal.addEventListener('abort', () => clearTimeout(slowHint));
     let match;
     try {
         match = await S.transport.findMatch({
-            mode: S.mode, interests: S.interests, blocked: [...S.blocked],
+            mode: S.mode, interests: S.interests, blocked: [...S.blocked], profile: myProfile(),
         }, ac.signal);
+        clearTimeout(slowHint);
     } catch (e) {
+        clearTimeout(slowHint);
         if (ac.signal.aborted) return;
         console.error(e);
         sys('Matching failed. Check your connection and try again.', 'bad');
@@ -630,7 +428,8 @@ function attachChannel(sess, dc) {
         sys("You're now chatting with a stranger. Say hi! 👋", 'good');
         el.partnerName.textContent = 'Stranger';
         el.avatar.textContent = 'S';
-        sendData({ t: 'hello', nick: S.nick, interests: S.interests });
+        sendData({ t: 'hello', nick: S.nick, interests: S.interests, country: S.country, gender: S.gender, timed: S.timed });
+        if (S.timed) startRound(sess);
         sendData({ t: 'av', muted: S.muted, camOff: S.camOff });
         SOUND.match();
         sess.clockTimer = setInterval(() => renderPartnerSub(sess), 1000);
@@ -655,9 +454,15 @@ function onPeerData(sess, msg) {
         case 'hello': {
             const nick = String(msg.nick || '').trim().slice(0, 20) || 'Stranger';
             const interests = Array.isArray(msg.interests) ? msg.interests.map(String).slice(0, MAX_INTERESTS) : [];
-            sess.partner = { nick, interests };
+            const country = /^[A-Z]{2}$/.test(msg.country || '') ? msg.country : '';
+            const gender = ['male', 'female'].includes(msg.gender) ? msg.gender : '';
+            sess.partner = { nick, interests, country, gender };
             el.partnerName.textContent = nick;
+            el.partnerFlag.textContent = country ? flagOf(country) : '';
+            el.partnerFlag.title = country ? countryName(country) : '';
             el.avatar.textContent = nick[0].toUpperCase();
+            if (country) sys(`${flagOf(country)} ${nick} is from ${countryName(country)}${gender ? ` · ${gender === 'male' ? '♂' : '♀'}` : ''}`);
+            if (msg.timed && !sess.round) startRound(sess);
             const shared = interests.filter(i => S.interests.includes(i));
             if (shared.length) {
                 const line = sys('You both like ');
@@ -672,6 +477,10 @@ function onPeerData(sess, msg) {
             break;
         case 'typing':
             msg.on ? showTyping() : hideTyping();
+            break;
+        case 'extend':
+            sess.partnerExtend = true;
+            tryExtend(sess);
             break;
         case 'av':
             sess.partnerAv = { muted: !!msg.muted, camOff: !!msg.camOff };
@@ -719,6 +528,8 @@ function endSession({ notify }) {
     clearInterval(sess.statsTimer);
     clearInterval(sess.clockTimer);
     clearInterval(sess.ageTimer);
+    clearInterval(sess.roundTimer);
+    el.round.classList.add('hidden');
     try { sess.dc?.close(); } catch { /* ignore */ }
     try { sess.pc.close(); } catch { /* ignore */ }
     sess.bus.close();
@@ -737,6 +548,56 @@ function partnerLeft(title, sub = '') {
     S.autoNextTimer = setTimeout(() => { if (S.phase === 'ended') startSearch(); }, 2500);
 }
 
+// Quick rounds: a countdown per chat. Time is only added when BOTH people tap "+1 min".
+function startRound(sess) {
+    if (sess.round || sess.ended) return;
+    sess.round = { endsAt: Date.now() + ROUND_SECONDS * 1000, total: ROUND_SECONDS };
+    sess.myExtend = sess.partnerExtend = false;
+    el.round.classList.remove('hidden');
+    el.extendBtn.classList.remove('waiting');
+    el.extendBtn.disabled = false;
+    el.roundNote.textContent = '';
+    const tick = () => {
+        if (sess.ended || sess !== S.session) return;
+        const left = Math.max(0, Math.ceil((sess.round.endsAt - Date.now()) / 1000));
+        el.roundTime.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+        el.roundFill.style.width = `${Math.min(100, (left / sess.round.total) * 100)}%`;
+        el.round.classList.toggle('low', left <= 10);
+        if (left === 0) {
+            startSearch('⏱ Time’s up!');
+        }
+    };
+    tick();
+    sess.roundTimer = setInterval(tick, 1000);
+}
+
+function tryExtend(sess) {
+    if (!sess.round || sess.ended) return;
+    if (sess.myExtend && sess.partnerExtend) {
+        sess.round.endsAt += 60000;
+        sess.round.total = Math.max(sess.round.total, Math.ceil((sess.round.endsAt - Date.now()) / 1000));
+        sess.myExtend = sess.partnerExtend = false;
+        el.extendBtn.classList.remove('waiting');
+        el.extendBtn.disabled = false;
+        el.roundNote.textContent = '';
+        sys('⏱ You both added a minute!', 'good');
+    } else if (sess.partnerExtend) {
+        el.roundNote.textContent = 'They want more time!';
+    } else if (sess.myExtend) {
+        el.roundNote.textContent = 'Waiting for them…';
+    }
+}
+
+el.extendBtn.onclick = () => {
+    const sess = S.session;
+    if (!sess?.round || sess.myExtend) return;
+    sess.myExtend = true;
+    el.extendBtn.classList.add('waiting');
+    el.extendBtn.disabled = true;
+    sendData({ t: 'extend' });
+    tryExtend(sess);
+};
+
 // Skipping requires a second press (like the classic "Really?" button) to avoid accidents.
 function disarmSkip() {
     S.skipArmed = false;
@@ -754,8 +615,7 @@ function onNext() {
         return;
     }
     disarmSkip();
-    sys('You skipped this chat.');
-    startSearch();
+    startSearch('You skipped the last chat.');
 }
 el.nextBtn.onclick = onNext;
 el.overlayNewBtn.onclick = () => startSearch();
@@ -1256,6 +1116,28 @@ el.tagInput.addEventListener('keydown', e => {
 el.tagInput.addEventListener('blur', () => { if (el.tagInput.value) { addTag(el.tagInput.value); el.tagInput.value = ''; } });
 el.tags.onclick = () => el.tagInput.focus();
 
+function myProfile() {
+    return { gender: S.gender, country: S.country, genderFilter: S.genderFilter, countryFilter: S.countryFilter };
+}
+
+function renderCountryFilter() {
+    const codes = [...new Set([S.country, ...COUNTRIES].filter(Boolean))];
+    if (S.countryFilter !== 'any' && !codes.includes(S.countryFilter)) codes.push(S.countryFilter);
+    codes.sort((a, b) => (a === S.country ? -1 : b === S.country ? 1 : countryName(a).localeCompare(countryName(b))));
+    el.countryFilter.replaceChildren(new Option('🌐 Anywhere', 'any'));
+    for (const c of codes) el.countryFilter.add(new Option(`${flagOf(c)} ${countryName(c)}${c === S.country ? ' (you)' : ''}`, c));
+    el.countryFilter.value = S.countryFilter;
+}
+
+el.genderSelect.value = S.gender;
+el.genderFilter.value = S.genderFilter;
+el.timedCheck.checked = S.timed;
+el.genderSelect.onchange = () => { S.gender = el.genderSelect.value; store.set('gender', S.gender); };
+el.genderFilter.onchange = () => { S.genderFilter = el.genderFilter.value; store.set('genderFilter', S.genderFilter); };
+el.countryFilter.onchange = () => { S.countryFilter = el.countryFilter.value; store.set('countryFilter', S.countryFilter); };
+el.timedCheck.onchange = () => { S.timed = el.timedCheck.checked; store.set('timed', S.timed); };
+renderCountryFilter();
+
 el.nickInput.value = S.nick;
 el.ageCheck.checked = store.get('ageConfirmed', false);
 const refreshStart = () => { el.startBtn.disabled = !(el.ageCheck.checked && S.transport); };
@@ -1294,8 +1176,47 @@ el.leaveBtn.onclick = () => {
 
 window.addEventListener('pagehide', () => {
     S.session?.bus.send('bye');
-    S.transport?.leaveQueue();
+    S.transport?.leave();
 });
+
+// =====================================================================
+// Online count
+// =====================================================================
+async function refreshOnline() {
+    if (!S.transport) return;
+    try {
+        const n = await S.transport.onlineCount();
+        const text = n.toLocaleString();
+        el.onlineCount.textContent = text;
+        document.getElementById('onlineLabel').textContent = n === 1 ? 'person online now' : 'people online now';
+        el.onlineChipCount.textContent = text;
+        el.onlineChip.classList.remove('hidden');
+    } catch (e) {
+        console.warn('online count failed', e);
+        el.onlineCount.closest('.online-pill').classList.add('hidden');
+    }
+}
+
+// =====================================================================
+// Installable app (PWA)
+// =====================================================================
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    navigator.serviceWorker.register('sw.js').catch(e => console.warn('service worker', e));
+}
+let installPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    installPrompt = e;
+    el.installBtn.classList.remove('hidden');
+});
+el.installBtn.onclick = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    await installPrompt.userChoice.catch(() => {});
+    installPrompt = null;
+    el.installBtn.classList.add('hidden');
+};
+window.addEventListener('appinstalled', () => el.installBtn.classList.add('hidden'));
 
 // =====================================================================
 // Boot
@@ -1303,11 +1224,16 @@ window.addEventListener('pagehide', () => {
 setMode(S.mode);
 renderTags();
 renderAgeStatus();
+detectCountry(store).then(code => { S.country = code; renderCountryFilter(); });
 el.startBtn.textContent = 'Connecting…';
 try {
-    S.transport = firebaseConfig ? await createFirebaseTransport() : createLocalTransport();
+    S.transport = firebaseConfig
+        ? await createFirebaseTransport({ firebaseConfig, appId, initialAuthToken })
+        : createLocalTransport();
     el.demoNote.classList.toggle('hidden', S.transport.kind !== 'local');
     el.startBtn.textContent = 'Start chatting';
+    refreshOnline();
+    setInterval(refreshOnline, S.transport.kind === 'local' ? 3000 : ONLINE_REFRESH_MS);
 } catch (e) {
     console.error('transport init failed', e);
     el.startBtn.textContent = 'Service unavailable';
