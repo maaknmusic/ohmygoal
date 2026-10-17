@@ -42,6 +42,16 @@ window.APP_CONFIG = {
         faceModel: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
     },
 
+    // Shown on legal.html (Terms, Privacy, Refunds, Delivery, Contact). Razorpay requires these
+    // details on your website before it activates live payments.
+    business: {
+        name: 'Anonymous Connect',
+        email: '',      // support email, e.g. 'support@yourdomain.com'
+        phone: '',
+        address: '',    // city, state, country
+        policiesUpdated: '17 October 2026',
+    },
+
     // Premium = signed in with Google + a pass bought through Razorpay (verified by the Cloud Functions
     // in /functions). Prices shown here are for display; the real prices live in functions/index.js.
     premium: {

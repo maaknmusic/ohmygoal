@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terms &amp; Policies · Anonymous Connect</title>
+    <meta name="theme-color" content="#4f46e5">
+    <link rel="icon" href="icons/icon-192.png" type="image/png">
+    <link rel="stylesheet" href="styles.css">
+    <script src="config.js"></script>
+    <style>
+        body { display: block; }
+        .legal { max-width: 820px; margin: 0 auto; padding: 24px 20px 60px; line-height: 1.65; }
+        .legal h1 { font-size: 30px; letter-spacing: -0.02em; margin: 10px 0 4px; }
+        .legal h2 { margin-top: 36px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 21px; }
+        .legal nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 8px; }
+        .legal nav a { font-size: 13px; font-weight: 600; color: var(--primary); text-decoration: none; padding: 5px 12px; border-radius: 999px; background: var(--primary-soft); }
+        .legal p, .legal li { color: var(--text); }
+        .legal .muted { color: var(--muted); font-size: 14px; }
+        .legal a { color: var(--primary); }
+        .placeholder { background: rgba(245, 158, 11, 0.18); border-radius: 4px; padding: 0 4px; }
+    </style>
+</head>
+<body>
+    <header class="topbar">
+        <a class="brand" href="./" style="color: inherit; text-decoration: none;">
+            <div class="brand-dot"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+            Anonymous Connect
+        </a>
+    </header>
+
+    <main class="legal">
+        <h1>Terms &amp; Policies</h1>
+        <p class="muted">Last updated: <span data-field="updated"></span></p>
+        <nav>
+            <a href="#terms">Terms of Service</a>
+            <a href="#privacy">Privacy Policy</a>
+            <a href="#refunds">Cancellation &amp; Refunds</a>
+            <a href="#delivery">Delivery</a>
+            <a href="#contact">Contact Us</a>
+        </nav>
+
+        <h2 id="terms">Terms of Service</h2>
+        <p>Anonymous Connect (the “Service”) is operated by <b data-field="business"></b>. By using the Service you agree to these terms.</p>
+        <ul>
+            <li><b>Age.</b> You must be at least 18 years old. We use an on-device face age estimate and may block access if you appear to be under 18.</li>
+            <li><b>Conduct.</b> No nudity or sexual content, harassment, hate speech, threats, spam, scams, or sharing other people’s personal information. No recording or redistributing other users without consent.</li>
+            <li><b>Enforcement.</b> We may blur video, end chats, and restrict or ban access for violations, including automatically when our safety checks detect nudity. Reports are reviewed by moderators.</li>
+            <li><b>Premium.</b> Premium is an optional paid pass that unlocks extra features (gender and country filters, priority matching, all video effects and a badge) for the period you buy. Premium requires signing in with Google. Premium does not exempt you from these terms.</li>
+            <li><b>No guarantees.</b> Matching depends on who is online and on your filters; we don’t guarantee a minimum number or type of matches. The Service is provided “as is”.</li>
+            <li><b>Liability.</b> You are responsible for what you share. To the extent permitted by law, we are not liable for content or conduct of other users.</li>
+            <li><b>Governing law.</b> These terms are governed by the laws of India.</li>
+        </ul>
+
+        <h2 id="privacy">Privacy Policy</h2>
+        <ul>
+            <li><b>Random chats</b> are peer-to-peer. Messages and video are not stored on our servers. Matching uses temporary records (queue and connection-setup data) that are deleted after the chat.</li>
+            <li><b>Safety checks</b> (age estimation, nudity detection) run on your device. Camera frames are not uploaded.</li>
+            <li><b>We store:</b> an anonymous account ID; your chosen nickname, interests, country (detected from your IP address) and declared gender while you are matching; abuse reports; and, if you sign in with Google, your Google account ID, name and email, your friends list and friend messages, and your Premium status.</li>
+            <li><b>Payments</b> are processed by Razorpay. We never see or store your card, UPI or bank details; we keep the order and payment IDs, amount and date.</li>
+            <li><b>Service providers:</b> Google Firebase (hosting of data and sign-in), Razorpay (payments), Metered (video relay for some networks).</li>
+            <li><b>Your choices:</b> you can use the Service without signing in, remove friends at any time, and ask us to delete your account data by contacting us.</li>
+        </ul>
+
+        <h2 id="refunds">Cancellation &amp; Refund Policy</h2>
+        <ul>
+            <li>Premium passes are <b>one-time payments with no auto-renewal</b>, so there is nothing to cancel.</li>
+            <li>If you were charged but Premium was not activated, or you were charged twice, contact us within 7 days with your payment ID and we will activate it or refund you in full.</li>
+            <li>Refunds for unused passes can be requested within 48 hours of purchase if Premium features have not been used.</li>
+            <li>Approved refunds are returned to the original payment method within 5–7 working days.</li>
+            <li>Passes removed because of a ban for breaking these terms are not refundable.</li>
+        </ul>
+
+        <h2 id="delivery">Delivery Policy</h2>
+        <p>Premium is a digital service; nothing is shipped. Premium is activated on your Google-signed-in account immediately after successful payment (usually within a few seconds) and is available on any device where you sign in with the same Google account.</p>
+
+        <h2 id="contact">Contact Us</h2>
+        <p>
+            <b data-field="business"></b><br>
+            Email: <span data-field="email"></span><br>
+            Phone: <span data-field="phone"></span><br>
+            Address: <span data-field="address"></span>
+        </p>
+    </main>
+
+    <script>
+        // Business details come from config.js (APP_CONFIG.business) so they're edited in one place.
+        (function () {
+            const b = (window.APP_CONFIG && window.APP_CONFIG.business) || {};
+            const fields = {
+                business: b.name, email: b.email, phone: b.phone, address: b.address, updated: b.policiesUpdated,
+            };
+            document.querySelectorAll('[data-field]').forEach(el => {
+                const value = fields[el.dataset.field];
+                if (value) {
+                    if (el.dataset.field === 'email') {
+                        const a = document.createElement('a');
+                        a.href = 'mailto:' + value;
+                        a.textContent = value;
+                        el.replaceChildren(a);
+                    } else el.textContent = value;
+                } else {
+                    el.textContent = '[set business.' + el.dataset.field + ' in config.js]';
+                    el.classList.add('placeholder');
+                }
+            });
+            try {
+                const theme = JSON.parse(localStorage.getItem('ac.theme'));
+                if (theme) document.documentElement.dataset.theme = theme;
+            } catch (e) { /* default theme */ }
+        })();
+    </script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 // Network-first, so users always get the latest version when online.
 const CACHE = 'anon-connect-v1';
 const SHELL = ['./', 'index.html', 'styles.css', 'config.js', 'js/app.js', 'js/transport.js', 'js/geo.js', 'js/effects.js', 'js/safety.js', 'js/friends.js', 'js/premium.js',
-    'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
+    'legal.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', event => {
     event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
