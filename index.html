@@ -164,7 +164,15 @@
                     <button id="micBtn" class="icon-btn" title="Mute microphone"><i class="icon" data-icon="mic"></i></button>
                     <button id="camBtn" class="icon-btn" title="Turn camera off"><i class="icon" data-icon="video"></i></button>
                     <button id="switchCamBtn" class="icon-btn hidden" title="Switch camera"><i class="icon" data-icon="switch"></i></button>
+                    <button id="fxBtn" class="icon-btn" title="Effects: backgrounds, masks, filters"><i class="icon" data-icon="sparkles"></i></button>
                     <button id="fullBtn" class="icon-btn" title="Fullscreen"><i class="icon" data-icon="max"></i></button>
+                </div>
+                <div class="fx-panel hidden" id="fxPanel">
+                    <div class="fx-head"><b>Effects</b><span id="fxStatus"></span><button id="fxClose" class="icon-btn" title="Close">×</button></div>
+                    <div class="fx-row"><span>Background</span><div class="fx-opts" data-kind="background"></div></div>
+                    <div class="fx-row"><span>Mask</span><div class="fx-opts" data-kind="mask"></div></div>
+                    <div class="fx-row"><span>Filter</span><div class="fx-opts" data-kind="filter"></div></div>
+                    <div class="fx-note">Processed on your device. Your partner sees exactly this preview.</div>
                 </div>
             </div>
         </section>

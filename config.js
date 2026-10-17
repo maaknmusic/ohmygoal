@@ -34,6 +34,14 @@ window.APP_CONFIG = {
     geminiModel: 'gemini-2.5-flash',
 
     // Face-based age estimation (runs on-device; no image ever leaves the browser).
+    // Video effects (background blur/replacement, face masks). Loaded only when a user opens the effects panel.
+    effects: {
+        libUrl: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs',
+        wasmUrl: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm',
+        segmenterModel: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite',
+        faceModel: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+    },
+
     ageCheck: {
         enabled: true,
         passAge: 25,        // estimated age needed to pass (margin for model error, like "Challenge 25")

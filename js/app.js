@@ -1,5 +1,6 @@
 import { createFirebaseTransport, createLocalTransport } from './transport.js';
 import { COUNTRIES, flagOf, countryName, detectCountry } from './geo.js';
+import { Effects, BACKGROUNDS, MASKS, FILTERS } from './effects.js';
 
 // =====================================================================
 // Config
@@ -39,6 +40,7 @@ const ICONS = {
     tag: '<path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>',
     clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
     shield: '<path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.7 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+    sparkles: '<path d="M9.94 14.06A2 2 0 0 0 8.5 12.6l-6.1-1.6a.5.5 0 0 1 0-1l6.1-1.6a2 2 0 0 0 1.45-1.44L11.5 1.9a.5.5 0 0 1 1 0l1.57 6.1a2 2 0 0 0 1.44 1.44l6.1 1.57a.5.5 0 0 1 0 1l-6.1 1.57a2 2 0 0 0-1.44 1.44L12.5 21.1a.5.5 0 0 1-1 0z"/><path d="M20 3v4M22 5h-4"/>',
     download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
     volumeOff: '<path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/>',
 };
@@ -69,7 +71,7 @@ const el = {
     genderSelect: $('genderSelect'), genderFilter: $('genderFilter'), countryFilter: $('countryFilter'),
     filterHint: $('filterHint'), timedCheck: $('timedCheck'), partnerFlag: $('partnerFlag'),
     onlineCount: $('onlineCount'), onlineChip: $('onlineChip'), onlineChipCount: $('onlineChipCount'),
-    installBtn: $('installBtn'),
+    installBtn: $('installBtn'), fxBtn: $('fxBtn'), fxPanel: $('fxPanel'), fxClose: $('fxClose'), fxStatus: $('fxStatus'),
     round: $('round'), roundFill: $('roundFill'), roundTime: $('roundTime'), roundNote: $('roundNote'), extendBtn: $('extendBtn'),
 };
 
@@ -105,6 +107,8 @@ const S = {
     genderFilter: store.get('genderFilter', 'any'),
     countryFilter: store.get('countryFilter', 'any'),
     timed: store.get('timed', false),
+    fx: { background: 'none', mask: 'none', filter: 'none', ...store.get('fx', {}) },
+    effects: null,
     country: '',
     phase: 'idle', // idle | searching | connecting | connected | ended
     localStream: null,
@@ -191,6 +195,7 @@ async function ensureMedia() {
     }
     el.localVideo.srcObject = S.localStream;
     applyTrackState();
+    if (fxActive()) applyEffects({});
     try {
         S.videoDevices = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
     } catch { S.videoDevices = []; }
@@ -199,6 +204,7 @@ async function ensureMedia() {
 }
 
 function stopMedia() {
+    S.effects?.stop();
     S.localStream?.getTracks().forEach(t => t.stop());
     S.localStream = null;
     el.localVideo.srcObject = null;
@@ -207,6 +213,7 @@ function stopMedia() {
 function applyTrackState() {
     S.localStream?.getAudioTracks().forEach(t => (t.enabled = !S.muted));
     S.localStream?.getVideoTracks().forEach(t => (t.enabled = !S.camOff));
+    if (S.effects?.track) S.effects.track.enabled = !S.camOff;
     el.micBtn.classList.toggle('active', S.muted);
     el.camBtn.classList.toggle('active', S.camOff);
     el.micBtn.title = S.muted ? 'Unmute microphone' : 'Mute microphone';
@@ -225,12 +232,16 @@ async function switchCamera() {
         const newTrack = fresh.getVideoTracks()[0];
         const oldTrack = S.localStream.getVideoTracks()[0];
         newTrack.enabled = !S.camOff;
-        const sender = S.session?.pc.getSenders().find(s => s.track?.kind === 'video');
-        if (sender) await sender.replaceTrack(newTrack);
         S.localStream.removeTrack(oldTrack);
         oldTrack.stop();
         S.localStream.addTrack(newTrack);
-        el.localVideo.srcObject = S.localStream;
+        if (S.effects?.track) {
+            S.effects.setSource(S.localStream); // the processed track keeps flowing to the partner
+        } else {
+            const sender = videoSender();
+            if (sender) await sender.replaceTrack(newTrack);
+            el.localVideo.srcObject = S.localStream;
+        }
     } catch (e) {
         toast('Could not switch camera.', true);
     }
@@ -243,6 +254,72 @@ el.fullBtn.onclick = () => {
     if (document.fullscreenElement) document.exitFullscreen();
     else el.videoWrap.requestFullscreen?.().catch(() => {});
 };
+
+// =====================================================================
+// Video effects
+// =====================================================================
+const fxActive = () => S.fx.background !== 'none' || S.fx.mask !== 'none' || S.fx.filter !== 'none';
+const videoSender = () => S.session?.pc.getSenders().find(s => s.track?.kind === 'video');
+/** The video track that is previewed and sent: processed when effects are on, raw camera otherwise. */
+const outVideoTrack = () => S.effects?.track || S.localStream?.getVideoTracks()[0] || null;
+/** Unprocessed camera (for safety checks that must not be fooled by masks). */
+const rawVideoEl = () => (S.effects?.track ? S.effects.video : el.localVideo);
+
+let fxChain = Promise.resolve();
+/** Update effect settings. Changes are applied one at a time, always using the latest settings. */
+function applyEffects(partial) {
+    S.fx = { ...S.fx, ...partial };
+    store.set('fx', S.fx);
+    renderFxPanel();
+    fxChain = fxChain.then(syncEffects, syncEffects);
+    return fxChain;
+}
+
+async function syncEffects() {
+    if (!S.localStream) return;
+    const fx = S.effects ||= new Effects(CFG.effects);
+    const needsModels = S.fx.background !== 'none' || S.fx.mask !== 'none';
+    if (needsModels) el.fxStatus.textContent = 'Loading…';
+    try {
+        await fx.set({ ...S.fx });
+    } catch (e) {
+        console.warn('effects failed to load', e);
+        toast('Backgrounds and masks aren’t available on this device.', true);
+        S.fx = { ...S.fx, background: 'none', mask: 'none' };
+        store.set('fx', S.fx);
+        await fx.set({ ...S.fx }).catch(() => {});
+        renderFxPanel();
+    }
+    el.fxStatus.textContent = '';
+    if (!S.localStream) return;
+    const previous = outVideoTrack();
+    let track;
+    if (fx.active) track = await fx.start(S.localStream);
+    else { fx.stop(); track = S.localStream.getVideoTracks()[0]; }
+    track.enabled = !S.camOff;
+    el.localVideo.srcObject = new MediaStream([track]);
+    const sender = videoSender();
+    if (sender && sender.track !== track) await sender.replaceTrack(track).catch(e => console.warn('replaceTrack', e));
+    if (previous && previous !== track && previous !== S.localStream.getVideoTracks()[0]) previous.stop();
+}
+
+function renderFxPanel() {
+    el.fxBtn.classList.toggle('on', fxActive());
+    const lists = { background: BACKGROUNDS, mask: MASKS, filter: FILTERS };
+    el.fxPanel.querySelectorAll('.fx-opts').forEach(box => {
+        const kind = box.dataset.kind;
+        box.replaceChildren(...lists[kind].map(opt => {
+            const b = h('button', (opt.emoji ? 'emoji' : '') + (S.fx[kind] === opt.id ? ' active' : ''), opt.label);
+            b.type = 'button';
+            b.title = opt.id;
+            b.onclick = () => applyEffects({ [kind]: opt.id });
+            return b;
+        }));
+    });
+}
+el.fxBtn.onclick = e => { e.stopPropagation(); el.fxPanel.classList.toggle('hidden'); renderFxPanel(); };
+el.fxClose.onclick = () => el.fxPanel.classList.add('hidden');
+renderFxPanel();
 
 // =====================================================================
 // Matching & connection lifecycle
@@ -361,7 +438,8 @@ async function connect({ roomId, role, bus, partnerId }) {
     };
 
     if (S.mode === 'video' && S.localStream) {
-        S.localStream.getTracks().forEach(t => pc.addTrack(t, S.localStream));
+        const send = new MediaStream([...S.localStream.getAudioTracks(), outVideoTrack()].filter(Boolean));
+        send.getTracks().forEach(t => pc.addTrack(t, send));
     }
     pc.onicecandidate = e => { if (e.candidate) bus.send('candidate', e.candidate.toJSON()); };
     pc.ontrack = e => { el.remoteVideo.srcObject = e.streams[0]; };
@@ -1054,9 +1132,10 @@ function startAgeRecheck(sess) {
     loadFaceApi().catch(() => {});
     sess.ageSamples = [];
     sess.ageTimer = setInterval(async () => {
-        if (sess.ended || !V.faceapi || S.camOff || !el.localVideo.videoWidth) return;
+        const cam = rawVideoEl();
+        if (sess.ended || !V.faceapi || S.camOff || !cam.videoWidth) return;
         let faces;
-        try { faces = await detectFaces(el.localVideo); } catch { return; }
+        try { faces = await detectFaces(cam); } catch { return; }
         if (sess.ended || faces.length !== 1) return;
         sess.ageSamples = [...sess.ageSamples, faces[0].age].slice(-3);
         // Conservative: only act on three consecutive clearly-underage estimates.
