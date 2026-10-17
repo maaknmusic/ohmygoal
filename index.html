@@ -26,8 +26,18 @@
             },
             appId: 'anon-connect',
             iceServers: [
-                { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
-                // { urls: 'turn:turn.example.com:3478', username: 'user', credential: 'pass' },
+                { urls: ['stun:stun.l.google.com:19302', 'stun:stun.relay.metered.ca:80'] },
+                // Metered TURN relay: used only when a direct connection is blocked (mobile data, strict NATs).
+                {
+                    urls: [
+                        'turn:global.relay.metered.ca:80',
+                        'turn:global.relay.metered.ca:80?transport=tcp',
+                        'turn:global.relay.metered.ca:443',
+                        'turns:global.relay.metered.ca:443?transport=tcp',
+                    ],
+                    username: '2a803601019d1d0bb1078a86',
+                    credential: 'Hcp9CNhuUNyqjV2f',
+                },
             ],
             geminiApiKey: '',
             geminiModel: 'gemini-2.5-flash',
