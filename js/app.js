@@ -1,6 +1,7 @@
 import { createFirebaseTransport, createLocalTransport } from './transport.js';
 import { COUNTRIES, flagOf, countryName, detectCountry } from './geo.js';
 import { Effects, BACKGROUNDS, MASKS, FILTERS } from './effects.js';
+import { NudityGuard } from './safety.js';
 
 // =====================================================================
 // Config
@@ -71,7 +72,9 @@ const el = {
     genderSelect: $('genderSelect'), genderFilter: $('genderFilter'), countryFilter: $('countryFilter'),
     filterHint: $('filterHint'), timedCheck: $('timedCheck'), partnerFlag: $('partnerFlag'),
     onlineCount: $('onlineCount'), onlineChip: $('onlineChip'), onlineChipCount: $('onlineChipCount'),
-    installBtn: $('installBtn'), fxBtn: $('fxBtn'), fxPanel: $('fxPanel'), fxClose: $('fxClose'), fxStatus: $('fxStatus'),
+    installBtn: $('installBtn'),
+    shield: $('shield'), shieldTitle: $('shieldTitle'), shieldSub: $('shieldSub'), shieldActions: $('shieldActions'),
+    shieldSkip: $('shieldSkip'), shieldReport: $('shieldReport'), fxBtn: $('fxBtn'), fxPanel: $('fxPanel'), fxClose: $('fxClose'), fxStatus: $('fxStatus'),
     round: $('round'), roundFill: $('roundFill'), roundTime: $('roundTime'), roundNote: $('roundNote'), extendBtn: $('extendBtn'),
 };
 
@@ -322,6 +325,98 @@ el.fxClose.onclick = () => el.fxPanel.classList.add('hidden');
 renderFxPanel();
 
 // =====================================================================
+// Nudity safety: partner video is blurred until an on-device check passes,
+// and your own camera is switched off if it shows nudity.
+// =====================================================================
+const SAFETY = { nudityModelUrl: 'models/nsfw/model.json', blurThreshold: 0.85, selfThreshold: 0.92, strikesForBan: 3, ...(CFG.safety || {}) };
+let guard = null;
+const getGuard = () => (guard ||= new NudityGuard(async () => (await loadFaceApi()).tf, SAFETY.nudityModelUrl));
+const DAY_MS = 86400000;
+const videoBannedUntil = () => { const u = store.get('videoBanUntil', 0); return u > Date.now() ? u : 0; };
+
+let shieldState = 'off';
+function setShield(state) {
+    shieldState = state;
+    el.remoteVideo.classList.toggle('shielded', state !== 'off');
+    el.shield.classList.toggle('hidden', state === 'off');
+    el.shield.classList.toggle('alert', state === 'hidden');
+    el.shieldActions.classList.toggle('hidden', state !== 'hidden');
+    if (state === 'checking') {
+        el.shieldTitle.textContent = 'Checking video…';
+        el.shieldSub.textContent = 'Video appears once our on-device safety check passes.';
+    } else if (state === 'hidden') {
+        el.shieldTitle.textContent = 'Video hidden';
+        el.shieldSub.textContent = 'It may contain nudity. It will reappear automatically if it’s clean again.';
+    }
+}
+
+function startSafety(sess) {
+    if (S.mode !== 'video') return;
+    setShield('checking');
+    const st = sess.safety = { bad: 0, good: 0, hits: 0, reported: false, selfBad: 0 };
+    const g = getGuard();
+    // If the model can't load (old device, offline CDN), don't leave the video blurred forever.
+    sess.safetyFailOpen = setTimeout(() => { if (!sess.ended && !g.model && shieldState === 'checking') setShield('off'); }, 20000);
+    g.load().catch(e => { console.warn('nudity model failed to load', e); if (!sess.ended && shieldState === 'checking') setShield('off'); });
+
+    sess.safetyTimer = setInterval(async () => {
+        const r = await g.check(el.remoteVideo).catch(() => null);
+        if (!r || sess.ended) return;
+        if (r.explicit >= SAFETY.blurThreshold) {
+            st.good = 0;
+            if (++st.bad >= 2) {
+                if (shieldState !== 'hidden') sys('⚠️ Video hidden: it may contain nudity.', 'bad');
+                setShield('hidden');
+                if (++st.hits >= 3 && !st.reported) {
+                    st.reported = true;
+                    S.transport.report({ partnerId: sess.partnerId, roomId: sess.roomId, reason: 'auto-nudity' }).catch(() => {});
+                }
+            }
+        } else {
+            st.bad = 0;
+            // The first clean frame lifts the initial blur; after a detection, require 3 clearly clean frames.
+            const clean = shieldState === 'hidden' ? r.explicit < SAFETY.blurThreshold - 0.2 : true;
+            if (clean && ++st.good >= (shieldState === 'hidden' ? 3 : 1)) setShield('off');
+            if (!clean) st.good = 0;
+        }
+    }, 1500);
+
+    sess.selfTimer = setInterval(async () => {
+        if (sess.ended || S.camOff) return;
+        const r = await g.check(rawVideoEl()).catch(() => null);
+        if (!r || sess.ended) return;
+        if (r.explicit >= SAFETY.selfThreshold) { if (++st.selfBad >= 2) selfViolation(sess); }
+        else st.selfBad = 0;
+    }, 3000);
+}
+
+function selfViolation(sess) {
+    sess.safety.selfBad = 0;
+    S.camOff = true;
+    applyTrackState();
+    const strikes = store.get('strikes', []).filter(t => Date.now() - t < DAY_MS);
+    strikes.push(Date.now());
+    store.set('strikes', strikes);
+    if (strikes.length >= SAFETY.strikesForBan) {
+        store.set('videoBanUntil', Date.now() + DAY_MS);
+        store.set('strikes', []);
+        toast('Video chat is locked for 24 hours after repeated nudity on camera. Text chat is still available.', true);
+        setMode('text');
+        startSearch('Your camera was turned off.');
+    } else {
+        toast(`Your camera was turned off: nudity detected. Strike ${strikes.length} of ${SAFETY.strikesForBan}.`, true);
+        sys('Your camera was turned off by the safety check. Turn it back on when you’re ready.', 'bad');
+    }
+}
+
+el.shieldSkip.onclick = () => startSearch('You skipped the last chat.');
+el.shieldReport.onclick = () => {
+    const sexual = document.querySelector('input[name="reason"][value="sexual"]');
+    if (sexual) sexual.checked = true;
+    el.reportBtn.click();
+};
+
+// =====================================================================
 // Matching & connection lifecycle
 // =====================================================================
 function setPhase(phase, info = {}) {
@@ -441,6 +536,7 @@ async function connect({ roomId, role, bus, partnerId }) {
         const send = new MediaStream([...S.localStream.getAudioTracks(), outVideoTrack()].filter(Boolean));
         send.getTracks().forEach(t => pc.addTrack(t, send));
     }
+    startSafety(sess);
     pc.onicecandidate = e => { if (e.candidate) bus.send('candidate', e.candidate.toJSON()); };
     pc.ontrack = e => { el.remoteVideo.srcObject = e.streams[0]; };
     pc.onconnectionstatechange = () => {
@@ -607,6 +703,10 @@ function endSession({ notify }) {
     clearInterval(sess.clockTimer);
     clearInterval(sess.ageTimer);
     clearInterval(sess.roundTimer);
+    clearInterval(sess.safetyTimer);
+    clearInterval(sess.selfTimer);
+    clearTimeout(sess.safetyFailOpen);
+    setShield('off');
     el.round.classList.add('hidden');
     try { sess.dc?.close(); } catch { /* ignore */ }
     try { sess.pc.close(); } catch { /* ignore */ }
@@ -1157,6 +1257,10 @@ function startAgeRecheck(sess) {
 // Welcome screen
 // =====================================================================
 function setMode(mode) {
+    if (mode === 'video' && videoBannedUntil()) {
+        toast(`Video chat is locked until ${new Date(videoBannedUntil()).toLocaleString()}. Text chat is available.`, true);
+        mode = 'text';
+    }
     S.mode = mode;
     store.set('mode', mode);
     document.querySelectorAll('.seg').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
@@ -1233,6 +1337,7 @@ el.startBtn.onclick = async () => {
 };
 
 function enterChat() {
+    if (S.mode === 'video') getGuard().load().catch(() => {});
     el.welcome.classList.add('hidden');
     el.chat.classList.remove('hidden');
     el.leaveBtn.classList.remove('hidden');

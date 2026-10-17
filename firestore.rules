@@ -53,7 +53,7 @@ service cloud.firestore {
       match /reports/{reportId} {
         allow create: if request.auth != null
           && request.resource.data.reporter == request.auth.uid
-          && request.resource.data.reason in ['sexual', 'minor', 'harassment', 'spam', 'other'];
+          && request.resource.data.reason in ['sexual', 'minor', 'harassment', 'spam', 'other', 'auto-nudity'];
       }
     }
   }

@@ -42,6 +42,16 @@ window.APP_CONFIG = {
         faceModel: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
     },
 
+    // On-device nudity detection for video chats.
+    safety: {
+        nudityModelUrl: 'models/nsfw/model.json',
+        // The model gives false positives around 0.6-0.8 on dim, skin-heavy (but clothed) scenes;
+        // real nudity typically scores above 0.9.
+        blurThreshold: 0.85,   // porn+hentai probability that hides the partner's video
+        selfThreshold: 0.92,   // ... that turns off your own camera (a strike)
+        strikesForBan: 3,      // strikes within 24 h before video chat is locked for 24 h
+    },
+
     ageCheck: {
         enabled: true,
         passAge: 25,        // estimated age needed to pass (margin for model error, like "Challenge 25")
