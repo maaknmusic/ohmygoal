@@ -24,6 +24,7 @@ const profileFields = p => ({
     country: p?.country || '',
     genderFilter: p?.genderFilter || 'any',
     countryFilter: p?.countryFilter || 'any',
+    premium: !!p?.premium,
 });
 
 export async function createFirebaseTransport({ firebaseConfig, appId, initialAuthToken, emulators }) {
@@ -100,7 +101,9 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
                     && !blocked.includes(d.id) && !(x.blocked || []).includes(me())
                     && compatible(profile, x);
             })
-            .sort((a, b) => shared(b.data()) - shared(a.data()) || a.data().ts - b.data().ts);
+            // Premium (priority) entries are matched first, then shared interests, then longest waiting.
+            .sort((a, b) => (b.data().premium ? 1 : 0) - (a.data().premium ? 1 : 0)
+                || shared(b.data()) - shared(a.data()) || a.data().ts - b.data().ts);
 
         const queueRef = myQueueRef();
         const uid = me();
@@ -193,7 +196,7 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
     }
 
     return {
-        kind: 'firebase', get uid() { return me(); }, findMatch, report, onlineCount, leave, roomBus, beat,
+        kind: 'firebase', get uid() { return me(); }, findMatch, report, onlineCount, leave, roomBus, beat, emulators,
         fb: { app, auth, db, fs, authMod, base },
     };
 }

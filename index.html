@@ -26,6 +26,7 @@
             <span id="onlineChip" class="chip online hidden"><span class="live-dot"></span><span id="onlineChipCount">0</span> online</span>
             <span id="modeChip" class="chip hidden"></span>
             <button id="installBtn" class="btn btn-ghost btn-sm hidden" title="Install as an app"><i class="icon" data-icon="download"></i><span>Install</span></button>
+            <button id="premiumBtn" class="btn btn-sm btn-premium hidden" title="Premium">👑 <span id="premiumBtnText">Go Premium</span></button>
             <button id="friendsBtn" class="icon-btn hidden" title="Friends"><i class="icon" data-icon="users"></i><span class="badge hidden" id="friendsBadge"></span></button>
             <button id="soundBtn" class="icon-btn" title="Toggle sounds"><i class="icon" data-icon="volume"></i></button>
             <button id="themeBtn" class="icon-btn" title="Toggle theme"><i class="icon" data-icon="moon"></i></button>
@@ -85,7 +86,7 @@
 
                 <div class="field-row">
                     <div class="field">
-                        <label class="lbl" for="genderFilter">Talk to</label>
+                        <label class="lbl" for="genderFilter">Talk to <span class="pro-tag">👑 Premium</span></label>
                         <select id="genderFilter" class="input">
                             <option value="any">Everyone</option>
                             <option value="female">Women</option>
@@ -93,7 +94,7 @@
                         </select>
                     </div>
                     <div class="field">
-                        <label class="lbl" for="countryFilter">From</label>
+                        <label class="lbl" for="countryFilter">From <span class="pro-tag">👑 Premium</span></label>
                         <select id="countryFilter" class="input">
                             <option value="any">🌐 Anywhere</option>
                         </select>
@@ -192,7 +193,7 @@
                 <div class="partner">
                     <div class="avatar" id="avatar">?</div>
                     <div style="min-width:0">
-                        <div class="partner-name"><span id="partnerName">Searching…</span> <span id="partnerFlag" class="flag"></span></div>
+                        <div class="partner-name"><span id="partnerName">Searching…</span> <span id="partnerFlag" class="flag"></span> <span id="partnerBadge" class="pro-badge hidden" title="Verified Premium member">👑</span></div>
                         <div class="partner-sub"><span class="status-dot wait" id="statusDot"></span><span id="partnerSub">Finding a match</span></div>
                     </div>
                 </div>
@@ -247,6 +248,26 @@
             </div>
         </div>
     </aside>
+
+    <!-- Premium paywall -->
+    <div id="paywall" class="modal-bg hidden">
+        <div class="modal paywall">
+            <button class="icon-btn paywall-close" id="paywallClose" title="Close">×</button>
+            <div class="paywall-crown">👑</div>
+            <h3>Go Premium</h3>
+            <p id="paywallReason">Get more out of every chat.</p>
+            <ul class="perks">
+                <li>🎯 <b>Gender filter</b>: choose to talk to women or men</li>
+                <li>🌍 <b>Country filter</b>: meet people from a specific country</li>
+                <li>⚡ <b>Priority matching</b>: get matched first</li>
+                <li>✨ <b>All effects</b>: every background, mask and filter</li>
+                <li>👑 <b>Premium badge</b>: verified, shown to the people you meet</li>
+            </ul>
+            <div class="plans" id="plans"></div>
+            <button class="btn btn-primary btn-block" id="paywallCta">Continue with Google</button>
+            <div class="hint paywall-hint" id="paywallHint">One-time payment, no auto-renewal. Secure checkout by Razorpay: UPI, cards, netbanking and wallets.</div>
+        </div>
+    </div>
 
     <!-- Incoming friend call -->
     <div id="callModal" class="modal-bg hidden">

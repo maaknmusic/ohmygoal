@@ -42,6 +42,19 @@ window.APP_CONFIG = {
         faceModel: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
     },
 
+    // Premium = signed in with Google + a pass bought through Razorpay (verified by the Cloud Functions
+    // in /functions). Prices shown here are for display; the real prices live in functions/index.js.
+    premium: {
+        enabled: true,
+        functionsRegion: 'asia-south1',
+        checkoutUrl: 'https://checkout.razorpay.com/v1/checkout.js',
+        plans: [
+            { id: 'week', label: '7 days', price: '₹49' },
+            { id: 'month', label: '30 days', price: '₹149', note: 'Most popular' },
+            { id: 'quarter', label: '90 days', price: '₹349', note: 'Best value' },
+        ],
+    },
+
     // On-device nudity detection for video chats.
     safety: {
         nudityModelUrl: 'models/nsfw/model.json',

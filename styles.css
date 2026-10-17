@@ -114,6 +114,28 @@ select.input option { background: var(--panel); color: var(--text); }
 .chip.online { display: inline-flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.12); color: var(--success); }
 .flag { font-size: 16px; }
 
+/* Premium */
+.btn-premium { background: linear-gradient(135deg, #f59e0b, #f97316); color: #fff; border: none; }
+.btn-premium:hover { filter: brightness(1.05); }
+.btn-premium.on { background: rgba(245, 158, 11, 0.15); color: #d97706; }
+.pro-tag { font-size: 10px; font-weight: 700; color: #d97706; background: rgba(245, 158, 11, 0.15); padding: 1px 6px; border-radius: 999px; margin-left: 4px; }
+body.is-premium .pro-tag { display: none; }
+.pro-badge { font-size: 15px; }
+.fx-opts button.locked { opacity: 0.55; }
+.fx-opts button.locked::after { content: '🔒'; font-size: 10px; margin-left: 3px; }
+.paywall { position: relative; max-width: 440px; text-align: center; }
+.paywall-close { position: absolute; top: 12px; right: 12px; font-size: 18px; width: 32px; height: 32px; }
+.paywall-crown { font-size: 40px; }
+.paywall h3 { font-size: 22px; margin: 4px 0; }
+.perks { list-style: none; padding: 0; margin: 12px 0 16px; text-align: left; display: grid; gap: 8px; font-size: 14px; }
+.plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.plan { border: 2px solid var(--border); border-radius: 14px; padding: 12px 6px; cursor: pointer; background: var(--bg-2); position: relative; }
+.plan.active { border-color: #f59e0b; background: rgba(245, 158, 11, 0.1); }
+.plan b { display: block; font-size: 18px; }
+.plan span { font-size: 12px; color: var(--muted); }
+.plan i { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); font-style: normal; font-size: 10px; font-weight: 700; white-space: nowrap; background: #f59e0b; color: #fff; padding: 1px 7px; border-radius: 999px; }
+.paywall-hint { margin-top: 10px; }
+
 /* Friends */
 #friendsBtn { position: relative; }
 .badge { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; }

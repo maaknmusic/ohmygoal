@@ -3,6 +3,7 @@ import { COUNTRIES, flagOf, countryName, detectCountry } from './geo.js';
 import { Effects, BACKGROUNDS, MASKS, FILTERS } from './effects.js';
 import { NudityGuard } from './safety.js';
 import { Friends, pairIdOf } from './friends.js';
+import { Premium } from './premium.js';
 
 // =====================================================================
 // Config
@@ -76,6 +77,9 @@ const el = {
     filterHint: $('filterHint'), timedCheck: $('timedCheck'), partnerFlag: $('partnerFlag'),
     onlineCount: $('onlineCount'), onlineChip: $('onlineChip'), onlineChipCount: $('onlineChipCount'),
     installBtn: $('installBtn'),
+    premiumBtn: $('premiumBtn'), premiumBtnText: $('premiumBtnText'), partnerBadge: $('partnerBadge'),
+    paywall: $('paywall'), paywallClose: $('paywallClose'), paywallReason: $('paywallReason'), plans: $('plans'),
+    paywallCta: $('paywallCta'), paywallHint: $('paywallHint'),
     friendsBtn: $('friendsBtn'), friendsBadge: $('friendsBadge'), addFriendBtn: $('addFriendBtn'),
     drawer: $('drawer'), drawerBack: $('drawerBack'), drawerTitle: $('drawerTitle'), drawerClose: $('drawerClose'),
     drawerAccount: $('drawerAccount'), friendList: $('friendList'), friendChat: $('friendChat'),
@@ -108,6 +112,17 @@ const store = {
 // =====================================================================
 // State
 // =====================================================================
+let friends = null;
+let premium = null;
+const PREMIUM_CFG = { enabled: true, functionsRegion: 'asia-south1', plans: [], ...(CFG.premium || {}) };
+// Premium only exists on the live (Firebase) site with premium.enabled; otherwise everything is unlocked.
+// Note: firestore.rules also enforce the filters, so turning Premium off needs a rules change too.
+const premiumExpected = !!firebaseConfig && PREMIUM_CFG.enabled;
+const isPremium = () => (premium ? premium.active : !premiumExpected);
+// What free users get in the effects panel; everything else is Premium.
+const FREE_FX = { background: ['none', 'blur'], mask: ['none', 'shades'], filter: ['none', 'beauty'] };
+const fxLocked = (kind, id) => !isPremium() && !FREE_FX[kind].includes(id);
+
 const S = {
     transport: null,
     mode: store.get('mode', 'video'),
@@ -281,6 +296,7 @@ let fxChain = Promise.resolve();
 /** Update effect settings. Changes are applied one at a time, always using the latest settings. */
 function applyEffects(partial) {
     S.fx = { ...S.fx, ...partial };
+    for (const kind of Object.keys(FREE_FX)) if (fxLocked(kind, S.fx[kind])) S.fx[kind] = 'none';
     store.set('fx', S.fx);
     renderFxPanel();
     fxChain = fxChain.then(syncEffects, syncEffects);
@@ -321,10 +337,12 @@ function renderFxPanel() {
     el.fxPanel.querySelectorAll('.fx-opts').forEach(box => {
         const kind = box.dataset.kind;
         box.replaceChildren(...lists[kind].map(opt => {
-            const b = h('button', (opt.emoji ? 'emoji' : '') + (S.fx[kind] === opt.id ? ' active' : ''), opt.label);
+            const locked = fxLocked(kind, opt.id);
+            const b = h('button', (opt.emoji ? 'emoji' : '') + (S.fx[kind] === opt.id ? ' active' : '') + (locked ? ' locked' : ''), opt.label);
             b.type = 'button';
-            b.title = opt.id;
-            b.onclick = () => applyEffects({ [kind]: opt.id });
+            b.title = locked ? `${opt.id} (Premium)` : opt.id;
+            b.dataset.id = opt.id;
+            b.onclick = () => (locked ? openPaywall('effects') : applyEffects({ [kind]: opt.id }));
             return b;
         }));
     });
@@ -452,6 +470,7 @@ function setPhase(phase, info = {}) {
         el.partnerSub.textContent = 'Finding a match';
         el.avatar.textContent = '?';
         el.partnerFlag.textContent = '';
+        el.partnerBadge.classList.add('hidden');
         el.nextBtn.textContent = 'Stop';
         el.nextBtn.title = 'Stop searching';
     } else if (phase === 'connecting') {
@@ -619,7 +638,7 @@ function attachChannel(sess, dc) {
         el.partnerName.textContent = sess.friend?.name || 'Stranger';
         el.avatar.textContent = (sess.friend?.name || 'S')[0].toUpperCase();
         if (sess.friend && sess.role === 'offerer') friends?.clearCall(sess.friend.id);
-        sendData({ t: 'hello', nick: S.nick, interests: S.interests, country: S.country, gender: S.gender, timed: S.timed });
+        sendData({ t: 'hello', nick: S.nick, interests: S.interests, country: S.country, gender: S.gender, timed: S.timed, premium: isPremium() });
         if (S.timed && !sess.friend) startRound(sess);
         sendData({ t: 'av', muted: S.muted, camOff: S.camOff });
         SOUND.match();
@@ -654,6 +673,10 @@ function onPeerData(sess, msg) {
             el.avatar.textContent = nick[0].toUpperCase();
             if (country) sys(`${flagOf(country)} ${nick} is from ${countryName(country)}${gender ? ` · ${gender === 'male' ? '♂' : '♀'}` : ''}`);
             if (msg.timed && !sess.round && !sess.friend) startRound(sess);
+            // A Premium badge is only shown after checking the partner's pass in the database.
+            if (msg.premium && premium) premium.verify(sess.partnerId).then(ok => {
+                if (ok && sess === S.session) el.partnerBadge.classList.remove('hidden');
+            });
             const shared = interests.filter(i => S.interests.includes(i));
             if (shared.length) {
                 const line = sys('You both like ');
@@ -1331,7 +1354,11 @@ el.tagInput.addEventListener('blur', () => { if (el.tagInput.value) { addTag(el.
 el.tags.onclick = () => el.tagInput.focus();
 
 function myProfile() {
-    return { gender: S.gender, country: S.country, genderFilter: S.genderFilter, countryFilter: S.countryFilter };
+    const pro = isPremium();
+    return {
+        gender: S.gender, country: S.country, premium: pro,
+        genderFilter: pro ? S.genderFilter : 'any', countryFilter: pro ? S.countryFilter : 'any',
+    };
 }
 
 function renderCountryFilter() {
@@ -1347,8 +1374,14 @@ el.genderSelect.value = S.gender;
 el.genderFilter.value = S.genderFilter;
 el.timedCheck.checked = S.timed;
 el.genderSelect.onchange = () => { S.gender = el.genderSelect.value; store.set('gender', S.gender); };
-el.genderFilter.onchange = () => { S.genderFilter = el.genderFilter.value; store.set('genderFilter', S.genderFilter); };
-el.countryFilter.onchange = () => { S.countryFilter = el.countryFilter.value; store.set('countryFilter', S.countryFilter); };
+el.genderFilter.onchange = () => {
+    if (el.genderFilter.value !== 'any' && !isPremium()) { el.genderFilter.value = 'any'; return openPaywall('filters'); }
+    S.genderFilter = el.genderFilter.value; store.set('genderFilter', S.genderFilter);
+};
+el.countryFilter.onchange = () => {
+    if (el.countryFilter.value !== 'any' && !isPremium()) { el.countryFilter.value = 'any'; return openPaywall('filters'); }
+    S.countryFilter = el.countryFilter.value; store.set('countryFilter', S.countryFilter);
+};
 el.timedCheck.onchange = () => { S.timed = el.timedCheck.checked; store.set('timed', S.timed); };
 renderCountryFilter();
 
@@ -1397,7 +1430,6 @@ window.addEventListener('pagehide', () => {
 // =====================================================================
 // Friends & accounts
 // =====================================================================
-let friends = null;
 const drawer = { view: 'list', open: null, unsubMessages: null };
 const handledCalls = new Set();
 
@@ -1408,7 +1440,104 @@ function initFriends() {
     friends.onChange(() => { renderDrawer(); checkIncomingCalls(); });
     friends.start();
     renderDrawer();
+    if (PREMIUM_CFG.enabled) {
+        premium = new Premium(S.transport, friends, PREMIUM_CFG);
+        premium.onChange(renderPremium);
+        el.premiumBtn.classList.remove('hidden');
+        renderPremium();
+    }
 }
+
+// =====================================================================
+// Premium: Google sign-in + a pass. Free (anonymous or Google) users get
+// everything except the features below.
+// =====================================================================
+const PAYWALL_REASONS = {
+    filters: 'Gender and country filters are a Premium feature.',
+    effects: 'This effect is part of Premium.',
+    menu: 'Get more out of every chat.',
+};
+let selectedPlan = null;
+
+function renderPremium() {
+    const pro = isPremium();
+    document.body.classList.toggle('is-premium', pro);
+    el.premiumBtn.classList.toggle('on', pro);
+    el.premiumBtnText.textContent = pro ? 'Premium' : 'Go Premium';
+    el.premiumBtn.title = pro ? `Premium until ${new Date(premium.premiumUntil).toLocaleString()}` : 'Get Premium';
+    // Premium ended (or signed out): fall back to free settings.
+    if (!pro) {
+        el.genderFilter.value = 'any';
+        el.countryFilter.value = 'any';
+    } else {
+        el.genderFilter.value = S.genderFilter;
+        el.countryFilter.value = S.countryFilter;
+    }
+    if (Object.keys(FREE_FX).some(k => fxLocked(k, S.fx[k]))) applyEffects({});
+    renderFxPanel();
+    renderPaywall();
+}
+
+function renderPaywall() {
+    if (!premium) return;
+    const plans = PREMIUM_CFG.plans || [];
+    selectedPlan ||= (plans.find(p => p.note === 'Most popular') || plans[0])?.id;
+    el.plans.replaceChildren(...plans.map(p => {
+        const card = h('div', 'plan' + (p.id === selectedPlan ? ' active' : ''));
+        card.dataset.plan = p.id;
+        card.append(h('b', '', p.price), h('span', '', p.label));
+        if (p.note) card.appendChild(h('i', '', p.note));
+        card.onclick = () => { selectedPlan = p.id; renderPaywall(); };
+        return card;
+    }));
+    const plan = plans.find(p => p.id === selectedPlan);
+    if (isPremium()) {
+        el.paywallCta.textContent = `Extend Premium · ${plan?.price || ''}`;
+    } else {
+        el.paywallCta.textContent = friends?.signedIn ? `Pay ${plan?.price || ''}` : 'Continue with Google';
+    }
+    el.paywallCta.disabled = false;
+}
+
+function openPaywall(reason = 'menu') {
+    if (!premium) { toast('Premium is available on the online version of the site.', true); return; }
+    el.paywallReason.textContent = isPremium()
+        ? `You're Premium until ${new Date(premium.premiumUntil).toLocaleDateString()}. Buying again adds more time.`
+        : PAYWALL_REASONS[reason] || PAYWALL_REASONS.menu;
+    renderPaywall();
+    el.paywall.classList.remove('hidden');
+}
+
+el.premiumBtn.onclick = () => openPaywall('menu');
+el.paywallClose.onclick = () => el.paywall.classList.add('hidden');
+
+el.paywallCta.onclick = async () => {
+    if (!friends.signedIn) {
+        if (await signInFlow()) {
+            renderPaywall();
+            if (isPremium()) { el.paywall.classList.add('hidden'); toast('👑 Welcome back! Your Premium is active.'); }
+        }
+        return;
+    }
+    el.paywallCta.disabled = true;
+    el.paywallCta.textContent = 'Opening secure checkout…';
+    try {
+        const until = await premium.buy(selectedPlan);
+        el.paywall.classList.add('hidden');
+        toast(`👑 Premium is active until ${new Date(until).toLocaleDateString()}. Thank you!`);
+        SOUND.match();
+    } catch (e) {
+        if (e.code !== 'cancelled') {
+            console.warn('purchase failed', e);
+            const msg = /not-found|internal|unavailable/.test(e.code || '') && /not found|NOT_FOUND|internal/i.test(e.message || '')
+                ? 'Premium payments aren’t set up yet. Please try again later.'
+                : e.message || 'Payment failed.';
+            toast(msg, true);
+        }
+    } finally {
+        renderPaywall();
+    }
+};
 
 async function signInFlow() {
     try {

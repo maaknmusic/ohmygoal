@@ -1,0 +1,4 @@
+node_modules/
+functions/.env.local
+functions/.secret.local
+*.log
