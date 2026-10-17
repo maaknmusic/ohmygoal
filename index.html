@@ -26,6 +26,7 @@
             <span id="onlineChip" class="chip online hidden"><span class="live-dot"></span><span id="onlineChipCount">0</span> online</span>
             <span id="modeChip" class="chip hidden"></span>
             <button id="installBtn" class="btn btn-ghost btn-sm hidden" title="Install as an app"><i class="icon" data-icon="download"></i><span>Install</span></button>
+            <button id="friendsBtn" class="icon-btn hidden" title="Friends"><i class="icon" data-icon="users"></i><span class="badge hidden" id="friendsBadge"></span></button>
             <button id="soundBtn" class="icon-btn" title="Toggle sounds"><i class="icon" data-icon="volume"></i></button>
             <button id="themeBtn" class="icon-btn" title="Toggle theme"><i class="icon" data-icon="moon"></i></button>
             <button id="leaveBtn" class="btn btn-ghost hidden" title="Leave and go back">Leave</button>
@@ -196,6 +197,7 @@
                     </div>
                 </div>
                 <div class="panel-actions">
+                    <button id="addFriendBtn" class="icon-btn hidden" title="Add as friend" disabled><i class="icon" data-icon="userPlus"></i></button>
                     <button id="reportBtn" class="icon-btn" title="Report" disabled><i class="icon" data-icon="flag"></i></button>
                     <button id="blockBtn" class="icon-btn" title="Block (never match again)" disabled><i class="icon" data-icon="ban"></i></button>
                 </div>
@@ -221,6 +223,43 @@
             <div class="kbd"><b>Enter</b> send · <b>Esc</b> next (press twice) · <b>Ctrl+M</b> mute</div>
         </section>
     </main>
+
+    <!-- Friends drawer -->
+    <aside id="drawer" class="drawer hidden" aria-label="Friends">
+        <div class="drawer-head">
+            <button id="drawerBack" class="icon-btn hidden" title="Back">‹</button>
+            <b id="drawerTitle">Friends</b>
+            <button id="drawerClose" class="icon-btn" title="Close">×</button>
+        </div>
+        <div id="drawerAccount" class="drawer-account"></div>
+        <div id="friendList" class="friend-list"></div>
+        <div id="friendChat" class="friend-chat hidden">
+            <div class="fc-head">
+                <span class="status-dot" id="fcDot"></span><span id="fcStatus" class="fc-status"></span>
+                <button id="fcCall" class="btn btn-primary btn-sm"><i class="icon" data-icon="video"></i>Video call</button>
+                <button id="fcRemove" class="btn btn-ghost btn-sm" title="Remove friend">Remove</button>
+            </div>
+            <div id="fcMessages" class="fc-messages"></div>
+            <div class="fc-note">Friend chats are saved so you can read them later. Random chats never are.</div>
+            <div class="composer">
+                <input id="fcInput" class="input" maxlength="1000" placeholder="Message…" autocomplete="off">
+                <button id="fcSend" class="icon-btn" title="Send"><i class="icon" data-icon="send"></i></button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Incoming friend call -->
+    <div id="callModal" class="modal-bg hidden">
+        <div class="modal call-modal">
+            <div class="avatar big" id="callAvatar">?</div>
+            <h3><span id="callName">Friend</span> is calling…</h3>
+            <p>Video call from your friend.</p>
+            <div class="modal-actions">
+                <button class="btn btn-danger" id="callDecline">Decline</button>
+                <button class="btn btn-primary" id="callAccept">Accept</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Report modal -->
     <div id="reportModal" class="modal-bg hidden">

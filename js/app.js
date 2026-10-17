@@ -2,6 +2,7 @@ import { createFirebaseTransport, createLocalTransport } from './transport.js';
 import { COUNTRIES, flagOf, countryName, detectCountry } from './geo.js';
 import { Effects, BACKGROUNDS, MASKS, FILTERS } from './effects.js';
 import { NudityGuard } from './safety.js';
+import { Friends, pairIdOf } from './friends.js';
 
 // =====================================================================
 // Config
@@ -42,6 +43,8 @@ const ICONS = {
     clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
     shield: '<path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.7 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
     sparkles: '<path d="M9.94 14.06A2 2 0 0 0 8.5 12.6l-6.1-1.6a.5.5 0 0 1 0-1l6.1-1.6a2 2 0 0 0 1.45-1.44L11.5 1.9a.5.5 0 0 1 1 0l1.57 6.1a2 2 0 0 0 1.44 1.44l6.1 1.57a.5.5 0 0 1 0 1l-6.1 1.57a2 2 0 0 0-1.44 1.44L12.5 21.1a.5.5 0 0 1-1 0z"/><path d="M20 3v4M22 5h-4"/>',
+    users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    userPlus: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/>',
     download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
     volumeOff: '<path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/>',
 };
@@ -73,6 +76,12 @@ const el = {
     filterHint: $('filterHint'), timedCheck: $('timedCheck'), partnerFlag: $('partnerFlag'),
     onlineCount: $('onlineCount'), onlineChip: $('onlineChip'), onlineChipCount: $('onlineChipCount'),
     installBtn: $('installBtn'),
+    friendsBtn: $('friendsBtn'), friendsBadge: $('friendsBadge'), addFriendBtn: $('addFriendBtn'),
+    drawer: $('drawer'), drawerBack: $('drawerBack'), drawerTitle: $('drawerTitle'), drawerClose: $('drawerClose'),
+    drawerAccount: $('drawerAccount'), friendList: $('friendList'), friendChat: $('friendChat'),
+    fcDot: $('fcDot'), fcStatus: $('fcStatus'), fcCall: $('fcCall'), fcRemove: $('fcRemove'),
+    fcMessages: $('fcMessages'), fcInput: $('fcInput'), fcSend: $('fcSend'),
+    callModal: $('callModal'), callAvatar: $('callAvatar'), callName: $('callName'), callDecline: $('callDecline'), callAccept: $('callAccept'),
     shield: $('shield'), shieldTitle: $('shieldTitle'), shieldSub: $('shieldSub'), shieldActions: $('shieldActions'),
     shieldSkip: $('shieldSkip'), shieldReport: $('shieldReport'), fxBtn: $('fxBtn'), fxPanel: $('fxPanel'), fxClose: $('fxClose'), fxStatus: $('fxStatus'),
     round: $('round'), roundFill: $('roundFill'), roundTime: $('roundTime'), roundNote: $('roundNote'), extendBtn: $('extendBtn'),
@@ -427,6 +436,8 @@ function setPhase(phase, info = {}) {
     el.emojiBtn.disabled = !live;
     el.reportBtn.disabled = !(live || phase === 'connecting');
     el.blockBtn.disabled = !(live || phase === 'connecting');
+    el.addFriendBtn.disabled = !live || !!S.session?.friend;
+    const friendCall = S.session?.friend;
     el.overlay.classList.toggle('hidden', live);
     el.overlaySpinner.classList.toggle('hidden', phase === 'ended');
     el.overlayNewBtn.classList.toggle('hidden', phase !== 'ended');
@@ -444,14 +455,15 @@ function setPhase(phase, info = {}) {
         el.nextBtn.textContent = 'Stop';
         el.nextBtn.title = 'Stop searching';
     } else if (phase === 'connecting') {
-        el.overlayTitle.textContent = 'Connecting…';
-        el.overlaySub.textContent = 'Setting up a secure peer‑to‑peer connection';
+        el.overlayTitle.textContent = friendCall ? `Calling ${friendCall.name}…` : 'Connecting…';
+        el.overlaySub.textContent = friendCall ? 'Waiting for your friend to answer' : 'Setting up a secure peer‑to‑peer connection';
         el.partnerSub.textContent = 'Connecting';
-        el.nextBtn.textContent = 'Next';
-        el.nextBtn.title = 'Skip to the next person (Esc)';
+        if (friendCall) { el.partnerName.textContent = friendCall.name; el.avatar.textContent = friendCall.name[0].toUpperCase(); }
+        el.nextBtn.textContent = friendCall ? 'Hang up' : 'Next';
+        el.nextBtn.title = friendCall ? 'End the call' : 'Skip to the next person (Esc)';
     } else if (phase === 'connected') {
         el.partnerSub.textContent = 'Connected';
-        el.nextBtn.textContent = 'Next';
+        el.nextBtn.textContent = friendCall ? 'Hang up' : 'Next';
         el.msgInput.focus();
     } else if (phase === 'ended') {
         el.overlayTitle.textContent = info.title || 'Chat ended';
@@ -524,11 +536,10 @@ function stopSearch() {
     sys('You stopped searching.');
 }
 
-async function connect({ roomId, role, bus, partnerId }) {
-    setPhase('connecting');
+async function connect({ roomId, role, bus, partnerId, friend = null }) {
     const pc = new RTCPeerConnection(ICE);
     const sess = S.session = {
-        roomId, role, bus, partnerId, pc, dc: null, partner: null,
+        roomId, role, bus, partnerId, pc, dc: null, partner: null, friend,
         pendingCandidates: [], ended: false, startedAt: 0, statsTimer: null, connectTimer: null, clockTimer: null,
     };
 
@@ -536,6 +547,7 @@ async function connect({ roomId, role, bus, partnerId }) {
         const send = new MediaStream([...S.localStream.getAudioTracks(), outVideoTrack()].filter(Boolean));
         send.getTracks().forEach(t => pc.addTrack(t, send));
     }
+    setPhase('connecting');
     startSafety(sess);
     pc.onicecandidate = e => { if (e.candidate) bus.send('candidate', e.candidate.toJSON()); };
     pc.ontrack = e => { el.remoteVideo.srcObject = e.streams[0]; };
@@ -544,7 +556,7 @@ async function connect({ roomId, role, bus, partnerId }) {
         if (pc.connectionState === 'failed') {
             partnerLeft('Connection failed', 'The network blocked a direct connection. A TURN server fixes this.');
         } else if (pc.connectionState === 'disconnected') {
-            setTimeout(() => { if (!sess.ended && pc.connectionState === 'disconnected') partnerLeft('Stranger disconnected'); }, 5000);
+            setTimeout(() => { if (!sess.ended && pc.connectionState === 'disconnected') partnerLeft(leftText(sess)); }, 5000);
         }
     };
 
@@ -573,7 +585,7 @@ async function connect({ roomId, role, bus, partnerId }) {
                 if (pc.remoteDescription) await pc.addIceCandidate(data);
                 else sess.pendingCandidates.push(data);
             } else if (type === 'bye') {
-                partnerLeft('Stranger disconnected');
+                partnerLeft(sess.friend && S.phase === 'connecting' ? `${sess.friend.name} declined` : leftText(sess));
             }
         } catch (e) {
             console.warn('signaling error', type, e);
@@ -581,8 +593,10 @@ async function connect({ roomId, role, bus, partnerId }) {
     });
 
     sess.connectTimer = setTimeout(() => {
-        if (!sess.ended && S.phase === 'connecting') partnerLeft('Could not connect', 'The other person didn’t respond in time.');
-    }, CONNECT_TIMEOUT_MS);
+        if (!sess.ended && S.phase === 'connecting') {
+            partnerLeft(friend ? 'No answer' : 'Could not connect', friend ? `${friend.name} didn’t pick up.` : 'The other person didn’t respond in time.');
+        }
+    }, friend ? 45000 : CONNECT_TIMEOUT_MS);
 
     if (role === 'offerer') {
         const offer = await pc.createOffer();
@@ -590,6 +604,8 @@ async function connect({ roomId, role, bus, partnerId }) {
         bus.send('offer', { type: offer.type, sdp: offer.sdp });
     }
 }
+
+const leftText = sess => (sess.friend ? 'Call ended' : 'Stranger disconnected');
 
 function attachChannel(sess, dc) {
     sess.dc = dc;
@@ -599,11 +615,12 @@ function attachChannel(sess, dc) {
         sess.startedAt = Date.now();
         setPhase('connected');
         clearMessages();
-        sys("You're now chatting with a stranger. Say hi! 👋", 'good');
-        el.partnerName.textContent = 'Stranger';
-        el.avatar.textContent = 'S';
+        sys(sess.friend ? `You're on a call with ${sess.friend.name}.` : "You're now chatting with a stranger. Say hi! 👋", 'good');
+        el.partnerName.textContent = sess.friend?.name || 'Stranger';
+        el.avatar.textContent = (sess.friend?.name || 'S')[0].toUpperCase();
+        if (sess.friend && sess.role === 'offerer') friends?.clearCall(sess.friend.id);
         sendData({ t: 'hello', nick: S.nick, interests: S.interests, country: S.country, gender: S.gender, timed: S.timed });
-        if (S.timed) startRound(sess);
+        if (S.timed && !sess.friend) startRound(sess);
         sendData({ t: 'av', muted: S.muted, camOff: S.camOff });
         SOUND.match();
         sess.clockTimer = setInterval(() => renderPartnerSub(sess), 1000);
@@ -615,7 +632,7 @@ function attachChannel(sess, dc) {
         try { msg = JSON.parse(e.data); } catch { return; }
         onPeerData(sess, msg);
     };
-    dc.onclose = () => { if (!sess.ended && S.phase === 'connected') partnerLeft('Stranger disconnected'); };
+    dc.onclose = () => { if (!sess.ended && S.phase === 'connected') partnerLeft(leftText(sess)); };
 }
 
 function sendData(obj) {
@@ -636,7 +653,7 @@ function onPeerData(sess, msg) {
             el.partnerFlag.title = country ? countryName(country) : '';
             el.avatar.textContent = nick[0].toUpperCase();
             if (country) sys(`${flagOf(country)} ${nick} is from ${countryName(country)}${gender ? ` · ${gender === 'male' ? '♂' : '♀'}` : ''}`);
-            if (msg.timed && !sess.round) startRound(sess);
+            if (msg.timed && !sess.round && !sess.friend) startRound(sess);
             const shared = interests.filter(i => S.interests.includes(i));
             if (shared.length) {
                 const line = sys('You both like ');
@@ -651,6 +668,13 @@ function onPeerData(sess, msg) {
             break;
         case 'typing':
             msg.on ? showTyping() : hideTyping();
+            break;
+        case 'friend-req':
+        case 'friend-ok':
+        case 'friend-no':
+        case 'friend-created':
+        case 'friend-done':
+            onFriendMessage(sess, msg);
             break;
         case 'extend':
             sess.partnerExtend = true;
@@ -719,9 +743,15 @@ function endSession({ notify }) {
 
 function partnerLeft(title, sub = '') {
     if (!S.session) return;
+    const friend = S.session.friend;
+    if (friend && S.session.role === 'offerer') friends?.clearCall(friend.id);
     endSession({ notify: true });
     SOUND.leave();
     sys(title + '.', 'bad');
+    if (friend) {
+        setPhase('ended', { title, sub: sub || 'Press “Find someone new” to meet strangers.' });
+        return;
+    }
     setPhase('ended', { title, sub: sub || 'Finding someone new in a moment…' });
     S.autoNextTimer = setTimeout(() => { if (S.phase === 'ended') startSearch(); }, 2500);
 }
@@ -783,6 +813,7 @@ function disarmSkip() {
     el.nextBtn.classList.remove('confirm');
 }
 function onNext() {
+    if (S.session?.friend) return partnerLeft('Call ended');
     if (S.phase === 'searching') return stopSearch();
     if (S.phase === 'ended') return startSearch();
     if (!S.skipArmed) {
@@ -1364,6 +1395,300 @@ window.addEventListener('pagehide', () => {
 });
 
 // =====================================================================
+// Friends & accounts
+// =====================================================================
+let friends = null;
+const drawer = { view: 'list', open: null, unsubMessages: null };
+const handledCalls = new Set();
+
+function initFriends() {
+    friends = new Friends(S.transport);
+    el.friendsBtn.classList.remove('hidden');
+    el.addFriendBtn.classList.remove('hidden');
+    friends.onChange(() => { renderDrawer(); checkIncomingCalls(); });
+    friends.start();
+    renderDrawer();
+}
+
+async function signInFlow() {
+    try {
+        await friends.signIn();
+        toast(`Signed in as ${friends.displayName}.`);
+        return true;
+    } catch (e) {
+        console.warn('sign-in failed', e);
+        const hints = {
+            'auth/popup-closed-by-user': 'Sign-in was cancelled.',
+            'auth/cancelled-popup-request': 'Sign-in was cancelled.',
+            'auth/popup-blocked': 'Your browser blocked the sign-in popup. Allow popups for this site and try again.',
+            'auth/operation-not-allowed': 'Google sign-in isn’t enabled yet (Firebase → Authentication → Sign-in method → Google).',
+            'auth/unauthorized-domain': 'This website isn’t authorised for sign-in yet (Firebase → Authentication → Settings → Authorized domains).',
+        };
+        toast(hints[e.code] || `Sign-in failed (${e.code || e.message}).`, true);
+        return false;
+    }
+}
+
+// --- Adding a friend during a chat (both people must agree) ---
+el.addFriendBtn.onclick = async () => {
+    const sess = S.session;
+    if (!sess || S.phase !== 'connected' || !friends) return;
+    if (friends.isFriend(sess.partnerId)) { toast('You’re already friends.'); return; }
+    if (!friends.signedIn && !(await signInFlow())) return;
+    if (sess.ended) return;
+    sess.friendReqSent = true;
+    el.addFriendBtn.disabled = true;
+    sendData({ t: 'friend-req', uid: friends.uid, nick: S.nick });
+    sys('Friend request sent. Waiting for them to accept…');
+};
+
+async function onFriendMessage(sess, msg) {
+    if (!friends) return;
+    const name = sess.partner?.nick || 'Stranger';
+    switch (msg.t) {
+        case 'friend-req': {
+            if (typeof msg.uid !== 'string') return;
+            sess.friendReqFrom = msg.uid;
+            const banner = h('div', 'friend-banner');
+            banner.append(h('span', '', `👋 ${name} wants to add you as a friend.`));
+            const no = h('button', 'btn btn-ghost btn-sm', 'No thanks');
+            const yes = h('button', 'btn btn-primary btn-sm', 'Accept');
+            no.onclick = () => { banner.remove(); sendData({ t: 'friend-no' }); };
+            yes.onclick = async () => {
+                if (!friends.signedIn && !(await signInFlow())) return;
+                if (sess.ended) return;
+                banner.replaceChildren(h('span', '', 'Accepted. Adding…'));
+                sendData({ t: 'friend-ok', uid: friends.uid, nick: S.nick });
+            };
+            banner.append(no, yes);
+            el.messages.appendChild(banner);
+            scrollMessages();
+            break;
+        }
+        case 'friend-no':
+            sys(`${name} declined the friend request.`);
+            break;
+        case 'friend-ok':
+            // They agreed: create the pending friendship; they confirm it on their side.
+            if (!sess.friendReqSent || typeof msg.uid !== 'string') return;
+            try {
+                const pairId = await friends.createPending(msg.uid, S.nick);
+                sendData({ t: 'friend-created', pairId });
+            } catch (e) {
+                console.warn('create friendship', e);
+                sys('Could not add friend. Please try again.', 'bad');
+            }
+            break;
+        case 'friend-created':
+            if (!sess.friendReqFrom || msg.pairId !== pairIdOf(friends.uid, sess.friendReqFrom)) return;
+            try {
+                await friends.accept(msg.pairId, S.nick);
+                sendData({ t: 'friend-done' });
+                el.messages.querySelectorAll('.friend-banner').forEach(b => b.remove());
+                sys(`🎉 You and ${name} are now friends! Find them under Friends.`, 'good');
+            } catch (e) {
+                console.warn('accept friendship', e);
+                sys('Could not add friend. Please try again.', 'bad');
+            }
+            break;
+        case 'friend-done':
+            sys(`🎉 You and ${name} are now friends! Find them under Friends.`, 'good');
+            break;
+    }
+}
+
+// --- Drawer: account, friends list, friend chat ---
+el.friendsBtn.onclick = () => { el.drawer.classList.toggle('hidden'); renderDrawer(); };
+el.drawerClose.onclick = () => el.drawer.classList.add('hidden');
+el.drawerBack.onclick = () => openFriendList();
+
+function renderDrawer() {
+    if (!friends) return;
+    const ringing = friends.incomingCalls().length;
+    el.friendsBadge.textContent = ringing ? String(ringing) : '';
+    el.friendsBadge.classList.toggle('hidden', !ringing);
+
+    el.drawerAccount.replaceChildren();
+    if (friends.signedIn) {
+        const line = h('div', '', `Signed in as ${friends.displayName}. Strangers never see this; friends see your nickname. `);
+        const out = h('a', '', 'Sign out');
+        out.onclick = async () => { await friends.signOut(); toast('Signed out.'); };
+        line.appendChild(out);
+        el.drawerAccount.appendChild(line);
+    } else {
+        el.drawerAccount.append(
+            h('div', '', 'Sign in with Google to add friends, chat with them later and video call them. Random chats stay anonymous.'),
+        );
+        const btn = h('button', 'btn btn-primary', 'Sign in with Google');
+        btn.onclick = signInFlow;
+        el.drawerAccount.appendChild(btn);
+    }
+    if (drawer.view === 'list') renderFriendList();
+    else renderFriendHeader();
+}
+
+function friendInitial(f) { return (f.name || 'F')[0].toUpperCase(); }
+
+function renderFriendList() {
+    el.friendList.classList.remove('hidden');
+    el.friendChat.classList.add('hidden');
+    el.drawerBack.classList.add('hidden');
+    el.drawerTitle.textContent = 'Friends';
+    const list = friends.friends;
+    if (!friends.signedIn) { el.friendList.replaceChildren(); return; }
+    if (!list.length) {
+        el.friendList.replaceChildren(h('div', 'empty', 'No friends yet. Tap the 👤+ button during a chat to add someone. They have to accept too.'));
+        return;
+    }
+    const ringing = new Set(friends.incomingCalls().map(f => f.id));
+    el.friendList.replaceChildren(...list.map(f => {
+        const row = h('div', 'friend' + (ringing.has(f.id) ? ' ringing' : ''));
+        const av = h('div', 'avatar', friendInitial(f));
+        av.appendChild(h('span', 'status-dot' + (friends.isOnline(f.other) ? ' on' : '')));
+        const info = h('div');
+        info.append(h('div', 'friend-name', f.name), h('div', 'friend-sub', ringing.has(f.id) ? '📞 Calling you…' : (f.lastMessage || (friends.isOnline(f.other) ? 'Online' : 'Offline'))));
+        row.append(av, info);
+        row.onclick = () => openFriendChat(f.id);
+        return row;
+    }));
+}
+
+function openFriendList() {
+    drawer.view = 'list';
+    drawer.open = null;
+    drawer.unsubMessages?.();
+    drawer.unsubMessages = null;
+    renderDrawer();
+}
+
+function currentFriend() { return friends?.friends.find(f => f.id === drawer.open); }
+
+function renderFriendHeader() {
+    const f = currentFriend();
+    if (!f) return openFriendList();
+    el.drawerTitle.textContent = f.name;
+    const online = friends.isOnline(f.other);
+    el.fcDot.className = 'status-dot' + (online ? ' on' : '');
+    el.fcStatus.textContent = online ? 'Online' : 'Offline';
+}
+
+function openFriendChat(pairId) {
+    drawer.view = 'chat';
+    drawer.open = pairId;
+    el.friendList.classList.add('hidden');
+    el.friendChat.classList.remove('hidden');
+    el.drawerBack.classList.remove('hidden');
+    renderFriendHeader();
+    drawer.unsubMessages?.();
+    el.fcMessages.replaceChildren();
+    drawer.unsubMessages = friends.watchMessages(pairId, msgs => {
+        el.fcMessages.replaceChildren(...msgs.map(m => {
+            const mine = m.from === friends.uid;
+            const wrap = h('div', 'msg ' + (mine ? 'me' : 'them'));
+            const text = mine ? m.text : maskProfanity(m.text);
+            if (EMOJI_ONLY.test(text)) wrap.classList.add('emoji-only');
+            wrap.append(h('div', 'bubble', text), h('div', 'meta', new Date(m.ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })));
+            return wrap;
+        }));
+        el.fcMessages.scrollTop = el.fcMessages.scrollHeight;
+    });
+    el.fcInput.focus();
+}
+
+async function sendFriendMessage() {
+    const text = el.fcInput.value.trim();
+    if (!text || !drawer.open) return;
+    el.fcInput.value = '';
+    try { await friends.send(drawer.open, text); }
+    catch (e) { console.warn('friend send', e); toast('Message not sent.', true); el.fcInput.value = text; }
+}
+el.fcSend.onclick = sendFriendMessage;
+el.fcInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendFriendMessage(); } });
+el.fcRemove.onclick = async () => {
+    const f = currentFriend();
+    if (!f || !confirm(`Remove ${f.name} from your friends?`)) return;
+    await friends.remove(f.id).catch(() => toast('Could not remove friend.', true));
+    openFriendList();
+};
+
+// --- Friend video calls ---
+function canCall() {
+    if (!ageVerified()) { toast('Verify your age first: press “Start chatting” once.', true); return false; }
+    if (videoBannedUntil()) { toast('Video chat is locked for now.', true); return false; }
+    return true;
+}
+
+/** Leave whatever we're doing and show the chat screen in video mode. */
+async function prepareCallScreen() {
+    S.searchAbort?.abort();
+    S.searchAbort = null;
+    clearTimeout(S.autoNextTimer);
+    endSession({ notify: true });
+    setMode('video');
+    el.welcome.classList.add('hidden');
+    vEl.screen.classList.add('hidden');
+    el.chat.classList.remove('hidden');
+    el.leaveBtn.classList.remove('hidden');
+    el.modeChip.classList.remove('hidden');
+    el.drawer.classList.add('hidden');
+    clearMessages();
+    getGuard().load().catch(() => {});
+    return ensureMedia();
+}
+
+el.fcCall.onclick = async () => {
+    const f = currentFriend();
+    if (!f || !canCall()) return;
+    if (!(await prepareCallScreen())) return;
+    try {
+        const roomId = await friends.call(f.id, f.other);
+        connect({ roomId, role: 'offerer', partnerId: f.other, bus: S.transport.roomBus(roomId), friend: f });
+    } catch (e) {
+        console.warn('call failed', e);
+        toast('Could not start the call.', true);
+    }
+};
+
+let ringTimer = null;
+function checkIncomingCalls() {
+    const call = friends.incomingCalls().find(f => !handledCalls.has(f.call.roomId));
+    if (!call || S.session?.friend) {
+        if (!call) { el.callModal.classList.add('hidden'); clearInterval(ringTimer); ringTimer = null; }
+        return;
+    }
+    el.callName.textContent = call.name;
+    el.callAvatar.textContent = friendInitial(call);
+    el.callModal.dataset.pair = call.id;
+    el.callModal.classList.remove('hidden');
+    if (!ringTimer) { SOUND.match(); ringTimer = setInterval(() => SOUND.match(), 2000); }
+}
+
+function takeCall() {
+    const f = friends.friends.find(x => x.id === el.callModal.dataset.pair);
+    el.callModal.classList.add('hidden');
+    clearInterval(ringTimer);
+    ringTimer = null;
+    if (f?.call) handledCalls.add(f.call.roomId);
+    return f;
+}
+
+el.callDecline.onclick = () => {
+    const f = takeCall();
+    if (!f?.call) return;
+    const bus = S.transport.roomBus(f.call.roomId);
+    bus.send('bye');
+    setTimeout(() => bus.close(), 500);
+};
+
+el.callAccept.onclick = async () => {
+    const f = takeCall();
+    if (!f?.call || !canCall()) return;
+    const { roomId } = f.call;
+    if (!(await prepareCallScreen())) return;
+    connect({ roomId, role: 'answerer', partnerId: f.other, bus: S.transport.roomBus(roomId), friend: f });
+};
+
+// =====================================================================
 // Online count
 // =====================================================================
 async function refreshOnline() {
@@ -1412,12 +1737,13 @@ detectCountry(store).then(code => { S.country = code; renderCountryFilter(); });
 el.startBtn.textContent = 'Connecting…';
 try {
     S.transport = firebaseConfig
-        ? await createFirebaseTransport({ firebaseConfig, appId, initialAuthToken })
+        ? await createFirebaseTransport({ firebaseConfig, appId, initialAuthToken, emulators: CFG.emulators })
         : createLocalTransport();
     el.demoNote.classList.toggle('hidden', S.transport.kind !== 'local');
     el.startBtn.textContent = 'Start chatting';
     refreshOnline();
     setInterval(refreshOnline, S.transport.kind === 'local' ? 3000 : ONLINE_REFRESH_MS);
+    if (S.transport.kind === 'firebase') initFriends();
 } catch (e) {
     console.error('transport init failed', e);
     el.startBtn.textContent = 'Service unavailable';

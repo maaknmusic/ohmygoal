@@ -26,7 +26,7 @@ const profileFields = p => ({
     countryFilter: p?.countryFilter || 'any',
 });
 
-export async function createFirebaseTransport({ firebaseConfig, appId, initialAuthToken }) {
+export async function createFirebaseTransport({ firebaseConfig, appId, initialAuthToken, emulators }) {
     const v = '11.6.1';
     const [appMod, authMod, fs] = await Promise.all([
         import(`https://www.gstatic.com/firebasejs/${v}/firebase-app.js`),
@@ -40,20 +40,25 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
     const app = appMod.initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+    if (emulators) { // local testing only
+        authMod.connectAuthEmulator(auth, emulators.auth, { disableWarnings: true });
+        fs.connectFirestoreEmulator(db, ...emulators.firestore);
+    }
     await auth.authStateReady();
     if (!auth.currentUser) {
         if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken);
         else await signInAnonymously(auth);
     }
-    const uid = auth.currentUser.uid;
+    // Always read the current user: signing in with Google can change it mid-session.
+    const me = () => auth.currentUser?.uid;
 
     const base = ['artifacts', appId, 'public', 'data'];
     const queueCol = collection(db, ...base, 'queue');
     const roomsCol = collection(db, ...base, 'rooms');
     const reportsCol = collection(db, ...base, 'reports');
     const presenceCol = collection(db, ...base, 'presence');
-    const myQueueRef = doc(queueCol, uid);
-    const myPresenceRef = doc(presenceCol, uid);
+    const myQueueRef = () => doc(queueCol, me());
+    const myPresenceRef = () => doc(presenceCol, me());
 
     function roomBus(roomId) {
         const sigCol = collection(db, ...base, 'rooms', roomId, 'signals');
@@ -64,13 +69,13 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
             snap.docChanges().forEach(ch => {
                 if (ch.type !== 'added') return;
                 const d = ch.doc.data();
-                if (d.from !== uid) handlers.forEach(fn => fn(d));
+                if (d.from !== me()) handlers.forEach(fn => fn(d));
             });
         }, err => console.warn('signal listener error', err));
         return {
             send(type, data) {
                 if (closed) return;
-                addDoc(sigCol, { from: uid, type, data: data ?? null, ts: Date.now() })
+                addDoc(sigCol, { from: me(), type, data: data ?? null, ts: Date.now() })
                     .then(ref => mine.push(ref)).catch(e => console.warn('signal send failed', e));
             },
             onMessage(fn) { handlers.push(fn); },
@@ -91,23 +96,25 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
         const candidates = snap.docs
             .filter(d => {
                 const x = d.data();
-                return d.id !== uid && !x.roomId && now - (x.ts || 0) < QUEUE_STALE_MS
-                    && !blocked.includes(d.id) && !(x.blocked || []).includes(uid)
+                return d.id !== me() && !x.roomId && now - (x.ts || 0) < QUEUE_STALE_MS
+                    && !blocked.includes(d.id) && !(x.blocked || []).includes(me())
                     && compatible(profile, x);
             })
             .sort((a, b) => shared(b.data()) - shared(a.data()) || a.data().ts - b.data().ts);
 
+        const queueRef = myQueueRef();
+        const uid = me();
         for (const cand of candidates) {
             const roomRef = doc(roomsCol);
             try {
                 const ok = await runTransaction(db, async t => {
                     const theirs = await t.get(cand.ref);
-                    const mine = await t.get(myQueueRef);
+                    const mine = await t.get(queueRef);
                     if (!theirs.exists() || theirs.data().roomId) return false;
                     if (mine.exists() && mine.data().roomId) return false; // someone already claimed us
                     t.update(cand.ref, { roomId: roomRef.id, partnerId: uid });
                     t.set(roomRef, { mode, users: [cand.id, uid], created: serverTimestamp() });
-                    if (mine.exists()) t.delete(myQueueRef);
+                    if (mine.exists()) t.delete(queueRef);
                     return true;
                 });
                 if (ok) return { roomId: roomRef.id, role: 'offerer', partnerId: cand.id, bus: roomBus(roomRef.id) };
@@ -123,7 +130,8 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
         if (first) return first;
         if (signal.aborted) throw new DOMException('aborted', 'AbortError');
 
-        await setDoc(myQueueRef, {
+        const queueRef = myQueueRef();
+        await setDoc(queueRef, {
             mode: opts.mode, interests: opts.interests, blocked: opts.blocked.slice(-100),
             ...profileFields(opts.profile), ts: Date.now(), roomId: null,
         });
@@ -140,14 +148,14 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
                 signal.removeEventListener('abort', onAbort);
                 error ? reject(error) : resolve(value);
             };
-            const unsub = onSnapshot(myQueueRef, snap => {
+            const unsub = onSnapshot(queueRef, snap => {
                 const x = snap.data();
                 if (x?.roomId) {
-                    deleteDoc(myQueueRef).catch(() => {});
+                    deleteDoc(queueRef).catch(() => {});
                     finish({ roomId: x.roomId, role: 'answerer', partnerId: x.partnerId, bus: roomBus(x.roomId) });
                 }
             });
-            const heartbeat = setInterval(() => updateDoc(myQueueRef, { ts: Date.now() }).catch(() => {}), 10000);
+            const heartbeat = setInterval(() => updateDoc(queueRef, { ts: Date.now() }).catch(() => {}), 10000);
             // Keep trying to claim others too, so two people who enqueue at the same moment still meet.
             const retry = setInterval(async () => {
                 if (claiming || done) return;
@@ -158,7 +166,7 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
                 } finally { claiming = false; }
             }, 4000 + Math.random() * 2000);
             const onAbort = () => {
-                deleteDoc(myQueueRef).catch(() => {});
+                deleteDoc(queueRef).catch(() => {});
                 finish(null, new DOMException('aborted', 'AbortError'));
             };
             signal.addEventListener('abort', onAbort);
@@ -166,11 +174,11 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
     }
 
     async function report({ partnerId, roomId, reason }) {
-        await addDoc(reportsCol, { reporter: uid, reported: partnerId, roomId, reason, ts: serverTimestamp() });
+        await addDoc(reportsCol, { reporter: me(), reported: partnerId, roomId, reason, ts: serverTimestamp() });
     }
 
     // Presence: every open page refreshes a tiny doc; "online" = refreshed within the window.
-    const beat = () => { if (document.visibilityState !== 'hidden') setDoc(myPresenceRef, { ts: Date.now() }).catch(() => {}); };
+    const beat = () => { if (me() && document.visibilityState !== 'hidden') setDoc(myPresenceRef(), { ts: Date.now() }).catch(() => {}); };
     beat();
     setInterval(beat, PRESENCE_BEAT_MS);
     document.addEventListener('visibilitychange', beat);
@@ -180,12 +188,12 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
     }
 
     function leave() {
-        deleteDoc(myQueueRef).catch(() => {});
-        deleteDoc(myPresenceRef).catch(() => {});
+        deleteDoc(myQueueRef()).catch(() => {});
+        deleteDoc(myPresenceRef()).catch(() => {});
     }
 
     return {
-        kind: 'firebase', uid, findMatch, report, onlineCount, leave, roomBus,
+        kind: 'firebase', get uid() { return me(); }, findMatch, report, onlineCount, leave, roomBus, beat,
         fb: { app, auth, db, fs, authMod, base },
     };
 }

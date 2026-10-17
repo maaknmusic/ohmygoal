@@ -4,13 +4,28 @@ Random one-on-one **video or text** chat with strangers. Everything is in a sing
 
 ## Features
 
-- **Real matchmaking**: a Firestore queue with transactional claiming, so two people never grab the same partner. People who share interests are matched first.
-- **Peer-to-peer video and chat**: video goes over WebRTC, and messages go over a WebRTC data channel. Messages are **never written to a database**.
-- **Video controls**: mute, camera on/off, switch camera (front/back), fullscreen, and a connection-quality indicator (round-trip time).
-- **Chat**: typing indicator, emoji picker, large emoji-only messages, timestamps, and optional Gemini translation of incoming messages.
-- **Face age verification**: runs on the user's device and nothing is uploaded. Users center their face, turn their head left and right (a liveness check, so a still photo fails), then look straight ahead while the model estimates their age. Estimates of 25+ pass, estimates under 18 are denied and the device is locked out for 24 hours, and anything in between is "inconclusive" (3 tries). During video chats, the camera feed is re-checked every 15 seconds. All of this is set in `APP_CONFIG.ageCheck`; add `?agedebug` to the URL to see live readings.
-- **Safety**: an 18+ confirmation with community rules, a report flow (stored for moderators), blocking (the blocked person is never matched with you again, in either direction), masking of profanity in incoming messages, a warning before you send personal info (phone, email, links, social handles), message rate limiting, and XSS-safe rendering.
-- **Ease of use**: Next needs two presses (Esc works too), you're automatically re-matched when a partner leaves, dark/light theme, sound cues, and a layout that works on phones.
+- **Matching**: random 1-on-1 video or text chat via a Firestore queue (transactional, so two people never grab the same partner). Shared interests are matched first. **Country** (auto-detected, shown as a flag) and **self-declared gender** filters work both ways.
+- **Peer-to-peer**: video over WebRTC, random-chat messages over a data channel, so they're **never stored**. TURN relay included for mobile/strict networks.
+- **Quick rounds**: optional 60-second chats, extended only when both people tap "+1 min".
+- **Video effects** (on-device, MediaPipe): background blur or replacement, face masks (including full-face masks for anonymity, with the frame blurred if the face is lost), and beauty/colour filters. The partner sees exactly your preview.
+- **Safety**:
+  - On-device **face age check** with liveness before chatting, re-checked during video calls.
+  - On-device **nudity detection** (NSFWJS model in `models/nsfw`): the partner's video stays blurred until checked, is hidden again on explicit content, and the person is auto-reported after repeated detections. Your own camera is switched off on nudity, and 3 strikes lock video for 24 h.
+  - Report, block, profanity masking, a warning before sharing personal info, rate limiting, and XSS-safe rendering.
+- **Friends & accounts**: sign in with Google (upgrades the anonymous account). Adding a friend needs **both** people to agree (enforced by Firestore rules). Friends get a list with online status, saved text chat, and **video calls** that ring.
+- **Extras**: live "people online" count, installable app (PWA, works offline), dark/light theme, sounds, keyboard shortcuts, and a layout that works on phones.
+
+## Files
+
+| File | What it is |
+|---|---|
+| `index.html`, `styles.css` | Page and styles |
+| `config.js` | **All settings**: Firebase, TURN, age check, effects, safety |
+| `js/app.js` | App logic and UI |
+| `js/transport.js` | Matching, signalling, presence (Firebase or local demo) |
+| `js/effects.js`, `js/safety.js`, `js/friends.js`, `js/geo.js` | Features |
+| `firestore.rules` | Database security rules: **republish after every change** |
+| `sw.js`, `manifest.webmanifest`, `icons/` | Installable app |
 
 ## Running it
 
@@ -26,10 +41,10 @@ With no Firebase config, the app matches tabs with each other through `Broadcast
 
 ### Production (Firebase)
 1. Create a Firebase project. Enable **Anonymous** sign-in and **Cloud Firestore**.
-2. Paste your web config into `APP_CONFIG.firebase` at the top of `index.html`.
+2. Paste your web config into `firebase` in `config.js`. For friends, enable the **Google** sign-in provider and add your site's domain under Authentication → Settings → Authorized domains.
 3. Deploy `firestore.rules`.
-4. Add a **TURN server** to `APP_CONFIG.iceServers`. Without one, roughly 10–20% of users (strict NATs, mobile carriers) can't connect.
-5. Optional: set `APP_CONFIG.geminiApiKey` to turn on translation. Put the key behind a proxy before going public.
+4. Add a **TURN server** to `iceServers` in `config.js`. Without one, roughly 10–20% of users (strict NATs, mobile carriers) can't connect.
+5. Optional: set `geminiApiKey` in `config.js` to turn on translation. Put the key behind a proxy before going public.
 6. Recommended: add a Firestore TTL policy on `queue.ts`, and on `rooms` / `signals`, to clean up abandoned docs.
 
 ## Important before launch

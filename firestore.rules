@@ -49,6 +49,52 @@ service cloud.firestore {
         allow delete: if request.auth != null && request.auth.uid == uid;
       }
 
+      // Friendships: doc id is "<uidA>_<uidB>" (sorted). Created "pending" by the requester,
+      // accepted by the other person. Only Google-signed-in users can befriend.
+      match /friendships/{pairId} {
+        function signedIn() {
+          return request.auth != null && request.auth.token.firebase.sign_in_provider != 'anonymous';
+        }
+        function changes() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+        allow read: if request.auth != null && request.auth.uid in resource.data.users;
+        allow create: if signedIn()
+          && request.resource.data.requestedBy == request.auth.uid
+          && request.resource.data.status == 'pending'
+          && request.resource.data.users.size() == 2
+          && request.auth.uid in request.resource.data.users
+          && pairId == request.resource.data.users[0] + '_' + request.resource.data.users[1];
+        allow update: if signedIn() && request.auth.uid in resource.data.users && (
+          // the other person accepts
+          (resource.data.status == 'pending' && request.auth.uid != resource.data.requestedBy
+            && request.resource.data.status == 'accepted'
+            && changes().hasOnly(['status', 'names', 'acceptedAt']))
+          // the requester re-sends their own pending request
+          || (resource.data.status == 'pending' && request.auth.uid == resource.data.requestedBy
+            && request.resource.data.status == 'pending'
+            && request.resource.data.users == resource.data.users
+            && request.resource.data.requestedBy == resource.data.requestedBy)
+          // friends: ring / cancel a call, update the chat preview
+          || (resource.data.status == 'accepted'
+            && changes().hasOnly(['call', 'lastMessage', 'lastMessageAt'])
+            && (request.resource.data.get('call', null) == null || request.resource.data.call.from == request.auth.uid
+                || !changes().hasAny(['call'])))
+        );
+        allow delete: if request.auth != null && request.auth.uid in resource.data.users;
+
+        match /messages/{msgId} {
+          function friendship() {
+            return get(/databases/$(database)/documents/artifacts/$(appId)/public/data/friendships/$(pairId)).data;
+          }
+          allow read: if request.auth != null && request.auth.uid in friendship().users
+            && friendship().status == 'accepted';
+          allow create: if request.auth != null && request.auth.uid in friendship().users
+            && friendship().status == 'accepted'
+            && request.resource.data.from == request.auth.uid
+            && request.resource.data.text is string && request.resource.data.text.size() <= 1000;
+        }
+      }
+
       // Reports are write-only for clients; moderators read them via the console / Admin SDK.
       match /reports/{reportId} {
         allow create: if request.auth != null
