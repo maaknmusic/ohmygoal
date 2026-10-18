@@ -378,3 +378,5 @@ body.is-premium .pro-tag { display: none; }
 .appeal h3 { margin: 0 0 12px; font-size: 17px; }
 .appeal textarea { resize: vertical; min-height: 76px; font: inherit; }
 .appeal.no-appeal h3, .appeal.no-appeal .field, .appeal.no-appeal #appealSend { display: none; }
+
+@media (max-width: 899px) { .topbar-nav { display: none; } .topbar { padding-inline: var(--space-4); } }

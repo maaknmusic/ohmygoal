@@ -132,7 +132,12 @@ export function createGamesUi({ send, say, getContainer, getName, attention }) {
     // ----- playing -----
     function statusLine(v) {
         const who = v.status?.turn;
-        if (v.phase === 'over') return v.lastEvent || v.status?.summary || '';
+        if (v.phase === 'over') {
+            const base = v.lastEvent || v.status?.summary || '';
+            const w = v.status?.winner;
+            if (/won|win|lost|draw|tie/i.test(base)) return base;
+            return w === v.me ? `${base}. You win! 🎉` : w === v.you ? `${base}. ${getName()} wins.` : base;
+        }
         if (v.game.simultaneous) {
             if (v.round?.iCommitted) return 'Waiting for them…';
             return v.round?.theyCommitted ? 'They’ve picked. Your turn!' : 'Pick now: both reveal together';

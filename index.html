@@ -51,95 +51,676 @@
     </header>
 
     <!-- ===================== WELCOME ===================== -->
-    <main id="welcome">
-        <section class="hero">
-            <div class="hero-copy">
-                <div class="online-pill"><span class="live-dot"></span><b id="onlineCount">…</b>&nbsp;<span id="onlineLabel">people online now</span></div>
-                <h1>Meet new people,<br><span>face to face.</span></h1>
-                <p class="lead">Random video and text chat with people around the world. Free, no sign‑up, age‑verified and private by design.</p>
-                <ul class="features">
-                    <li><i class="icon" data-icon="video"></i><div><b>HD video or text</b><span>Peer‑to‑peer. Nothing is recorded.</span></div></li>
-                    <li><i class="icon" data-icon="globe"></i><div><b>Country &amp; gender filters</b><span>Choose who you meet.</span></div></li>
-                    <li><i class="icon" data-icon="tag"></i><div><b>Shared interests</b><span>Get matched on what you love.</span></div></li>
-                    <li><i class="icon" data-icon="clock"></i><div><b>Quick rounds</b><span>60 seconds. Both tap +1 min to keep going.</span></div></li>
-                    <li><i class="icon" data-icon="shield"></i><div><b>Safer by design</b><span>Face age check, reporting and blocking.</span></div></li>
-                    <li><i class="icon" data-icon="download"></i><div><b>Works like an app</b><span>Install it on your phone or desktop.</span></div></li>
+    <main id="welcome" class="lp">
+
+    <!-- Icon sprite: stroke icons, 24px grid. Used as <svg class="lp-i"><use href="#lp-i-NAME"/></svg> -->
+    <svg class="lp-sprite" width="0" height="0" aria-hidden="true" focusable="false">
+        <symbol id="lp-i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+        <symbol id="lp-i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+        <symbol id="lp-i-chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+        <symbol id="lp-i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+        <symbol id="lp-i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+        <symbol id="lp-i-eyeoff" viewBox="0 0 24 24"><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c7 0 10 8 10 8a13.2 13.2 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3 8 10 8a9.7 9.7 0 0 0 5.39-1.61"/><path d="M2 2l20 20"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/></symbol>
+        <symbol id="lp-i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.7 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+        <symbol id="lp-i-video" viewBox="0 0 24 24"><path d="m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></symbol>
+        <symbol id="lp-i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+        <symbol id="lp-i-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></symbol>
+        <symbol id="lp-i-headset" viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4.5" height="6.5" rx="2"/><rect x="16.5" y="14" width="4.5" height="6.5" rx="2"/></symbol>
+        <symbol id="lp-i-gamepad" viewBox="0 0 24 24"><rect x="2.5" y="7" width="19" height="11" rx="5.5"/><path d="M7.5 10.5v4M5.5 12.5h4"/><circle cx="15.6" cy="11.6" r=".8"/><circle cx="18" cy="13.6" r=".8"/></symbol>
+        <symbol id="lp-i-hash" viewBox="0 0 24 24"><path d="M5 9h14M4 15h14M10 3 8 21M16 3l-2 18"/></symbol>
+        <symbol id="lp-i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+        <symbol id="lp-i-tag" viewBox="0 0 24 24"><path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r=".6"/></symbol>
+        <symbol id="lp-i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+        <symbol id="lp-i-smile" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01"/></symbol>
+        <symbol id="lp-i-sparkles" viewBox="0 0 24 24"><path d="M10 4l1.7 4.6 4.6 1.7-4.6 1.7L10 16.6l-1.7-4.6L3.7 10.3l4.6-1.7z"/><path d="M18 14l.9 2.1 2.1.9-2.1.9L18 20l-.9-2.1-2.1-.9 2.1-.9z"/></symbol>
+        <symbol id="lp-i-sliders" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+        <symbol id="lp-i-alert" viewBox="0 0 24 24"><path d="M12 3.5 2.5 19.5h19z"/><path d="M12 10v4.5M12 17.4v.1"/></symbol>
+        <symbol id="lp-i-flag" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></symbol>
+        <symbol id="lp-i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></symbol>
+        <symbol id="lp-i-phone" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></symbol>
+        <symbol id="lp-i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+        <defs>
+        <linearGradient id="lp-hairA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#43305f"/><stop offset=".55" stop-color="#1e1530"/><stop offset="1" stop-color="#120d1d"/></linearGradient>
+        <linearGradient id="lp-hairB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a2a22"/><stop offset="1" stop-color="#1b110d"/></linearGradient>
+        <linearGradient id="lp-skinA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9a07a"/><stop offset="1" stop-color="#c58760"/></linearGradient>
+        <linearGradient id="lp-skinB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#efc7a2"/><stop offset="1" stop-color="#dba783"/></linearGradient>
+        <g id="lp-pa">
+         <path d="M60 140C52 80 86 36 126 36s74 44 66 104c10 44 12 92-6 140H60C46 232 52 184 60 140z" fill="url(#lp-hairA)"/>
+         <path class="lp-cloth lp-cloth--a" d="M0 300c0-64 44-88 94-96h52c50 8 94 32 94 96z"/>
+         <path class="lp-cloth lp-cloth--a2" d="M30 300c2-48 30-78 66-92l30 92z"/>
+         <path d="M94 204c10 26 42 26 52 0" fill="none" stroke="#ffc861" stroke-width="3.4" stroke-linecap="round"/>
+         <circle cx="120" cy="233" r="2.4" fill="#ffc861"/><circle cx="120" cy="246" r="2.4" fill="#ffc861"/><circle cx="120" cy="259" r="2.4" fill="#ffc861"/>
+         <path d="M103 160h34v46c-10 11-24 11-34 0z" fill="url(#lp-skinA)"/>
+         <path d="M103 186c11 9 23 9 34 0v-26h-34z" fill="#7a3b2a" opacity=".18"/>
+         <circle cx="80" cy="134" r="7" fill="#c58760"/><circle cx="164" cy="134" r="7" fill="#c58760"/>
+         <path d="M80 142v12" stroke="#ffc861" stroke-width="2.4"/><path d="M80 154l-4 10h8z" fill="#ffc861"/>
+         <path d="M164 142v12" stroke="#ffc861" stroke-width="2.4"/><path d="M164 154l-4 10h8z" fill="#ffc861"/>
+         <path d="M80 124c0-30 18-52 42-52s42 22 42 52c0 36-18 60-42 60s-42-24-42-60z" fill="url(#lp-skinA)"/>
+         <path d="M72 128C64 84 92 54 124 54c34 0 58 30 50 74-3-24-12-40-28-50-14 16-40 34-74 50z" fill="url(#lp-hairA)"/>
+         <path d="M126 56C118 76 102 98 76 116" fill="none" stroke="#8a74b8" stroke-width="2.6" stroke-linecap="round" opacity=".5"/>
+         <path d="M96 116q8-5 17-1M131 115q9-4 17 1" fill="none" stroke="#2a1b33" stroke-width="3.2" stroke-linecap="round"/>
+         <ellipse cx="104" cy="131" rx="4.4" ry="5.2" fill="#1a1020"/><ellipse cx="141" cy="131" rx="4.4" ry="5.2" fill="#1a1020"/>
+         <circle cx="105.8" cy="129" r="1.5" fill="#fff"/><circle cx="142.8" cy="129" r="1.5" fill="#fff"/>
+         <path d="M123 135q-4 12 2 16" fill="none" stroke="#a8664a" stroke-width="2.4" stroke-linecap="round" opacity=".6"/>
+         <path d="M108 156q15 13 30 0" fill="none" stroke="#8a3d45" stroke-width="3.6" stroke-linecap="round"/>
+         <circle cx="94" cy="148" r="8" fill="#ef7a8e" opacity=".3"/><circle cx="152" cy="148" r="8" fill="#ef7a8e" opacity=".3"/>
+        </g>
+        <g id="lp-pb">
+         <path class="lp-cloth lp-cloth--b" d="M0 300c0-64 44-88 94-96h52c50 8 94 32 94 96z"/>
+         <path d="M80 208c10 22 28 32 42 32s32-10 42-32" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="5" stroke-linecap="round"/>
+         <path d="M103 164h34v44c-10 11-24 11-34 0z" fill="url(#lp-skinB)"/>
+         <path d="M103 188c11 9 23 9 34 0v-24h-34z" fill="#7a3b2a" opacity=".16"/>
+         <circle cx="79" cy="134" r="7" fill="#dba783"/><circle cx="165" cy="134" r="7" fill="#dba783"/>
+         <path d="M80 126c0-32 18-54 42-54s42 22 42 54c0 36-18 60-42 60s-42-24-42-60z" fill="url(#lp-skinB)"/>
+         <path d="M76 120c-6-44 22-70 48-70 30 0 52 26 46 70-6-14-14-22-26-26-10 8-26 12-44 10-10 2-18 8-24 16z" fill="url(#lp-hairB)"/>
+         <path d="M96 116q8-5 17-1M131 115q9-4 17 1" fill="none" stroke="#2a1b13" stroke-width="3.4" stroke-linecap="round"/>
+         <circle cx="104" cy="133" r="12.5" fill="none" stroke="#1a1330" stroke-width="3.6"/><circle cx="141" cy="133" r="12.5" fill="none" stroke="#1a1330" stroke-width="3.6"/><path d="M116.5 132h12" stroke="#1a1330" stroke-width="3.6"/>
+         <ellipse cx="104" cy="134" rx="3.6" ry="4.4" fill="#1a1020"/><ellipse cx="141" cy="134" rx="3.6" ry="4.4" fill="#1a1020"/>
+         <circle cx="105.4" cy="132.4" r="1.3" fill="#fff"/><circle cx="142.4" cy="132.4" r="1.3" fill="#fff"/>
+         <path d="M123 138q-3 11 2 14" fill="none" stroke="#b9764f" stroke-width="2.4" stroke-linecap="round" opacity=".6"/>
+         <path d="M108 158q15 12 30 0" fill="none" stroke="#8a3d45" stroke-width="3.6" stroke-linecap="round"/>
+         <path d="M74 116C72 70 96 46 124 46s52 24 50 70" fill="none" stroke="#2c2c3a" stroke-width="7" stroke-linecap="round"/>
+         <rect x="66" y="114" width="15" height="36" rx="7.5" class="lp-cup"/><rect x="165" y="114" width="15" height="36" rx="7.5" class="lp-cup"/>
+        </g>
+        </defs>
+        <symbol id="lp-i-logo" viewBox="0 0 32 32"><circle cx="12" cy="16" r="9" style="fill:var(--primary)" stroke="none"/><circle cx="20" cy="16" r="9" style="fill:var(--success)" stroke="none" opacity=".92"/><path d="M16 7.94A9 9 0 0 1 16 24.06A9 9 0 0 1 16 7.94Z" fill="#fff" stroke="none" opacity=".95"/></symbol>
+    </svg>
+
+    <!-- ===================== HERO ===================== -->
+    <section class="lp-hero" id="hero" aria-labelledby="lpTitle">
+        <div class="lp-aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="lp-wrap lp-hero-grid">
+
+            <div class="lp-hero-copy">
+                <div class="online-pill"><span class="live-dot"></span><b id="onlineCount">…</b><span id="onlineLabel">people online now</span></div>
+                <h1 id="lpTitle" class="lp-h1">Meet someone new. <span class="lp-em">Keep it safe.</span></h1>
+                <p class="lp-sub">Random video and text chat, free to start. Your age is checked on your device, nothing is recorded, and you can leave in one tap.</p>
+
+                <!-- THE START CARD -->
+                <div class="lp-card" id="start" role="group" aria-label="Start a chat">
+                    <div class="lp-card-top"><span>Start a chat</span><span>Free · no sign-up</span></div>
+
+                    <div class="segmented lp-seg" role="group" aria-label="Chat mode">
+                        <button type="button" class="seg active" data-mode="video"><i class="icon" data-icon="video"></i>Video</button>
+                        <button type="button" class="seg" data-mode="voice"><i class="icon" data-icon="mic"></i>Voice</button>
+                        <button type="button" class="seg" data-mode="text"><i class="icon" data-icon="chat"></i>Text</button>
+                    </div>
+
+                    <div class="lp-id">
+                        <span id="avatarPreview" class="lp-ava" aria-hidden="true">🦊</span>
+                        <span class="lp-id-main">
+                            <label for="nickInput" class="lp-id-label">You'll appear as</label>
+                            <input id="nickInput" class="lp-id-input" maxlength="20" placeholder="Your handle" autocomplete="off" autocapitalize="off" spellcheck="false">
+                        </span>
+                        <button type="button" id="diceBtn" class="lp-dice" aria-label="New random handle">🎲</button>
+                    </div>
+
+                    <button type="button" id="prefsBtn" class="lp-prefs" data-sheet-open="prefsSheet" aria-haspopup="dialog">
+                        <svg class="lp-i lp-prefs-ico" aria-hidden="true"><use href="#lp-i-sliders"/></svg>
+                        <span class="lp-prefs-main"><b>Interests &amp; filters</b><span id="prefsSummary" class="lp-prefs-sum">Optional</span></span>
+                        <svg class="lp-i lp-chev" aria-hidden="true"><use href="#lp-i-chev"/></svg>
+                    </button>
+                    <div id="prefsChips" class="lp-chips" aria-live="polite"></div>
+
+                    <label class="lp-consent">
+                        <input type="checkbox" id="ageCheck">
+                        <span class="lp-consent-text">I'm 18 or older and agree to the <a href="legal.html#terms" target="_blank" rel="noopener">rules</a></span>
+                    </label>
+
+                    <div class="lp-start-wrap">
+                        <button type="button" id="startBtn" class="lp-start" disabled>Start chatting</button>
+                    </div>
+                    <div id="ageStatus" class="lp-age" role="status" aria-live="polite"></div>
+
+                    <p class="lp-trust"><svg class="lp-i" aria-hidden="true"><use href="#lp-i-shield"/></svg><span>Peer-to-peer · never recorded · age-checked on your device</span></p>
+                    <p class="lp-legal"><a href="legal.html#terms">Terms</a><span aria-hidden="true">·</span><a href="legal.html#privacy">Privacy</a></p>
+                    <div id="demoNote" class="demo-note hidden">Local demo mode: no Firebase config found, so matching only works between tabs of this browser. Open this page in a second tab to test.</div>
+                </div>
+            </div>
+
+            <!-- Product mockup (decorative) -->
+            <div class="lp-mock" aria-hidden="true">
+                <div class="lp-stage">
+
+                    <div class="lp-vt lp-vt--a">
+                        <svg class="lp-person" viewBox="0 0 240 300" preserveAspectRatio="xMidYMax meet"><use href="#lp-pa"/></svg>
+                        <div class="lp-vt-top">
+                            <span class="lp-safechip"><svg class="lp-i"><use href="#lp-i-eyeoff"/></svg>Blurred until checked</span>
+                            <span class="lp-sig"><i></i><i></i><i></i></span>
+                        </div>
+                        <div class="lp-idchip">
+                            <span class="lp-idchip-ava">🦚</span>
+                            <span class="lp-idchip-txt"><b>MonsoonFox</b><small>🇮🇳 Pune · 🏏 Cricket</small></span>
+                        </div>
+                        <div class="lp-pip">
+                            <svg class="lp-person" viewBox="0 0 240 300" preserveAspectRatio="xMidYMax meet"><use href="#lp-pb"/></svg>
+                            <span class="lp-pip-tag">You</span>
+                        </div>
+                        <div class="lp-ctl">
+                            <span class="lp-ctl-btn"><svg class="lp-i"><use href="#lp-i-mic"/></svg></span>
+                            <span class="lp-ctl-btn"><svg class="lp-i"><use href="#lp-i-video"/></svg></span>
+                            <span class="lp-ctl-next">Next<svg class="lp-i"><use href="#lp-i-arrow"/></svg></span>
+                            <span class="lp-ctl-btn"><svg class="lp-i"><use href="#lp-i-flag"/></svg></span>
+                        </div>
+                        <div class="lp-reacts" data-reacts>
+                            <span class="lp-react lp-react--still">❤️</span>
+                        </div>
+                    </div>
+
+                    <div class="lp-match">
+                        <span class="lp-match-k">It's a match</span>
+                        <b>You both like</b>
+                        <span class="lp-match-chips"><span>🏏 Cricket</span><span>🎵 Music</span></span>
+                        <span class="lp-match-hi">👋 Say hi</span>
+                    </div>
+
+                    <div class="lp-game">
+                        <div class="lp-game-top"><b>Tic-Tac-Toe</b><span data-game-turn>Your turn</span></div>
+                        <div class="lp-board" data-board>
+                            <i class="x">✕</i><i class="o">○</i><i></i><i></i><i class="x">✕</i><i></i><i></i><i></i><i class="o">○</i>
+                        </div>
+                        <div class="lp-game-foot" data-game-note>You're ✕</div>
+                    </div>
+
+                    <div class="lp-chat">
+                        <div class="lp-bub lp-bub--them">Chai ya coffee? ☕</div>
+                        <div class="lp-bub lp-bub--me">Chai, always 😄</div>
+                        <div class="lp-bub lp-bub--them lp-typing" data-typing><i></i><i></i><i></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===================== HOW IT WORKS ===================== -->
+    <section class="lp-sec" id="how" aria-labelledby="howTitle">
+        <div class="lp-wrap">
+            <header class="lp-head reveal">
+                <span class="lp-eyebrow">How it works</span>
+                <h2 id="howTitle" class="lp-h2">Hello, in three steps.</h2>
+                <p class="lp-lede">No sign-up and no profile to fill in. We make you a handle and an avatar. Change them whenever you like.</p>
+            </header>
+            <ol class="lp-steps">
+                <li class="lp-step reveal" style="--d:0">
+                    <span class="lp-step-n">1</span>
+                    <div class="lp-step-vis" aria-hidden="true">
+                        <span class="lp-mini-seg"><span class="on">Video</span><span>Text</span></span>
+                        <span class="lp-mini-chips"><span>🏏 Cricket</span><span>🎵 Music</span></span>
+                    </div>
+                    <h3>Pick your vibe</h3>
+                    <p>Choose video or text. Add a few interests if you want people who like what you like. Your handle is ready, and the 🎲 rerolls it.</p>
+                </li>
+                <li class="lp-step reveal" style="--d:1">
+                    <span class="lp-step-n">2</span>
+                    <div class="lp-step-vis" aria-hidden="true">
+                        <span class="lp-link"><span class="lp-link-a">🦊</span><span class="lp-link-line"></span><span class="lp-link-b">🦚</span></span>
+                    </div>
+                    <h3>Tap Start</h3>
+                    <p>Confirm you're 18+, do the quick age check on your device, and we look for someone online who fits. Shared interests come first.</p>
+                </li>
+                <li class="lp-step reveal" style="--d:2">
+                    <span class="lp-step-n">3</span>
+                    <div class="lp-step-vis" aria-hidden="true">
+                        <span class="lp-mini-react">❤️ 😂 🔥</span>
+                        <span class="lp-mini-next">Next<svg class="lp-i"><use href="#lp-i-arrow"/></svg></span>
+                    </div>
+                    <h3>Talk, play, or move on</h3>
+                    <p>Break the ice with a question, a game or a reaction. Not feeling it? Tap Next. Something off? Report or block in one tap.</p>
+                </li>
+            </ol>
+        </div>
+    </section>
+
+    <!-- ===================== FEATURES (bento) ===================== -->
+    <section class="lp-sec" id="features" aria-labelledby="featTitle">
+        <div class="lp-wrap">
+            <header class="lp-head reveal">
+                <span class="lp-eyebrow">What's inside</span>
+                <h2 id="featTitle" class="lp-h2">More than a random chat.</h2>
+                <p class="lp-lede">Small touches that make talking to a stranger feel easy. Chai pe charcha, now with games.</p>
+            </header>
+
+            <div class="lp-bento">
+                <article class="lp-tile lp-tile--video reveal">
+                    <div class="lp-fx" aria-hidden="true">
+                        <div class="lp-fx-view">
+                            <svg class="lp-person" viewBox="0 0 240 300" preserveAspectRatio="xMidYMax meet"><use href="#lp-pb"/></svg>
+                            <span class="lp-fx-badge">Background blur on</span>
+                        </div>
+                        <div class="lp-fx-row">
+                            <span class="lp-fx-sw lp-fx-sw--blur on">Blur</span>
+                            <span class="lp-fx-sw lp-fx-sw--dusk">Dusk</span>
+                            <span class="lp-fx-sw lp-fx-sw--rain">Rain</span>
+                            <span class="lp-fx-sw lp-fx-sw--mask">🕶️</span>
+                            <span class="lp-fx-sw lp-fx-sw--glow">✨</span>
+                        </div>
+                    </div>
+                    <div class="lp-tile-copy">
+                        <span class="lp-tile-ico"><svg class="lp-i"><use href="#lp-i-video"/></svg></span>
+                        <h3>Video that feels like a hangout</h3>
+                        <p>Blur your background, swap it for a scene, or wear a face mask. Effects run on your device and your partner sees exactly what you see. <span class="lp-soft">More looks with Premium.</span></p>
+                    </div>
+                </article>
+
+                <article class="lp-tile lp-tile--interests reveal" style="--d:1">
+                    <div class="lp-tile-copy">
+                        <span class="lp-tile-ico"><svg class="lp-i"><use href="#lp-i-tag"/></svg></span>
+                        <h3>Matched on what you love</h3>
+                        <p>Add up to five interests. People who share them are matched first, and you'll see what you have in common.</p>
+                    </div>
+                    <div class="lp-cloud" aria-hidden="true">
+                        <span class="hit">🏏 Cricket</span><span>🎬 Bollywood</span><span class="hit">🎵 Music</span><span>✈️ Travel</span><span>🎮 Gaming</span><span>💻 Coding</span>
+                    </div>
+                </article>
+
+                <article class="lp-tile lp-tile--react reveal" style="--d:2">
+                    <div class="lp-tile-copy">
+                        <span class="lp-tile-ico"><svg class="lp-i"><use href="#lp-i-smile"/></svg></span>
+                        <h3>Never run out of things to say</h3>
+                        <p>Float a reaction over their video. Stuck? Tap a suggested question to get things going.</p>
+                    </div>
+                    <div class="lp-react-vis" aria-hidden="true">
+                        <span class="lp-rail"><span>❤️</span><span>😂</span><span>🔥</span><span>👏</span><span>🙏</span><span>😮</span></span>
+                        <span class="lp-ice">💬 Ask: best street food in your city?</span>
+                    </div>
+                </article>
+
+                <article class="lp-tile lp-tile--voice reveal">
+                    <span class="lp-soon">Coming soon</span>
+                    <div class="lp-voice" aria-hidden="true"><span class="lp-v-a">🐼</span><span class="lp-v-b">🦉</span></div>
+                    <div class="lp-tile-copy">
+                        <span class="lp-tile-ico"><svg class="lp-i"><use href="#lp-i-headset"/></svg></span>
+                        <h3>Voice-only mode</h3>
+                        <p>Just talk. No camera, two avatars and a call timer.</p>
+                    </div>
+                </article>
+
+                <article class="lp-tile lp-tile--friends reveal" style="--d:1">
+                    <div class="lp-friends" aria-hidden="true"><span>🦊</span><span>🐯</span><span class="ring">📞</span></div>
+                    <div class="lp-tile-copy">
+                        <span class="lp-tile-ico"><svg class="lp-i"><use href="#lp-i-users"/></svg></span>
+                        <h3>Keep the good ones</h3>
+                        <p>Sign in with Google, only if you want to. Add friends who say yes back, keep the chat and ring them for a video call.</p>
+                    </div>
+                </article>
+
+                <article class="lp-tile lp-tile--rounds reveal" style="--d:2">
+                    <div class="lp-timer" aria-hidden="true"><span class="lp-timer-orbit"><i></i></span><b>60</b><small>sec</small></div>
+                    <div class="lp-tile-copy">
+                        <span class="lp-tile-ico"><svg class="lp-i"><use href="#lp-i-clock"/></svg></span>
+                        <h3>60-second rounds</h3>
+                        <p>Short and low pressure. When time's up, both tap “+1 min” to keep going.</p>
+                    </div>
+                </article>
+
+                <article class="lp-tile lp-tile--themes reveal">
+                    <div class="lp-tile-copy">
+                        <span class="lp-tile-ico"><svg class="lp-i"><use href="#lp-i-sparkles"/></svg></span>
+                        <h3>Make it yours</h3>
+                        <p>Light, dark and accent themes. Rani and Monsoon are free. Diwali, Holi, Chai and Neon Mumbai come with Premium.</p>
+                    </div>
+                    <div class="lp-swatches" aria-hidden="true">
+                        <span class="lp-sw"><i></i><b>Rani</b></span>
+                        <span class="lp-sw" data-accent="monsoon"><i></i><b>Monsoon</b></span>
+                        <span class="lp-sw lp-sw--pro" data-accent="diwali"><i></i><b>Diwali</b></span>
+                        <span class="lp-sw lp-sw--pro" data-accent="holi"><i></i><b>Holi</b></span>
+                        <span class="lp-sw lp-sw--pro" data-accent="chai"><i></i><b>Chai</b></span>
+                        <span class="lp-sw lp-sw--pro" data-accent="mumbai"><i></i><b>Neon</b></span>
+                    </div>
+                </article>
+
+                <article class="lp-tile lp-tile--install reveal" style="--d:1">
+                    <div class="lp-app" aria-hidden="true">
+                        <span class="lp-phone"><i></i><i></i><i></i><i></i><i class="me"><svg class="lp-i"><use href="#lp-i-logo"/></svg></i><i></i><i></i><i></i><i></i></span>
+                        <span class="lp-app-add"><svg class="lp-i"><use href="#lp-i-plus"/></svg>Add to Home screen</span>
+                    </div>
+                    <div class="lp-tile-copy">
+                        <span class="lp-tile-ico"><svg class="lp-i"><use href="#lp-i-phone"/></svg></span>
+                        <h3>Installs like an app</h3>
+                        <p>Add it to your home screen from the browser menu. No app store, no big download.</p>
+                    </div>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===================== GAMES ===================== -->
+    <section class="lp-sec" id="games" aria-labelledby="gamesTitle">
+        <div class="lp-wrap">
+            <header class="lp-head reveal">
+                <span class="lp-eyebrow">Games</span>
+                <h2 id="gamesTitle" class="lp-h2">Break the ice with a game.</h2>
+                <p class="lp-lede">Invite your partner with one tap. Games appear over the lower part of the video, so you can still see each other's faces.</p>
+            </header>
+            <ol class="lp-flow reveal" aria-label="How a game starts">
+                <li><b>Invite</b><span>one tap</span></li>
+                <li><b>Accept</b><span>or decline, no pressure</span></li>
+                <li><b>Play</b><span>turns shown clearly</span></li>
+                <li><b>Rematch</b><span>if you're feeling it</span></li>
+            </ol>
+            <div class="lp-games-scroll">
+                <ul class="lp-games">
+                    <li class="lp-game-card reveal" style="--d:0">
+                        <div class="lp-gv lp-gv--ttt" aria-hidden="true"><i class="x">✕</i><i class="o">○</i><i></i><i></i><i class="x">✕</i><i class="o">○</i><i></i><i></i><i class="x win">✕</i></div>
+                        <h3>Tic-Tac-Toe</h3><p>The classic. Three in a row wins.</p>
+                    </li>
+                    <li class="lp-game-card reveal" style="--d:1">
+                        <div class="lp-gv lp-gv--rps" aria-hidden="true"><span>✊</span><em>vs</em><span>✌️</span></div>
+                        <h3>Stone Paper Scissors</h3><p>Quick rounds, instant rivalry.</p>
+                    </li>
+                    <li class="lp-game-card reveal" style="--d:2">
+                        <div class="lp-gv lp-gv--c4" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="a"></i><i class="b"></i><i></i><i></i><i></i><i class="b"></i><i class="a"></i><i class="a"></i><i class="b"></i><i></i><i class="b"></i><i class="a"></i><i class="a"></i><i class="b"></i><i class="b"></i><i class="a"></i></div>
+                        <h3>Connect Four</h3><p>Drop discs, plan ahead, groan loudly.</p>
+                    </li>
+                    <li class="lp-game-card reveal" style="--d:3">
+                        <div class="lp-gv lp-gv--cricket" aria-hidden="true"><span class="lp-bat">🏏</span><span class="lp-run">4</span><span class="lp-run lp-run--out">OUT</span></div>
+                        <h3>Hand Cricket</h3><p>The playground classic. Pick a number, don't match theirs.</p>
+                    </li>
+                    <li class="lp-game-card reveal" style="--d:4">
+                        <div class="lp-gv lp-gv--word" aria-hidden="true"><span>CHAI</span><span>INDIA</span><span>AAM</span></div>
+                        <h3>Word Chain</h3><p>Your word starts with their last letter. How long can you go?</p>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===================== ROOMS (teaser) ===================== -->
+    <section class="lp-sec" id="rooms" aria-labelledby="roomsTitle">
+        <div class="lp-wrap">
+            <header class="lp-head reveal">
+                <span class="lp-eyebrow">Topic rooms <span class="lp-soon lp-soon--inline">Coming soon</span></span>
+                <h2 id="roomsTitle" class="lp-h2">Prefer a crowd? Rooms are on the way.</h2>
+                <p class="lp-lede">Public group-text rooms built around what people love, with the same report, block and safety tools as a one-on-one chat. We're still building them, so none are open yet.</p>
+            </header>
+            <ul class="lp-rooms">
+                <li class="lp-room reveal" style="--d:0"><span class="lp-room-e">🏏</span><b>Cricket</b><span>Match-day banter and hot takes</span><em>Coming soon</em></li>
+                <li class="lp-room reveal" style="--d:1"><span class="lp-room-e">🎬</span><b>Bollywood</b><span>Songs, films and fan wars</span><em>Coming soon</em></li>
+                <li class="lp-room reveal" style="--d:2"><span class="lp-room-e">🌙</span><b>Late night</b><span>For the night owls</span><em>Coming soon</em></li>
+                <li class="lp-room reveal" style="--d:3"><span class="lp-room-e">💻</span><b>Coding</b><span>Bugs, side projects, chai breaks</span><em>Coming soon</em></li>
+                <li class="lp-room reveal" style="--d:0"><span class="lp-room-e">🎵</span><b>Music</b><span>What's on your playlist?</span><em>Coming soon</em></li>
+                <li class="lp-room reveal" style="--d:1"><span class="lp-room-e">📚</span><b>Study</b><span>Quiet company while you grind</span><em>Coming soon</em></li>
+                <li class="lp-room reveal" style="--d:2"><span class="lp-room-e">🎮</span><b>Gaming</b><span>Squads, strategies, scores</span><em>Coming soon</em></li>
+                <li class="lp-room reveal" style="--d:3"><span class="lp-room-e">🇮🇳</span><b>Hindi</b><span>Hindi mein baat-cheet</span><em>Coming soon</em></li>
+            </ul>
+            <p class="lp-note reveal">Missing a room you'd use? <a href="legal.html#contact">Tell us</a>.</p>
+        </div>
+    </section>
+
+    <!-- ===================== SAFETY ===================== -->
+    <section class="lp-sec lp-safety" id="safety" aria-labelledby="safetyTitle">
+        <div class="lp-wrap">
+            <header class="lp-head reveal">
+                <span class="lp-eyebrow">Safety first</span>
+                <h2 id="safetyTitle" class="lp-h2">Safety isn't an add-on. It's how this is built.</h2>
+                <p class="lp-lede">The checks that matter run on your device, and the camera frames they use are never uploaded. Here is what that means for you.</p>
+            </header>
+
+            <div class="lp-safe-grid">
+                <div class="lp-gate reveal" aria-hidden="true">
+                    <div class="lp-gate-view">
+                        <svg class="lp-person lp-person--clear" viewBox="0 0 240 300" preserveAspectRatio="xMidYMax meet"><use href="#lp-pa"/></svg>
+                        <svg class="lp-person lp-person--blur" viewBox="0 0 240 300" preserveAspectRatio="xMidYMax meet"><use href="#lp-pa"/></svg>
+                        <span class="lp-gate-chip lp-gate-chip--a"><svg class="lp-i"><use href="#lp-i-eyeoff"/></svg>Blurred until checked<i></i></span>
+                        <span class="lp-gate-chip lp-gate-chip--b"><svg class="lp-i"><use href="#lp-i-shield"/></svg>Clear · checked on your device</span>
+                    </div>
+                    <div class="lp-scam">
+                        <div class="lp-bub lp-bub--them">text me on 98•••••210</div>
+                        <div class="lp-scam-warn"><svg class="lp-i"><use href="#lp-i-alert"/></svg><span><b>Careful.</b> That looks like a phone number. Keep chatting here until you trust them.</span></div>
+                    </div>
+                </div>
+
+                <ul class="lp-proofs">
+                    <li class="lp-proof reveal" style="--d:0"><span class="lp-proof-ico"><svg class="lp-i"><use href="#lp-i-shield"/></svg></span><div><h3>Age check on your device</h3><p>A quick face check estimates your age in the browser and asks for a small head turn to prove you're really there. Nothing is uploaded or stored.</p></div></li>
+                    <li class="lp-proof reveal" style="--d:1"><span class="lp-proof-ico"><svg class="lp-i"><use href="#lp-i-eyeoff"/></svg></span><div><h3>Blurred until checked</h3><p>Your partner's video stays blurred until an on-device check clears it, and it hides again if something explicit shows up.</p></div></li>
+                    <li class="lp-proof reveal" style="--d:2"><span class="lp-proof-ico"><svg class="lp-i"><use href="#lp-i-lock"/></svg></span><div><h3>Never recorded</h3><p>Video goes straight between you and your partner. We don't record or store it. A few networks need an encrypted relay to connect, and it still isn't saved.</p></div></li>
+                    <li class="lp-proof reveal" style="--d:3"><span class="lp-proof-ico"><svg class="lp-i"><use href="#lp-i-flag"/></svg></span><div><h3>Report and block, always</h3><p>Both are one tap away in every chat. Reports are read by human moderators.</p></div></li>
+                    <li class="lp-proof reveal" style="--d:4"><span class="lp-proof-ico"><svg class="lp-i"><use href="#lp-i-alert"/></svg></span><div><h3>Scam shield</h3><p>If someone shares a phone number, UPI ID or social handle, you get a warning before you reply. In India, report fraud on 1930 or at <a href="https://cybercrime.gov.in" target="_blank" rel="noopener noreferrer">cybercrime.gov.in</a>.</p></div></li>
+                    <li class="lp-proof reveal" style="--d:5"><span class="lp-proof-ico"><svg class="lp-i"><use href="#lp-i-ban"/></svg></span><div><h3>Fair bans, free appeals</h3><p>Bans cover the device, network and account. You always see why, and you can appeal for free. Many restrictions end on their own.</p></div></li>
                 </ul>
             </div>
 
-            <div class="welcome-card">
-                <h2>Start a chat</h2>
-                <div class="field-row">
-                    <div class="field">
-                        <label class="lbl" for="nickInput">Nickname</label>
-                        <input id="nickInput" class="input" maxlength="20" placeholder="Stranger" autocomplete="off">
-                    </div>
-                    <div class="field">
-                        <label class="lbl" for="genderSelect">I am</label>
-                        <select id="genderSelect" class="input">
-                            <option value="x">Prefer not to say</option>
-                            <option value="male">Male</option>
-                            <option value="female">Female</option>
-                        </select>
-                    </div>
+            <div class="lp-never reveal">
+                <div>
+                    <h3>We never sell safety.</h3>
+                    <p>Nobody can pay to skip a ban, buy a verification badge or unlock the safety tools. They are free and the same for everyone.</p>
                 </div>
+                <ul class="lp-never-list" aria-label="Not for sale">
+                    <li><svg class="lp-i"><use href="#lp-i-lock"/></svg>Unbans</li>
+                    <li><svg class="lp-i"><use href="#lp-i-lock"/></svg>Verification</li>
+                    <li><svg class="lp-i"><use href="#lp-i-lock"/></svg>Safety tools</li>
+                </ul>
+            </div>
+        </div>
+    </section>
 
-                <div class="field">
-                    <label class="lbl" for="tagInput">Interests</label>
-                    <div class="tags" id="tags">
-                        <input id="tagInput" maxlength="24" placeholder="music, gaming, travel…" autocomplete="off">
-                    </div>
-                    <div class="hint">Press Enter to add, up to 5. People who share them are matched first.</div>
+    <!-- ===================== PREMIUM ===================== -->
+    <section class="lp-sec lp-prem" id="premium" aria-labelledby="premTitle">
+        <div class="lp-wrap">
+            <header class="lp-head lp-head--c reveal">
+                <span class="lp-eyebrow lp-eyebrow--gold">👑 Premium</span>
+                <h2 id="premTitle" class="lp-h2">Pay for the extras. Never for safety.</h2>
+                <p class="lp-lede">Chatting, games, friends and every safety tool are free. Premium adds more ways to choose who you meet and to make the app yours.</p>
+            </header>
+
+            <div class="lp-plans">
+                <article class="lp-plan reveal" style="--d:0">
+                    <h3>7 days</h3>
+                    <p class="lp-price"><b>₹49</b></p>
+                    <p class="lp-per">≈ ₹7 a day</p>
+                    <button type="button" class="lp-btn lp-btn--gold-o" data-open-premium data-plan="7">Get 7 days</button>
+                </article>
+                <article class="lp-plan lp-plan--feat reveal" style="--d:1">
+                    <span class="lp-plan-badge">Save 29%</span>
+                    <h3>30 days</h3>
+                    <p class="lp-price"><b>₹149</b></p>
+                    <p class="lp-per">≈ ₹5 a day</p>
+                    <button type="button" class="lp-btn lp-btn--gold" data-open-premium data-plan="30">Get 30 days</button>
+                </article>
+                <article class="lp-plan reveal" style="--d:2">
+                    <span class="lp-plan-badge lp-plan-badge--soft">Best value · save 45%</span>
+                    <h3>90 days</h3>
+                    <p class="lp-price"><b>₹349</b></p>
+                    <p class="lp-per">≈ ₹4 a day</p>
+                    <button type="button" class="lp-btn lp-btn--gold-o" data-open-premium data-plan="90">Get 90 days</button>
+                </article>
+            </div>
+
+            <div class="lp-pay reveal">
+                <span class="lp-pay-line"><b>One-time payment · no auto-renew.</b> Nothing to cancel.</span>
+                <span class="lp-upi" aria-label="Pay with UPI">
+                    <span>UPI</span><span>GPay</span><span>PhonePe</span><span>Paytm</span>
+                </span>
+            </div>
+
+            <div class="lp-compare">
+                <div class="lp-col reveal" style="--d:0">
+                    <h3>Free, always</h3>
+                    <ul class="lp-checks">
+                        <li>Random video and text chat</li>
+                        <li>Interest matching and 60-second rounds</li>
+                        <li>Games, reactions and icebreakers</li>
+                        <li>Friends, with a Google sign-in</li>
+                        <li>Age check, blur, scam shield, report and block</li>
+                        <li>Free appeals and the Rani and Monsoon themes</li>
+                    </ul>
                 </div>
-
-                <div class="field">
-                    <label class="lbl">Mode</label>
-                    <div class="segmented">
-                        <button class="seg active" data-mode="video"><i class="icon" data-icon="video"></i>Video + Text</button>
-                        <button class="seg" data-mode="text"><i class="icon" data-icon="chat"></i>Text only</button>
-                    </div>
+                <div class="lp-col lp-col--prem reveal" style="--d:1">
+                    <h3>Premium adds</h3>
+                    <ul class="lp-checks">
+                        <li>Choose who you meet: women, men or everyone</li>
+                        <li>Choose a country, or stay open to anywhere</li>
+                        <li>Priority matching</li>
+                        <li>All backgrounds, face masks and filters</li>
+                        <li>Diwali, Holi, Chai and Neon Mumbai themes</li>
+                        <li>A 👑 next to your handle</li>
+                    </ul>
+                    <p class="lp-col-note">Premium needs a Google sign-in, so it follows you to any device.</p>
                 </div>
-
-                <div class="field-row">
-                    <div class="field">
-                        <label class="lbl" for="genderFilter">Talk to <span class="pro-tag">👑 Premium</span></label>
-                        <select id="genderFilter" class="input">
-                            <option value="any">Everyone</option>
-                            <option value="female">Women</option>
-                            <option value="male">Men</option>
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label class="lbl" for="countryFilter">From <span class="pro-tag">👑 Premium</span></label>
-                        <select id="countryFilter" class="input">
-                            <option value="any">🌐 Anywhere</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="hint filter-hint" id="filterHint">Filters work both ways and can make waits longer.</div>
-
-                <label class="toggle">
-                    <input type="checkbox" id="timedCheck">
-                    <span class="switch"></span>
-                    <span><b>Quick rounds</b> · 60 s per chat, both tap “+1 min” to keep talking</span>
-                </label>
-
-                <div class="rules">
-                    <label class="check">
-                        <input type="checkbox" id="ageCheck">
-                        <span>I’m <b>18 or older</b> and agree to the rules: no nudity or sexual content, no harassment or hate, don’t share personal info, and report anyone who seems under 18.</span>
-                    </label>
-                </div>
-
-                <button id="startBtn" class="btn btn-primary btn-block" disabled>Start chatting</button>
-                <div id="ageStatus" class="hint" style="text-align:center"></div>
-                <div class="legal-links"><a href="legal.html#terms">Terms</a> · <a href="legal.html#privacy">Privacy</a> · <a href="legal.html#refunds">Refunds</a> · <a href="legal.html#contact">Contact</a></div>
-                <div id="demoNote" class="demo-note hidden">
-                    <strong>Local demo mode:</strong> no Firebase config found, so matching only works between tabs of this browser. Open this page in a second tab to test. Set <code>firebase</code> in <code>config.js</code> to go live.
+                <div class="lp-col lp-col--never reveal" style="--d:2">
+                    <h3>Not for sale</h3>
+                    <p>Safety tools, verification, unbans. Money can't buy them, and a ban can't be paid off. You appeal, and appeals are free.</p>
+                    <ul class="lp-never-list" aria-label="Not for sale">
+                        <li><svg class="lp-i"><use href="#lp-i-lock"/></svg>Unbans</li>
+                        <li><svg class="lp-i"><use href="#lp-i-lock"/></svg>Verification</li>
+                        <li><svg class="lp-i"><use href="#lp-i-lock"/></svg>Safety tools</li>
+                    </ul>
+                    <p class="lp-col-note">Questions about a payment? See <a href="legal.html#refunds">refunds</a>.</p>
                 </div>
             </div>
-        </section>
-    </main>
+        </div>
+    </section>
+
+    <!-- ===================== FAQ ===================== -->
+    <section class="lp-sec" id="faq" aria-labelledby="faqTitle">
+        <div class="lp-wrap lp-faq-grid">
+            <header class="lp-head lp-faq-head reveal">
+                <span class="lp-eyebrow">FAQ</span>
+                <h2 id="faqTitle" class="lp-h2">Straight answers.</h2>
+                <p class="lp-lede">Something missing? <a href="legal.html#contact">Contact us</a> and a person will reply.</p>
+            </header>
+            <div class="lp-faq reveal">
+                <details name="lp-faq" open>
+                    <summary>Is it really free?</summary>
+                    <p>Yes. Chatting, interests, games, reactions and every safety tool are free, and you don't need an account to chat. Friends need a Google sign-in. Premium is an optional pass for extras like gender and country filters.</p>
+                </details>
+                <details name="lp-faq">
+                    <summary>Is my video recorded?</summary>
+                    <p>No. Video goes peer-to-peer between your browser and your partner's, and we don't record or store it. If your network blocks a direct link, an encrypted relay may carry the stream so it can connect. It still isn't saved. Remember the other person's device could record, so don't share anything you wouldn't want out.</p>
+                </details>
+                <details name="lp-faq">
+                    <summary>How does the age check work?</summary>
+                    <p>Before your first chat, your camera estimates your age on your device and asks for a small head turn so we know you're live. Camera frames are not uploaded or stored. If you look under 18 or can't be checked, you can't chat, and we may re-check during video calls.</p>
+                </details>
+                <details name="lp-faq">
+                    <summary>What if someone is rude or unsafe?</summary>
+                    <p>Tap Report or Block in any chat. Reports go to moderators. Nudity is blurred on your device, and a scam shield warns you when someone shares a phone number, UPI ID or social handle. In India you can also call 1930 or visit cybercrime.gov.in.</p>
+                </details>
+                <details name="lp-faq">
+                    <summary>Can I get banned, and can I appeal?</summary>
+                    <p>Yes, if you break the rules or fail an age or nudity check. Bans apply to the device, network and account, and the ban screen tells you why. Many restrictions end on their own after about 15 minutes or 24 hours. Appeals are free, and a ban can't be bought off.</p>
+                </details>
+                <details name="lp-faq">
+                    <summary>How does Premium work? Can I get a refund?</summary>
+                    <p>Premium is a one-time UPI payment for 7, 30 or 90 days (₹49, ₹149 or ₹349). It doesn't auto-renew, so there's nothing to cancel. If you were charged but Premium didn't switch on, or you were charged twice, write to us within 7 days and we'll fix it or refund you. Unused passes can be refunded within 48 hours. See the <a href="legal.html#refunds">refund policy</a>.</p>
+                </details>
+                <details name="lp-faq">
+                    <summary>What data do you keep?</summary>
+                    <p>Messages and video aren't stored. We keep short-lived matching records and abuse reports, and, to enforce bans, your IP address and a device hash. If you sign in with Google we also keep your Google ID, name, email, friends and Premium status. Read the full <a href="legal.html#privacy">privacy policy</a>.</p>
+                </details>
+                <details name="lp-faq">
+                    <summary>Does it work on my phone?</summary>
+                    <p>Yes. It runs in your browser on Android, iPhone and desktop, and you can add it to your home screen. Video needs a camera and a steady connection. Text chat is lighter if your data is low.</p>
+                </details>
+                <details name="lp-faq">
+                    <summary>When do voice mode and rooms arrive?</summary>
+                    <p>We're working on both. They're marked “coming soon” until they're ready, and we won't promise dates we can't keep.</p>
+                </details>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===================== FINAL CTA ===================== -->
+    <section class="lp-sec lp-cta-sec" id="cta" aria-labelledby="ctaTitle">
+        <div class="lp-wrap">
+            <div class="lp-cta reveal">
+                <span class="lp-cta-hi">Bas ek “hi” ki baat hai.</span>
+                <h2 id="ctaTitle" class="lp-h2">Ready when you are.</h2>
+                <p class="lp-lede">Free to start, no sign-up, and you can leave in one tap.</p>
+                <a class="lp-btn lp-btn--primary lp-btn--lg" href="#start" data-start-link>Start chatting<svg class="lp-i"><use href="#lp-i-arrow"/></svg></a>
+                <p class="lp-cta-live"><span class="live-dot"></span><b data-online-count>…</b> people online right now</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===================== FOOTER ===================== -->
+    <footer class="lp-foot">
+        <div class="lp-wrap lp-foot-grid">
+            <div class="lp-foot-brand">
+                <span class="lp-brand"><svg class="lp-logo" aria-hidden="true"><use href="#lp-i-logo"/></svg>Anonymous Connect</span>
+                <p>Random video and text chat that puts safety first. 18+ only.</p>
+            </div>
+            <nav class="lp-foot-nav" aria-label="Footer">
+                <a href="legal.html#terms">Terms</a>
+                <a href="legal.html#privacy">Privacy</a>
+                <a href="legal.html#refunds">Refunds</a>
+                <a href="legal.html#contact">Contact</a>
+                <a href="#safety">Safety</a>
+            </nav>
+            <p class="lp-foot-help">In India, report cybercrime on <b>1930</b> or at <a href="https://cybercrime.gov.in" target="_blank" rel="noopener noreferrer">cybercrime.gov.in</a>.</p>
+        </div>
+    </footer>
+
+    <!-- ===================== PREFERENCES SHEET ===================== -->
+    <div class="sheet-bg hidden" id="prefsSheet" role="dialog" aria-modal="true" aria-labelledby="prefsTitle">
+        <div class="sheet">
+            <div class="sheet-grab"></div>
+            <div class="sheet-head">
+                <h3 id="prefsTitle">Your preferences</h3>
+                <button type="button" class="icon-btn" data-sheet-close aria-label="Close preferences"><svg class="lp-i" aria-hidden="true"><use href="#lp-i-x"/></svg></button>
+            </div>
+            <div class="sheet-body">
+                <div class="lp-pf">
+                    <div class="lp-pf-h">Interests</div>
+                    <div class="tags" id="tags">
+                        <input id="tagInput" maxlength="24" placeholder="music, gaming, travel…" autocomplete="off" aria-label="Add an interest">
+                    </div>
+                    <div class="hint">Press Enter to add, up to 5. People who share them are matched first.</div>
+                    <div id="interestChips" class="lp-ichips">
+                        <button type="button" class="ichip" data-tag="cricket">🏏 Cricket</button>
+                        <button type="button" class="ichip" data-tag="music">🎵 Music</button>
+                        <button type="button" class="ichip" data-tag="bollywood">🎬 Bollywood</button>
+                        <button type="button" class="ichip" data-tag="gaming">🎮 Gaming</button>
+                        <button type="button" class="ichip" data-tag="movies">🍿 Movies</button>
+                        <button type="button" class="ichip" data-tag="travel">✈️ Travel</button>
+                        <button type="button" class="ichip" data-tag="coding">💻 Coding</button>
+                        <button type="button" class="ichip" data-tag="study">📚 Study</button>
+                        <button type="button" class="ichip" data-tag="anime">🌸 Anime</button>
+                        <button type="button" class="ichip" data-tag="fitness">💪 Fitness</button>
+                    </div>
+                </div>
+
+                <div class="lp-pf">
+                    <label class="lp-pf-h" for="genderSelect">I am</label>
+                    <select id="genderSelect" class="input">
+                        <option value="x">Prefer not to say</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                    </select>
+                </div>
+
+                <div class="lp-pf lp-pf--pro">
+                    <div class="lp-pf-h">Choose who you meet <span class="pro-tag">👑 Premium</span></div>
+                    <div class="lp-pf-row">
+                        <div>
+                            <label class="lbl" for="genderFilter">Talk to</label>
+                            <select id="genderFilter" class="input">
+                                <option value="any">Everyone</option>
+                                <option value="female">Women</option>
+                                <option value="male">Men</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="lbl" for="countryFilter">From</label>
+                            <select id="countryFilter" class="input">
+                                <option value="any">🌐 Anywhere</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="hint" id="filterHint">Filters work both ways and can make waits longer.</div>
+                </div>
+
+                <label class="toggle"><input type="checkbox" id="timedCheck"><span class="switch"></span><span><b>Quick rounds</b> · 60 s per chat, both tap “+1 min” to keep talking</span></label>
+            </div>
+            <div class="sheet-foot"><button type="button" class="btn btn-primary" data-sheet-close>Done</button></div>
+        </div>
+    </div>
+
+    <!-- Mobile bottom bar: shown (by landing.js) once the hero Start button scrolls out of view -->
+    <div id="stickyStart" class="lp-sticky">
+        <button type="button" id="stickyStartBtn" class="btn btn-primary lp-btn lp-btn--primary lp-btn--lg">Start chatting</button>
+    </div>
+</main>
 
     <!-- ===================== AGE VERIFICATION ===================== -->
     <main id="verify" class="hidden">
@@ -337,10 +918,10 @@
     </div>
 
     <!-- Safety & help -->
-    <div id="safetySheet" class="sheet-bg hidden" role="dialog" aria-modal="true" aria-labelledby="safetyTitle">
+    <div id="safetySheet" class="sheet-bg hidden" role="dialog" aria-modal="true" aria-labelledby="safetySheetTitle">
         <div class="sheet">
             <div class="sheet-grab"></div>
-            <div class="sheet-head"><h3 id="safetyTitle">Stay safe</h3><button class="icon-btn" data-sheet-close aria-label="Close"><i class="icon" data-icon="x"></i></button></div>
+            <div class="sheet-head"><h3 id="safetySheetTitle">Stay safe</h3><button class="icon-btn" data-sheet-close aria-label="Close"><i class="icon" data-icon="x"></i></button></div>
             <div class="sheet-body">
                 <p>Strangers are strangers. A few habits keep chats fun:</p>
                 <ul class="safety-list">

@@ -14,6 +14,9 @@
 //
 // Peers are untrusted: input is size-limited, copied through JSON, validated, and never throws.
 // Both sides run the same pure game code, so they hold identical state.
+// A commit that is a copy of our own is cheating (they would just echo our reveal and always tie).
+// Messages are queued while an entry point runs and sent when it is done, so a peer that answers
+// from inside send() (or a UI that reacts inside onChange) always finds our state already settled.
 // =====================================================================
 
 import { byId } from './index.js';
@@ -80,10 +83,10 @@ export function sha256Hex(text) {
     return Array.from(h, v => v.toString(16).padStart(8, '0')).join('');
 }
 
+/** Throws without a secure source: a guessable commit nonce would reveal our move. */
 function randomHex(bytes) {
     const buf = new Uint8Array(bytes);
-    if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(buf);
-    else for (let i = 0; i < bytes; i++) buf[i] = Math.floor(Math.random() * 256);
+    globalThis.crypto.getRandomValues(buf);
     return Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
 }
 
@@ -139,11 +142,30 @@ export function createGameSession({
     let lastRound = null;            // picks of the last resolved round { A, B }
     let rematchMine = null;
     let rematchTheirs = null;
+    let lateOffer = null;            // our rematch offer that just lapsed: an acceptance already on its way still counts
+    let depth = 0;                   // entry points running (public calls, incoming messages, timers)
+    const outbox = [];
     const timers = { invite: null, play: null, rematch: null };
 
     // ----- plumbing -----
     function post(op, fields) {
-        try { send?.({ t: 'game', op, gid, ...fields }); } catch { /* channel closed */ }
+        outbox.push({ t: 'game', op, gid, ...fields });
+        if (depth === 0) flush();
+    }
+
+    function flush() {
+        while (outbox.length) {
+            try { send?.(outbox.shift()); } catch { /* channel closed */ }
+        }
+    }
+
+    /** Run an entry point; what it queued goes out once it (and any onChange reaction) has finished. */
+    function entry(fn) {
+        depth++;
+        try { return fn(); } finally {
+            depth--;
+            if (depth === 0) flush();
+        }
     }
 
     function emit() {
@@ -162,14 +184,14 @@ export function createGameSession({
         timers[name] = setT(() => {
             timers[name] = null;
             if (disposed) return;
-            try { fn(); } catch { /* never throw out of a timer */ }
+            try { entry(fn); } catch { /* never throw out of a timer */ }
         }, Math.max(0, ms));
     }
 
     function reset() {
         Object.keys(timers).forEach(clearTimer);
         gid = null; def = null; state = null; seq = 0; ended = null; rd = null; lastRound = null;
-        rematchMine = null; rematchTheirs = null; inviteAt = 0;
+        rematchMine = null; rematchTheirs = null; lateOffer = null; inviteAt = 0;
     }
 
     function toIdle(event) {
@@ -232,8 +254,9 @@ export function createGameSession({
         if (disposed || (phase !== 'idle' && phase !== 'over')) return false;
         const game = isStr(gameId, GAME_ID) ? byId[gameId] : undefined;
         if (!game) return false;
+        const id = randomHex(6);
         reset();
-        phase = 'inviting'; role = 'A'; def = game; gid = randomHex(6); lastEvent = '';
+        phase = 'inviting'; role = 'A'; def = game; gid = id; lastEvent = '';
         post('invite', { game: game.id });
         startInviteTimer();
         emit();
@@ -297,8 +320,8 @@ export function createGameSession({
 
     function onCancel(msg) {
         if (msg.gid !== gid) return;
-        // The invitee may have accepted just as the invite expired on the other side.
-        const justStarted = phase === 'playing' && role === 'B' && seq === 0 && !rd?.mine && !rd?.theirHash;
+        // The invitee may have accepted (and even committed) just as the invite expired on the other side.
+        const justStarted = phase === 'playing' && role === 'B' && seq === 0 && !rd?.theirHash;
         if (phase === 'invited' || justStarted) toIdle('Invite cancelled');
     }
 
@@ -307,7 +330,7 @@ export function createGameSession({
         Object.keys(timers).forEach(clearTimer);
         first = firstPlayer;
         phase = 'playing'; ended = null; seq = 0; lastRound = null; lastEvent = '';
-        rematchMine = null; rematchTheirs = null;
+        rematchMine = null; rematchTheirs = null; lateOffer = null;
         state = def.init({ first, opts: {} });
         rd = def.simultaneous ? newRound(0) : null;
         activityAt = now();
@@ -427,7 +450,7 @@ export function createGameSession({
         if (move === undefined || !valid(role, move)) return false;
         const nonce = randomHex(16);
         const hash = sha256Hex(commitPayload(gid, rd.n, move, nonce));
-        rd.mine = { move, nonce };
+        rd.mine = { move, nonce, hash };
         post('commit', { round: rd.n, hash });
         activityAt = now();
         advanceRound();
@@ -437,6 +460,10 @@ export function createGameSession({
     function onCommit(msg) {
         if (phase !== 'playing' || !def.simultaneous || msg.gid !== gid || ended) return;
         if (msg.round !== rd.n || rd.theirHash || !isStr(msg.hash, HASH)) return;
+        if (rd.mine?.hash === msg.hash) { // an echo of our commit: they would mirror our reveal and never lose a round
+            endGame(role, 'They cheated, you win!', 'Cheating detected');
+            return;
+        }
         rd.theirHash = msg.hash;
         activityAt = now();
         advanceRound();
@@ -485,15 +512,20 @@ export function createGameSession({
         post('rematch', { newGid: rematchMine });
         if (rematchTheirs) beginRematch();
         else {
-            setTimer('rematch', INVITE_TTL_MS, () => { rematchMine = null; lastEvent = 'Rematch expired'; emit(); });
+            setTimer('rematch', INVITE_TTL_MS, () => {
+                lateOffer = { gid: rematchMine, until: now() + GRACE_MS };
+                rematchMine = null; lastEvent = 'Rematch expired'; emit();
+            });
             emit();
         }
         return true;
     }
 
     function onRematch(msg) {
-        if (phase !== 'over' || msg.gid !== gid || rematchTheirs || !isStr(msg.newGid, GID)) return;
+        if (phase !== 'over' || msg.gid !== gid || rematchTheirs || !isStr(msg.newGid, GID) || msg.newGid === gid) return;
         rematchTheirs = msg.newGid;
+        // They answered our offer in the last moment: it reached us just after our own timer ran out.
+        if (!rematchMine && lateOffer?.gid === msg.newGid && now() <= lateOffer.until) rematchMine = msg.newGid;
         if (rematchMine) beginRematch();
         else {
             setTimer('rematch', INVITE_TTL_MS, () => { rematchTheirs = null; lastEvent = 'Rematch expired'; emit(); });
@@ -517,12 +549,12 @@ export function createGameSession({
         if (disposed) return;
         try {
             const msg = parse(input);
-            if (msg) handlers[msg.op](msg);
+            if (msg) entry(() => handlers[msg.op](msg));
         } catch { /* garbage from the peer must never throw */ }
     }
 
     const guard = (fn, fallback) => (...args) => {
-        try { return fn(...args); } catch { return fallback; }
+        try { return entry(() => fn(...args)); } catch { return fallback; }
     };
 
     return {

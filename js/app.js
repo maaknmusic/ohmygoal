@@ -11,6 +11,7 @@ import { generateHandle, generateAvatar, sanitizeAvatar, sanitizeHandle, avatarS
 import { pickPrompts } from './icebreakers.js';
 import { scanMessage, maskContact } from './shield.js';
 import { meterStream } from './audio-meter.js';
+import { initLanding } from './landing.js';
 
 // =====================================================================
 // Config
@@ -565,7 +566,7 @@ function setPhase(phase, info = {}) {
     el.msgInput.disabled = !live;
     el.sendBtn.disabled = !live;
     el.emojiBtn.disabled = !live;
-    el.reportBtn.disabled = !(live || phase === 'connecting');
+    el.reportBtn.disabled = !(live || phase === 'connecting' || (phase === 'ended' && info.report));
     el.blockBtn.disabled = !(live || phase === 'connecting');
     el.addFriendBtn.disabled = !live || !!S.session?.friend;
     const friendCall = S.session?.friend;
@@ -2388,7 +2389,10 @@ async function refreshOnline() {
         el.onlineCount.textContent = text;
         document.getElementById('onlineLabel').textContent = n === 1 ? 'person online now' : 'people online now';
         el.onlineChipCount.textContent = text;
-        el.onlineChip.classList.remove('hidden');
+        // "1 online" is just you and makes a new site look empty: only show the count once it means something.
+        const show = n >= 3;
+        el.onlineChip.classList.toggle('hidden', !show);
+        el.onlineCount.closest('.online-pill')?.classList.toggle('hidden', !show);
     } catch (e) {
         console.warn('online count failed', e);
         el.onlineCount.closest('.online-pill')?.classList.add('hidden');
@@ -2420,6 +2424,7 @@ window.addEventListener('appinstalled', () => el.installBtn.classList.add('hidde
 // Boot
 // =====================================================================
 renderAccents();
+initLanding();
 setMode(S.mode);
 renderTags();
 renderAgeStatus();

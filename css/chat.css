@@ -12,8 +12,14 @@
     gap: 12px 16px; padding: 12px 16px 16px;
 }
 #chat.text-mode { grid-template-columns: minmax(0, 860px); justify-content: center; }
+#chat.text-mode { grid-template-rows: auto auto minmax(0, 1fr); }
 #chat.text-mode .stage { display: none; }
-#chat.text-mode .panel { grid-column: 1; }
+#chat.text-mode .panel { grid-column: 1; grid-row: 3; }
+/* Text chats have no video, but searching and "they left" still get the same friendly card, as a banner. */
+#chat.text-mode[data-phase="searching"] .stage, #chat.text-mode[data-phase="ended"] .stage { display: flex; grid-row: 2; }
+#chat.text-mode .stage .video-wrap { flex: 1; min-height: 190px; max-height: 250px; }
+#chat.text-mode .stage-dock, #chat.text-mode .stage #localVideo, #chat.text-mode .stage #remoteVideo, #chat.text-mode .quality,
+#chat.text-mode .react-layer, #chat.text-mode .react-bar, #chat.text-mode .game-stage, #chat.text-mode .fx-panel, #chat.text-mode .shield { display: none; }
 
 /* ---------- Header: who you're talking to ---------- */
 .chat-head {
@@ -224,6 +230,8 @@
     body:has(#chat:not(.hidden)) .topbar { display: none; }
     #chat { display: flex; flex-direction: column; height: 100dvh; padding: 0; gap: 0; }
     #chat.text-mode { align-items: stretch; }
+    #chat.text-mode[data-phase="searching"] .stage, #chat.text-mode[data-phase="ended"] .stage { flex: 0 0 auto; min-height: 0; }
+    #chat.text-mode .stage .video-wrap { border-radius: 0; min-height: 200px; }
     .chat-head {
         position: absolute; top: 0; left: 0; right: 0; z-index: 9; border: 0; border-radius: 0; color: #fff;
         padding: calc(8px + env(safe-area-inset-top)) 10px 22px; background: linear-gradient(rgba(5, 6, 13, 0.78), transparent);
