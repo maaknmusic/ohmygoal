@@ -22,6 +22,9 @@ const firebaseConfig = CFG.firebase || injectedFirebase;
 const appId = typeof __app_id !== 'undefined' ? __app_id : (CFG.appId || 'anon-connect');
 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 const ICE = { iceServers: CFG.iceServers || [{ urls: 'stun:stun.l.google.com:19302' }] };
+const HAS_TURN = (CFG.iceServers || []).some(srv => [].concat(srv.urls).some(u => /^turns?:/i.test(u)));
+// With 'relay' our connection candidates are only relay addresses, so the other person never learns our IP address.
+const iceConfig = () => ({ ...ICE, iceTransportPolicy: S.hideIp ? 'relay' : 'all' });
 const canTranslate = Boolean(CFG.geminiApiKey) || typeof __app_id !== 'undefined';
 
 const MAX_INTERESTS = 5;
@@ -102,6 +105,7 @@ const el = {
     shield: $('shield'), shieldTitle: $('shieldTitle'), shieldSub: $('shieldSub'), shieldActions: $('shieldActions'),
     shieldSkip: $('shieldSkip'), shieldReport: $('shieldReport'), fxBtn: $('fxBtn'), fxPanel: $('fxPanel'), fxClose: $('fxClose'), fxStatus: $('fxStatus'),
     round: $('round'), roundFill: $('roundFill'), roundTime: $('roundTime'), roundNote: $('roundNote'), extendBtn: $('extendBtn'),
+    hideIpBtn: $('hideIpBtn'), hideIpLabel: $('hideIpLabel'), shieldShow: $('shieldShow'), reportWho: $('reportWho'),
     exitBtn: $('exitBtn'), shareBtn: $('shareBtn'), themeLabel: $('themeLabel'), soundLabel: $('soundLabel'), accentGrid: $('accentGrid'), menuSheet: $('menuSheet'),
     overlayChips: $('overlayChips'), overlayTip: $('overlayTip'), endPauseBtn: $('endPauseBtn'), endReportBtn: $('endReportBtn'),
     reactBar: $('reactBar'), reactLayer: $('reactLayer'), reactBtn: $('reactBtn'), gamesBtn: $('gamesBtn'), gameStage: $('gameStage'), gameDock: $('gameDock'),
@@ -174,6 +178,9 @@ const S = {
     skipTimer: null,
 };
 
+// Hide my IP: on by default on the live site (needs the TURN relay); off in the local demo, which has no relay.
+S.hideIp = HAS_TURN && store.get('hideIp', Boolean(firebaseConfig) && CFG.privacy?.hideIp !== false);
+
 // Anonymous identity: a friendly generated handle + emoji avatar, rerolled with the dice button.
 if (!S.nick) { S.nick = generateHandle(); store.set('nick', S.nick); }
 S.avatar = sanitizeAvatar(store.get('avatar', null)) || generateAvatar();
@@ -207,10 +214,10 @@ const ACCENTS = [
     { id: 'mumbai', name: 'Mumbai', sw: 'linear-gradient(135deg,#3d5cff,#2dd4bf)' },
 ];
 const currentAccent = () => document.documentElement.dataset.accent || 'rani';
-function applyAccent(id) {
+function applyAccent(id, { save = true } = {}) {
     if (id === 'rani') delete document.documentElement.dataset.accent;
     else document.documentElement.dataset.accent = id;
-    store.set('accent', id);
+    if (save) store.set('accent', id);
     renderAccents();
 }
 function renderAccents() {
@@ -229,6 +236,21 @@ function renderAccents() {
         return b;
     }));
 }
+
+function renderHideIp() {
+    el.hideIpLabel.textContent = HAS_TURN ? (S.hideIp ? 'On' : 'Off') : 'Unavailable';
+    el.hideIpBtn.disabled = !HAS_TURN;
+    el.hideIpBtn.title = HAS_TURN
+        ? 'When on, your connection goes through a relay so strangers never see your IP address. When off, they can.'
+        : 'Needs a TURN relay server in config.js';
+}
+el.hideIpBtn.onclick = () => {
+    S.hideIp = !S.hideIp;
+    store.set('hideIp', S.hideIp);
+    renderHideIp();
+    toast(S.hideIp ? 'Your IP address is hidden from strangers.' : 'Direct connections on: strangers can see your IP address.', !S.hideIp);
+};
+renderHideIp();
 
 function renderSoundBtn() {
     setIcon(el.soundBtn.querySelector('.icon'), S.sound ? 'volume' : 'volumeOff');
@@ -275,30 +297,49 @@ const EMOJI_ONLY = /^(?=.*\p{Extended_Pictographic})(?:\p{Extended_Pictographic}
 // =====================================================================
 // Media
 // =====================================================================
+let mediaGen = 0;       // bumped when media is stopped: a request finishing after that must throw its stream away
+let mediaPending = null;
 async function ensureMedia() {
-    if (S.localStream) return true;
-    try {
-        S.localStream = await navigator.mediaDevices.getUserMedia({
-            video: S.mode === 'video' ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } : false,
-            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        });
-    } catch (e) {
-        console.warn('getUserMedia failed', e);
-        toast(S.mode === 'voice' ? 'Microphone unavailable, switched to text only.' : 'Camera/microphone unavailable, switched to text only.', true);
-        setMode('text');
-        return false;
-    }
-    el.localVideo.srcObject = S.localStream;
-    applyTrackState();
-    if (S.mode === 'video' && fxActive()) applyEffects({});
-    try {
-        S.videoDevices = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
-    } catch { S.videoDevices = []; }
-    el.switchCamBtn.classList.toggle('hidden', S.videoDevices.length < 2);
-    return true;
+    const wantVideo = S.mode === 'video';
+    if (S.localStream && (!wantVideo || S.localStream.getVideoTracks().length)) return true;
+    if (S.localStream) stopMedia(); // e.g. an audio-only stream left over from a voice chat
+    if (mediaPending) return mediaPending;
+    const gen = mediaGen;
+    mediaPending = (async () => {
+        let stream;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: wantVideo ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } : false,
+                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+            });
+        } catch (e) {
+            console.warn('getUserMedia failed', e);
+            if (gen === mediaGen) {
+                toast(S.mode === 'voice' ? 'Microphone unavailable, switched to text only.' : 'Camera/microphone unavailable, switched to text only.', true);
+                setMode('text');
+            }
+            return false;
+        }
+        // The person left, or changed mode, while the permission prompt was open: don't keep the camera or mic.
+        if (gen !== mediaGen || S.mode === 'text' || (S.mode === 'video') !== wantVideo || S.localStream) {
+            stream.getTracks().forEach(t => t.stop());
+            return Boolean(S.localStream);
+        }
+        S.localStream = stream;
+        el.localVideo.srcObject = stream;
+        applyTrackState();
+        if (wantVideo && fxActive()) applyEffects({});
+        try {
+            S.videoDevices = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+        } catch { S.videoDevices = []; }
+        el.switchCamBtn.classList.toggle('hidden', S.videoDevices.length < 2);
+        return true;
+    })().finally(() => { mediaPending = null; });
+    return mediaPending;
 }
 
 function stopMedia() {
+    mediaGen++;
     S.effects?.stop();
     S.localStream?.getTracks().forEach(t => t.stop());
     S.localStream = null;
@@ -440,11 +481,15 @@ function setShield(state) {
     shieldState = state;
     el.remoteVideo.classList.toggle('shielded', state !== 'off');
     el.shield.classList.toggle('hidden', state === 'off');
-    el.shield.classList.toggle('alert', state === 'hidden');
-    el.shieldActions.classList.toggle('hidden', state !== 'hidden');
+    el.shield.classList.toggle('alert', state === 'hidden' || state === 'unavailable');
+    el.shieldActions.classList.toggle('hidden', state !== 'hidden' && state !== 'unavailable');
+    el.shieldShow.classList.toggle('hidden', state !== 'unavailable');
     if (state === 'checking') {
         el.shieldTitle.textContent = 'Checking video…';
         el.shieldSub.textContent = 'Video appears once our on-device safety check passes.';
+    } else if (state === 'unavailable') {
+        el.shieldTitle.textContent = 'Safety check unavailable';
+        el.shieldSub.textContent = 'We can’t check this video for nudity right now, so it stays hidden. You can skip, or show it at your own risk.';
     } else if (state === 'hidden') {
         el.shieldTitle.textContent = 'Video hidden';
         el.shieldSub.textContent = 'It may contain nudity. It will reappear automatically if it’s clean again.';
@@ -457,8 +502,8 @@ function startSafety(sess) {
     const st = sess.safety = { bad: 0, good: 0, hits: 0, reported: false, selfBad: 0 };
     const g = getGuard();
     // If the model can't load (old device, offline CDN), don't leave the video blurred forever.
-    sess.safetyFailOpen = setTimeout(() => { if (!sess.ended && !g.model && shieldState === 'checking') setShield('off'); }, 20000);
-    g.load().catch(e => { console.warn('nudity model failed to load', e); if (!sess.ended && shieldState === 'checking') setShield('off'); });
+    sess.safetyFailOpen = setTimeout(() => { if (!sess.ended && !g.model && shieldState === 'checking') setShield('unavailable'); }, 20000);
+    g.load().catch(e => { console.warn('nudity model failed to load', e); if (!sess.ended && shieldState === 'checking') setShield('unavailable'); });
 
     sess.safetyTimer = setInterval(async () => {
         const r = await g.check(el.remoteVideo).catch(() => null);
@@ -523,6 +568,7 @@ async function selfViolation(sess) {
 }
 
 el.shieldSkip.onclick = () => startSearch('You skipped the last chat.');
+el.shieldShow.onclick = () => setShield('off');
 el.shieldReport.onclick = () => {
     const sexual = document.querySelector('input[name="reason"][value="sexual"]');
     if (sexual) sexual.checked = true;
@@ -603,7 +649,7 @@ function setPhase(phase, info = {}) {
     } else if (phase === 'connected') {
         el.partnerSub.textContent = 'Connected';
         el.nextBtn.textContent = friendCall ? 'Hang up' : 'Next';
-        el.msgInput.focus();
+        if (!anySheetOpen()) el.msgInput.focus();
     } else if (phase === 'ended') {
         el.overlayTitle.textContent = info.title || 'Chat ended';
         el.overlaySub.textContent = info.sub || '';
@@ -626,7 +672,14 @@ function sys(text, kind = '') {
     return node;
 }
 
-function scrollMessages() { el.messages.scrollTop = el.messages.scrollHeight; }
+let scrollQueued = false;
+function scrollMessages() {
+    // Keep the list bounded, and read layout at most once a frame however fast lines arrive.
+    while (el.messages.childElementCount > 300) el.messages.firstElementChild.remove();
+    if (scrollQueued) return;
+    scrollQueued = true;
+    requestAnimationFrame(() => { scrollQueued = false; el.messages.scrollTop = el.messages.scrollHeight; });
+}
 
 /** note: optional message carried over from the chat that just ended (e.g. "Time's up"). */
 async function startSearch(note) {
@@ -647,8 +700,10 @@ async function startSearch(note) {
         if (st && applyAccess(st)) return;
     }
 
-    if (S.mode !== 'text' && !(await ensureMedia())) {
-        // ensureMedia already switched us to text mode
+    if (S.mode !== 'text') {
+        const ok = await ensureMedia();
+        if (ac.signal.aborted || S.searchAbort !== ac) return; // they left or pressed Stop while the permission prompt was open
+        if (!ok && S.mode !== 'text') setMode('text');
     }
     const filtered = S.genderFilter !== 'any' || S.countryFilter !== 'any';
     const slowHint = setTimeout(() => {
@@ -681,6 +736,7 @@ async function startSearch(note) {
             if (ac.signal.aborted || S.searchAbort !== ac) return;
             if (applyAccess(st)) { ac.abort(); return; }
             if (S.mode !== 'text' && !S.localStream && !(await ensureMedia())) { /* switched to text */ }
+            if (ac.signal.aborted || S.searchAbort !== ac) return;
             match = await searchAs(myProfile());
         }
         clearTimeout(slowHint);
@@ -706,7 +762,7 @@ function stopSearch() {
 }
 
 async function connect({ roomId, role, bus, partnerId, friend = null }) {
-    const pc = new RTCPeerConnection(ICE);
+    const pc = new RTCPeerConnection(iceConfig());
     const sess = S.session = {
         roomId, role, bus, partnerId, pc, dc: null, partner: null, friend,
         pendingCandidates: [], ended: false, startedAt: 0, statsTimer: null, connectTimer: null, clockTimer: null,
@@ -719,18 +775,33 @@ async function connect({ roomId, role, bus, partnerId, friend = null }) {
     setPhase('connecting');
     startSafety(sess);
     pc.onicecandidate = e => { if (e.candidate) bus.send('candidate', e.candidate.toJSON()); };
-    pc.ontrack = e => { el.remoteVideo.srcObject = e.streams[0]; };
+    // Only accept the kind of media this chat is for: a stranger can't push sound into a text chat or video into a voice chat.
+    const remote = new MediaStream();
+    pc.ontrack = e => {
+        if (sess.ended || S.mode === 'text') return;
+        if (e.track.kind === 'video' && S.mode !== 'video') return;
+        if (!remote.getTracks().includes(e.track)) remote.addTrack(e.track);
+        if (el.remoteVideo.srcObject !== remote) el.remoteVideo.srcObject = remote;
+    };
     pc.onconnectionstatechange = () => {
         if (sess.ended) return;
         if (pc.connectionState === 'failed') {
-            partnerLeft('Connection failed', 'The network blocked a direct connection. A TURN server fixes this.');
+            partnerLeft('Connection failed', S.hideIp
+                ? 'The privacy relay could not connect. You can turn off “Hide my IP address” in the menu to allow direct connections (this shows your IP address to the other person).'
+                : 'The network blocked a direct connection. A TURN server fixes this.');
         } else if (pc.connectionState === 'disconnected') {
             setTimeout(() => { if (!sess.ended && pc.connectionState === 'disconnected') partnerLeft(leftText(sess)); }, 5000);
         }
     };
 
     if (role === 'offerer') attachChannel(sess, pc.createDataChannel('chat', { ordered: true }));
-    else pc.ondatachannel = e => attachChannel(sess, e.channel);
+    else {
+        // One channel, named 'chat'. Extra channels would re-run the opening sequence and wipe what the person is reading.
+        pc.ondatachannel = e => {
+            if (sess.dc || e.channel.label !== 'chat') { e.channel.close(); return; }
+            attachChannel(sess, e.channel);
+        };
+    }
 
     const flushCandidates = async () => {
         for (const c of sess.pendingCandidates.splice(0)) {
@@ -776,10 +847,25 @@ async function connect({ roomId, role, bus, partnerId, friend = null }) {
 
 const leftText = sess => (sess.friend ? 'Call ended' : 'Stranger disconnected');
 
+const MAX_PEER_BYTES = 4096;
+const FLOOD_LIMIT = 200;
+/** Token bucket: a burst of 20 messages, then 10 a second. */
+function takePeerToken(sess) {
+    const now = Date.now();
+    const b = sess.bucket ||= { tokens: 20, at: now };
+    b.tokens = Math.min(20, b.tokens + (now - b.at) / 100);
+    b.at = now;
+    sess.flood ||= 0;
+    if (b.tokens < 1) return false;
+    b.tokens -= 1;
+    return true;
+}
+
 function attachChannel(sess, dc) {
     sess.dc = dc;
     dc.onopen = () => {
-        if (sess.ended) return;
+        if (sess.ended || sess.opened) return;
+        sess.opened = true;
         clearTimeout(sess.connectTimer);
         sess.startedAt = Date.now();
         setPhase('connected');
@@ -794,10 +880,16 @@ function attachChannel(sess, dc) {
         sendData({ t: 'av', muted: S.muted, camOff: S.camOff });
         sess.games = createGamesUi({
             send: sendData,
-            say: (text, kind) => { if (sess === S.session) sys(text, kind || ''); },
+            say: (text, kind) => {
+                if (sess !== S.session || Date.now() - (sess.sayAt || 0) < 1500) return;
+                sess.sayAt = Date.now();
+                sys(text, kind || '');
+            },
             getContainer: () => (S.mode !== 'text' && matchMedia('(min-width: 900px)').matches ? el.gameStage : el.gameDock),
             getName: () => sess.partner?.nick || 'Stranger',
             attention: kind => {
+                if (Date.now() - (sess.attnAt || 0) < 10000) return; // an invite storm gets one nudge
+                sess.attnAt = Date.now();
                 SOUND.message();
                 if (kind === 'invite') toast(`🎮 ${sess.partner?.nick || 'Stranger'} invited you to play a game.`);
                 el.gamesBtn.classList.add('on'); el.gamesBtnText.classList.add('on');
@@ -812,6 +904,15 @@ function attachChannel(sess, dc) {
     };
     dc.onmessage = e => {
         if (sess.ended) return;
+        // The other side can be a modified client: bound the size and the rate of everything it sends.
+        if (typeof e.data !== 'string' || e.data.length > MAX_PEER_BYTES) return;
+        if (!takePeerToken(sess)) {
+            if (++sess.flood === FLOOD_LIMIT && !sess.ended) {
+                S.transport.report({ partnerId: sess.partnerId, roomId: sess.roomId, reason: 'spam' }).catch(() => {});
+                partnerLeft('Connection closed', 'The other person was sending far too fast.');
+            }
+            return;
+        }
         let msg;
         try { msg = JSON.parse(e.data); } catch { return; }
         onPeerData(sess, msg);
@@ -859,6 +960,7 @@ function renderMatchCard(p, shared) {
 function onPeerData(sess, msg) {
     switch (msg.t) {
         case 'hello': {
+            if (sess.partner) break; // only the first greeting counts
             const nick = sanitizeHandle(msg.nick) || 'Stranger';
             const avatar = sanitizeAvatar(msg.avatar);
             const interests = Array.isArray(msg.interests) ? msg.interests.map(String).slice(0, MAX_INTERESTS) : [];
@@ -965,7 +1067,7 @@ function endSession({ notify }) {
     try { sess.dc?.close(); } catch { /* ignore */ }
     try { sess.pc.close(); } catch { /* ignore */ }
     sess.bus.close();
-    if (!sess.friend) S.last = { partnerId: sess.partnerId, roomId: sess.roomId, at: Date.now() };
+    if (!sess.friend) S.last = { partnerId: sess.partnerId, roomId: sess.roomId, at: Date.now(), nick: sess.partner?.nick };
     S.session = null;
     el.remoteVideo.srcObject = null;
     hideTyping();
@@ -988,6 +1090,7 @@ function partnerLeft(title, sub = '') {
     // A countdown with Pause, so someone who needs a breath (or to report) isn't rushed along.
     S.autoNextTimer = setInterval(() => {
         if (S.phase !== 'ended') return clearInterval(S.autoNextTimer);
+        if (anySheetOpen()) return; // reporting or reading something: don't move on underneath them
         if (--left <= 0) { clearInterval(S.autoNextTimer); startSearch(); return; }
         if (!sub) el.overlaySub.textContent = `Next chat in ${left}…`;
     }, 1000);
@@ -1079,7 +1182,7 @@ const RISK_COPY = {
     'explicit-ask': 'They asked for photos or private video. You never have to, and you can report this.',
     default: 'They shared contact details or a link. Moving to another app is how many scams start.',
 };
-function riskCard(scan, bubble, original) {
+function riskCard(scan, bubble, original, senderId) {
     const kind = scan.kinds.includes('explicit-ask') ? 'explicit-ask' : scan.kinds.includes('money') ? 'money' : 'default';
     const card = h('div', 'alert-card');
     card.append(h('b', '', 'Heads up. '), document.createTextNode(RISK_COPY[kind]));
@@ -1089,7 +1192,10 @@ function riskCard(scan, bubble, original) {
     show.onclick = () => { bubble.textContent = maskProfanity(original); bubble.classList.remove('masked'); show.remove(); };
     const block = h('button', 'btn btn-ghost btn-sm', 'Block & next');
     block.type = 'button';
-    block.onclick = () => { blockCurrent(); startSearch(); };
+    block.onclick = () => {
+        blockCurrent({ partnerId: senderId });
+        if (S.session?.partnerId === senderId || S.phase === 'ended') startSearch(); else toast('Blocked. You won’t be matched with them again.');
+    };
     row.append(show, block);
     card.appendChild(row);
     return card;
@@ -1103,7 +1209,7 @@ function addMessage(who, text) {
     if (EMOJI_ONLY.test(shown)) wrap.classList.add('emoji-only');
     const bubble = h('div', 'bubble' + (scan.risky ? ' masked' : ''), shown);
     wrap.appendChild(bubble);
-    if (scan.risky) wrap.appendChild(riskCard(scan, bubble, text));
+    if (scan.risky) wrap.appendChild(riskCard(scan, bubble, text, S.session?.partnerId));
     const meta = h('div', 'meta', new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     if (who === 'them' && canTranslate && !wrap.classList.contains('emoji-only')) {
         const btn = h('button', '', 'Translate');
@@ -1246,6 +1352,8 @@ el.reactBar.append(...REACTIONS.map(e => {
     return b;
 }));
 el.gamesBtn.onclick = el.gamesBtnText.onclick = () => S.session?.games?.toggle();
+// A rotated tablet or resized window moves the game card between the video and the panel.
+matchMedia('(min-width: 900px)').addEventListener('change', () => S.session?.games?.refresh());
 el.reactBtn.onclick = () => {
     el.reactBar.classList.toggle('hidden');
     el.reactBtn.classList.toggle('on', !el.reactBar.classList.contains('hidden'));
@@ -1277,7 +1385,10 @@ function receiveReaction(sess, msg) {
     if (!floatEmoji(msg.e)) sys(`${sess.partner?.nick || 'Stranger'} sent ${msg.e}`);
     SOUND.message();
 }
-el.videoWrap.addEventListener('dblclick', () => sendReaction('❤️'));
+el.videoWrap.addEventListener('dblclick', e => {
+    if (e.target.closest('button, input, textarea, .game-stage, .fx-panel, .react-bar, .stage-dock')) return;
+    sendReaction('❤️');
+});
 
 el.shareBtn.onclick = async () => {
     const url = location.origin + location.pathname.replace(/index\.html$/, '');
@@ -1294,8 +1405,8 @@ el.shareBtn.onclick = async () => {
 /** 'Priya Sharma' / 'priya@gmail.com' -> 'P•••' so a screen share doesn't reveal who you are. */
 const maskName = name => { const t = String(name || '').trim(); return t ? t[0].toUpperCase() + '•••' : 'Google'; };
 
-function blockCurrent() {
-    const id = S.session?.partnerId;
+function blockCurrent(target = S.session || S.last) {
+    const id = target?.partnerId;
     if (!id) return;
     S.blocked.add(id);
     store.set('blocked', [...S.blocked].slice(-200));
@@ -1308,29 +1419,40 @@ el.blockBtn.onclick = () => {
     startSearch();
 };
 /** The person to report: the current partner, or the one who just left (so a quick disconnect can still be reported). */
-const reportTarget = () => S.session || (S.last && Date.now() - S.last.at < 120000 ? S.last : null);
-el.reportBtn.onclick = () => { if (reportTarget()) openSheet(el.reportModal); };
-el.endReportBtn.onclick = el.reportBtn.onclick;
-el.reportCancel.onclick = () => closeSheet(el.reportModal);
+const reportTarget = () => S.session || S.last || null;
+let reportFor = null; // fixed when the sheet opens, so a new match can never be reported by mistake
+function openReport() {
+    const t = reportTarget();
+    if (!t) { toast('Too late to report this person.', true); return; }
+    reportFor = { partnerId: t.partnerId, roomId: t.roomId, nick: t.partner?.nick || t.nick || 'Stranger', live: t === S.session };
+    el.reportWho.textContent = `You’re reporting ${reportFor.nick}.`;
+    openSheet(el.reportModal);
+}
+el.reportBtn.onclick = openReport;
+el.endReportBtn.onclick = openReport;
+el.reportCancel.onclick = () => { reportFor = null; closeSheet(el.reportModal); };
+el.reportModal.addEventListener('sheet:close', () => { reportFor = null; });
 el.reportSubmit.onclick = async () => {
+    const target = reportFor;
+    reportFor = null;
     closeSheet(el.reportModal);
-    const target = reportTarget();
-    if (!target) return;
+    if (!target) { toast('Too late to report this person.', true); return; }
     const reason = document.querySelector('input[name="reason"]:checked')?.value || 'other';
     S.blocked.add(target.partnerId);
     store.set('blocked', [...S.blocked].slice(-200));
     S.transport.report({ partnerId: target.partnerId, roomId: target.roomId, reason })
         .then(() => toast('Thanks, report sent.'))
-        .catch(() => toast('Could not send report.', true));
-    S.last = null;
-    startSearch();
+        .catch(e => toast(e?.code === 'permission-denied' ? 'You already reported this chat.' : 'Could not send report.', e?.code !== 'permission-denied'));
+    if (S.last?.partnerId === target.partnerId) S.last = null;
+    // Only move on if they are who we are still looking at; never drop someone new who just connected.
+    if (S.session?.partnerId === target.partnerId || S.phase === 'ended') startSearch();
 };
 
 // =====================================================================
 // Keyboard shortcuts
 // =====================================================================
 document.addEventListener('keydown', e => {
-    if (el.chat.classList.contains('hidden') || anySheetOpen()) return;
+    if (el.chat.classList.contains('hidden') || anySheetOpen() || e.repeat) return;
     if (e.key === 'Escape') {
         if (!el.drawer.classList.contains('hidden')) { el.drawer.classList.add('hidden'); return; }
         e.preventDefault();
@@ -1776,7 +1898,8 @@ function setMode(mode) {
     el.modeChip.textContent = { video: 'Video chat', voice: 'Voice chat', text: 'Text chat' }[mode];
     (mode === 'text' ? el.nextSlotComposer : el.nextSlotStage).appendChild(el.nextBtn);
     // Leaving video: release the camera. Leaving text for voice/video: the mic/camera is requested on search.
-    if (mode === 'text' || (mode === 'voice' && S.localStream?.getVideoTracks().length)) stopMedia();
+    const hasVideo = (S.localStream?.getVideoTracks().length || 0) > 0;
+    if (mode === 'text' || (mode === 'voice' && hasVideo) || (mode === 'video' && S.localStream && !hasVideo)) stopMedia();
 }
 document.querySelectorAll('.seg').forEach(b => (b.onclick = () => setMode(b.dataset.mode)));
 
@@ -1961,7 +2084,8 @@ function initFriends() {
         premium.onChange(renderPremium);
         premium.waitReady().then(() => {
             const a = ACCENTS.find(x => x.id === currentAccent());
-            if (a && !a.free && !isPremium()) applyAccent('rani');
+            // Show the free colour, but keep the saved choice: the Premium answer may just be slow.
+            if (a && !a.free && !isPremium()) applyAccent('rani', { save: false });
         });
         el.premiumBtn.classList.remove('hidden');
         renderPremium();
@@ -2143,6 +2267,8 @@ async function onFriendMessage(sess, msg) {
             break;
         }
         case 'friend-no':
+            if (!sess.friendReqSent || sess.friendNoShown) return;
+            sess.friendNoShown = true;
             sys(`${name} declined the friend request.`);
             break;
         case 'friend-ok':
@@ -2171,6 +2297,8 @@ async function onFriendMessage(sess, msg) {
             }
             break;
         case 'friend-done':
+            if (!sess.friendOkHandled || sess.friendDoneShown) return;
+            sess.friendDoneShown = true;
             sys(`🎉 You and ${name} are now friends! Find them under Friends.`, 'good');
             break;
     }
@@ -2304,6 +2432,12 @@ async function prepareCallScreen() {
     clearTimeout(S.autoNextTimer);
     endSession({ notify: true });
     setMode('video');
+    getGuard().load().catch(() => {});
+    if (!(await ensureMedia()) || S.mode !== 'video') {
+        // No camera or microphone: go back to the start screen instead of a dead chat screen.
+        el.leaveBtn.onclick();
+        return false;
+    }
     el.welcome.classList.add('hidden');
     vEl.screen.classList.add('hidden');
     el.chat.classList.remove('hidden');
@@ -2311,8 +2445,7 @@ async function prepareCallScreen() {
     el.modeChip.classList.remove('hidden');
     el.drawer.classList.add('hidden');
     clearMessages();
-    getGuard().load().catch(() => {});
-    return ensureMedia();
+    return true;
 }
 
 el.fcCall.onclick = async () => {
@@ -2372,9 +2505,12 @@ el.callDecline.onclick = () => {
 
 el.callAccept.onclick = async () => {
     const f = takeCall();
-    if (!f?.call || !canCall()) return;
+    if (!f?.call) return;
     const { roomId } = f.call;
-    if (!(await prepareCallScreen())) return;
+    // If we can't take the call, say so: otherwise the caller keeps ringing for 45 seconds.
+    const decline = () => { const bus = S.transport.roomBus(roomId); bus.send('bye'); setTimeout(() => bus.close(), 500); };
+    if (!canCall()) return decline();
+    if (!(await prepareCallScreen())) return decline();
     connect({ roomId, role: 'answerer', partnerId: f.other, bus: S.transport.roomBus(roomId), friend: f });
 };
 

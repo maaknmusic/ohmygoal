@@ -269,7 +269,8 @@ export function createGamesUi({ send, say, getContainer, getName, attention }) {
         form.onsubmit = e => { e.preventDefault(); const word = input.value.trim(); if (word) { input.value = ''; session.move({ word }); } };
         form.append(input, go);
         body.appendChild(form);
-        if (v.canMove) setTimeout(() => input.focus({ preventScroll: true }), 0);
+        // Only when nothing else is being typed in: the opponent's move must not steal the chat box's focus.
+        if (v.canMove && !document.activeElement?.matches?.('input, textarea')) setTimeout(() => input.focus({ preventScroll: true }), 0);
     }
 
     // Time runs out for the side on turn in Word Chain: send the timeout claim.

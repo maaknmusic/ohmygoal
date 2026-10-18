@@ -815,6 +815,7 @@
                     <div class="shield-sub" id="shieldSub">Video appears once our on-device safety check passes.</div>
                     <div class="shield-actions hidden" id="shieldActions">
                         <button class="btn btn-ghost btn-sm" id="shieldSkip">Skip</button>
+                        <button class="btn btn-ghost btn-sm hidden" id="shieldShow">Show anyway</button>
                         <button class="btn btn-danger btn-sm" id="shieldReport">Report</button>
                     </div>
                 </div>
@@ -905,11 +906,12 @@
             <div class="sheet-body">
                 <div class="menu-list">
                     <button id="themeBtn" class="menu-item" type="button"><i class="icon" data-icon="moon"></i><span>Light / dark</span><small id="themeLabel">Dark</small></button>
+                    <button id="hideIpBtn" class="menu-item" type="button"><i class="icon" data-icon="shield"></i><span>Hide my IP address</span><small id="hideIpLabel">On</small></button>
                     <button id="soundBtn" class="menu-item" type="button"><i class="icon" data-icon="volume"></i><span>Sounds</span><small id="soundLabel">On</small></button>
                     <button id="installBtn" class="menu-item hidden" type="button"><i class="icon" data-icon="download"></i><span>Install the app</span></button>
                     <button id="shareBtn" class="menu-item" type="button"><i class="icon" data-icon="users"></i><span>Invite friends</span></button>
                     <button class="menu-item" type="button" data-sheet-open="safetySheet"><i class="icon" data-icon="shield"></i><span>Safety &amp; help</span></button>
-                    <a class="menu-item" href="legal.html"><i class="icon" data-icon="flag"></i><span>Terms, privacy &amp; refunds</span></a>
+                    <a class="menu-item" href="legal.html" target="_blank" rel="noopener"><i class="icon" data-icon="flag"></i><span>Terms, privacy &amp; refunds</span></a>
                 </div>
                 <div class="menu-sub">Colour theme</div>
                 <div class="accent-grid" id="accentGrid"></div>
@@ -928,7 +930,8 @@
                     <li><b>Never share</b> your phone number, UPI ID, OTPs, address or social handles. Scams start by moving you to another app.</li>
                     <li><b>Nobody needs money</b> from you here. Don’t send any, and don’t click links from strangers.</li>
                     <li><b>Report and block</b> in one tap (flag and ban icons). We review reports, and repeat offenders are banned by device and network.</li>
-                    <li><b>Your video is never recorded</b> and goes directly between you and your partner. Partner video stays blurred until our on-device check passes.</li>
+                    <li><b>Your IP address stays hidden</b> from strangers while “Hide my IP address” is on (Menu). It is on by default.</li>
+                    <li><b>Your video is never recorded.</b> It is encrypted and goes only to your partner (through a relay that cannot read it). Partner video stays blurred until our on-device check passes.</li>
                     <li><b>Asked for photos or threatened?</b> Stop replying, block, and report. In India call <b>1930</b> (cybercrime helpline) or visit <a href="https://cybercrime.gov.in" target="_blank" rel="noopener">cybercrime.gov.in</a>.</li>
                 </ul>
                 <p class="hint">We never sell unbans or verification. Appeals are free.</p>
@@ -990,6 +993,7 @@
             <div class="sheet-grab"></div>
             <div class="sheet-head"><h3 id="reportTitle">Report this person</h3><button class="icon-btn" data-sheet-close aria-label="Close"><i class="icon" data-icon="x"></i></button></div>
             <div class="sheet-body">
+                <p id="reportWho" style="font-weight:700;color:var(--text)"></p>
                 <p>Moderators review reports. They’ll also be blocked and you’ll move on to someone new.</p>
                 <div class="reasons" id="reasons">
                     <label><input type="radio" name="reason" value="sexual" checked> Nudity or sexual content</label>

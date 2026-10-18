@@ -30,6 +30,17 @@ window.APP_CONFIG = {
             credential: 'Hcp9CNhuUNyqjV2f',
         },
     ],
+    // Privacy.
+    privacy: {
+        // true: all chat traffic goes through the TURN relay above, so strangers never see anyone's IP address.
+        // It uses your relay's bandwidth (video most of all). false: direct connections, which show IPs to each other.
+        hideIp: true,
+    },
+    // Optional "how far away is this person". Off by default for every user. A position is rounded to a grid
+    // square of cellDeg degrees (0.05 is about 5.5 km) on the device, and only that square is shared, directly
+    // with the chat partner and only if both turned it on. Never stored. Larger = more private.
+    location: { cellDeg: 0.05 },
+
     geminiApiKey: '',
     geminiModel: 'gemini-2.5-flash',
 
