@@ -1517,8 +1517,17 @@ async function sendLike(t) {
         el.endLikeBtn.classList.add('hidden');
     } catch (e) {
         console.warn('like failed', e);
-        const msg = { 'functions/resource-exhausted': 'That’s a lot of good vibes for today. Come back tomorrow.', 'functions/failed-precondition': e?.message }[e?.code];
-        toast(msg || 'Couldn’t send a good vibe. Try again.', true);
+        if (e?.code === 'functions/already-exists') {
+            // Same person within 24 h: nothing more to send, so show it as sent.
+            t.liked = true;
+            el.likeBtn.classList.add('on');
+            el.likeBtn.disabled = true;
+            el.endLikeBtn.classList.add('hidden');
+            toast('You already sent them a good vibe today. 💜');
+        } else {
+            const msg = { 'functions/resource-exhausted': 'That’s a lot of good vibes for today. Come back tomorrow.', 'functions/failed-precondition': e?.message }[e?.code];
+            toast(msg || 'Couldn’t send a good vibe. Try again.', true);
+        }
     } finally {
         t.liking = false;
     }

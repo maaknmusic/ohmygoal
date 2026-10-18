@@ -106,14 +106,41 @@ service cloud.firestore {
       }
 
       // ---------------- Rooms & signaling ----------------
+      // A room is either a matchmaking room (created in the same batch that claims a queued person, stamped
+      // with server time) or a friend call (between two accepted friends). Nobody can invent a room with
+      // an arbitrary victim or a back-dated timestamp, which keeps likes and reports tied to real matches.
+      function matchRoom(roomId, d) {
+        let other = d.users[0] == request.auth.uid ? d.users[1] : d.users[0];
+        let qp = /databases/$(database)/documents/artifacts/$(appId)/public/data/queue/$(other);
+        return !('friendship' in d.keys())
+          && d.created == request.time
+          && exists(qp)
+          && get(qp).data.get('roomId', null) == null
+          && get(qp).data.mode == d.mode
+          && getAfter(qp).data.get('roomId', null) == roomId
+          && getAfter(qp).data.get('partnerId', null) == request.auth.uid;
+      }
+      function friendRoom(d) {
+        let fp = /databases/$(database)/documents/artifacts/$(appId)/public/data/friendships/$(d.friendship);
+        return d.get('friendship', null) is string
+          && d.created is number
+          && d.mode == 'video'
+          && exists(fp)
+          && get(fp).data.status == 'accepted'
+          && get(fp).data.users.hasAll(d.users);
+      }
       match /rooms/{roomId} {
         allow create: if request.auth != null
           && request.resource.data.keys().hasOnly(['mode', 'users', 'created', 'friendship'])
           && request.resource.data.mode in ['video', 'voice', 'text']
           && request.resource.data.users is list
           && request.resource.data.users.size() == 2
+          && request.resource.data.users[0] != request.resource.data.users[1]
           && request.auth.uid in request.resource.data.users
-          && hasAccess(request.auth.uid, request.resource.data.mode);
+          && hasAccess(request.auth.uid, request.resource.data.mode)
+          && ('friendship' in request.resource.data.keys()
+              ? friendRoom(request.resource.data)
+              : matchRoom(roomId, request.resource.data));
         allow read: if request.auth != null && request.auth.uid in resource.data.users;
 
         // Signaling messages: only the two room members can read/write, and only as themselves.
@@ -122,8 +149,24 @@ service cloud.firestore {
             return request.auth.uid in get(/databases/$(database)/documents/artifacts/$(appId)/public/data/rooms/$(roomId)).data.users;
           }
           allow read: if request.auth != null && isMember();
+          // Only the four WebRTC message kinds, with bounded fields, so a room can't be used as free storage.
+          function validSignal(d) {
+            return d.keys().hasOnly(['from', 'type', 'data', 'ts'])
+              && d.type in ['offer', 'answer', 'candidate', 'bye']
+              && d.ts is number
+              && (d.get('data', null) == null
+                  || (d.data is map
+                      && d.data.keys().hasOnly(['type', 'sdp', 'candidate', 'sdpMid', 'sdpMLineIndex', 'usernameFragment'])
+                      && d.data.get('sdp', '') is string && d.data.get('sdp', '').size() <= 20000
+                      && d.data.get('candidate', '') is string && d.data.get('candidate', '').size() <= 2000
+                      && d.data.get('type', '') is string && d.data.get('type', '').size() <= 16
+                      && (d.data.get('sdpMid', null) == null || (d.data.sdpMid is string && d.data.sdpMid.size() <= 64))
+                      && (d.data.get('usernameFragment', null) == null || (d.data.usernameFragment is string && d.data.usernameFragment.size() <= 64))
+                      && (d.data.get('sdpMLineIndex', null) == null || d.data.sdpMLineIndex is number)));
+          }
           allow create: if request.auth != null && isMember()
-            && request.resource.data.from == request.auth.uid;
+            && request.resource.data.from == request.auth.uid
+            && validSignal(request.resource.data);
           allow delete: if request.auth != null && resource.data.from == request.auth.uid;
         }
       }
@@ -203,8 +246,10 @@ service cloud.firestore {
       // ---------------- Reports ----------------
       // Write-only for clients; moderators read them in the console / Admin SDK.
       // You can only report someone you were actually in a room with.
+      // The document id is reporter_room_reason, so one person can't flood the moderators with copies.
       match /reports/{reportId} {
         allow create: if request.auth != null
+          && reportId == request.auth.uid + '_' + request.resource.data.roomId + '_' + request.resource.data.reason
           && request.resource.data.keys().hasOnly(['reporter', 'reported', 'roomId', 'reason', 'ts'])
           && request.resource.data.reporter == request.auth.uid
           && request.resource.data.reason in ['sexual', 'minor', 'harassment', 'spam', 'other', 'auto-nudity']

@@ -14,23 +14,99 @@ const MASK = '•';
 
 // ---------- text preparation ----------
 
-const INVISIBLE = /[\u00AD\u200B-\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]/g;
-const FOLDABLE = /[\uFF01-\uFF5E\u0660-\u0669\u06F0-\u06F9\u0966-\u096F]/g;
+// Characters that show nothing: zero-width and bidi controls, variation selectors, tag characters, Hangul/Khmer/Mongolian
+// fillers, the soft hyphen, control codes and the blank Braille cell. The Unicode property covers most of them.
+const INVISIBLE_SET = String.raw`\p{Default_Ignorable_Code_Point}؜‎‏‪-‮⁦-⁩⠀￹-￻\u0000-\u0008\u000E-\u001F\u007F-\u009F`;
+const INVISIBLE = new RegExp(`[${INVISIBLE_SET}]`, 'u');
+const INVISIBLE_ALL = new RegExp(`[${INVISIBLE_SET}]`, 'gu');
+// Accents, strike-through and keycap rings drawn over a letter or digit: skipped when scanning (n̶u̶d̶e̶s̶), left alone when masking.
+const MARK = /[̀-ͯ⃐-⃿]/u;
+const MARK_ALL = /[̀-ͯ⃐-⃿]/gu;
 
-/** Full-width ASCII and Arabic/Devanagari digits -> plain ASCII, one code unit for one. */
-function foldChar(c) {
-    const n = c.charCodeAt(0);
-    if (n >= 0xFF01) return String.fromCharCode(n - 0xFEE0);
-    if (n >= 0x0966) return String.fromCharCode(48 + n - 0x0966);
-    if (n >= 0x06F0) return String.fromCharCode(48 + n - 0x06F0);
-    return String.fromCharCode(48 + n - 0x0660);
+/** The text without invisible characters (zero-width, bidi and filler code points, control codes). */
+export function stripInvisible(text) {
+    return typeof text === 'string' ? text.replace(INVISIBLE_ALL, '') : '';
 }
 
-/** { clean, folded } with equal length (so spans found in folded text apply to clean), or null for non-strings. */
+const ANY_DIGIT = /[\p{Nd}\p{No}]/u;
+const DECIMAL = /^\p{Nd}$/u;
+// Digits outside \p{Nd}: [first code point, last, value of the first] (superscript, subscript, circled, bracketed, dingbat).
+const OTHER_DIGITS = [
+    [0xB2, 0xB3, 2], [0xB9, 0xB9, 1], [0x2070, 0x2070, 0], [0x2074, 0x2079, 4], [0x2080, 0x2089, 0],
+    [0x2460, 0x2468, 1], [0x2474, 0x247C, 1], [0x2488, 0x2490, 1], [0x24EA, 0x24EA, 0], [0x24F5, 0x24FD, 1], [0x24FF, 0x24FF, 0],
+    [0x2776, 0x277E, 1], [0x2780, 0x2788, 1], [0x278A, 0x2792, 1],
+    [0x1F100, 0x1F100, 0], [0x1F101, 0x1F10A, 0], [0x1F10B, 0x1F10B, 0], [0x1F10C, 0x1F10C, 0],
+];
+const digitValues = new Map(); // code point -> 0-9 (or -1); only digit-like code points get here, a few hundred at most
+
+/** 0-9 for a decimal digit in any script, else -1. Every \p{Nd} block is a run of ten, so the offset into the run is the value. */
+function digitValue(ch, c) {
+    let v = digitValues.get(c);
+    if (v !== undefined) return v;
+    v = -1;
+    if (DECIMAL.test(ch)) {
+        let zero = c;
+        while (DECIMAL.test(String.fromCodePoint(zero - 1))) zero--;
+        v = (c - zero) % 10;
+    } else {
+        const row = OTHER_DIGITS.find(([lo, hi]) => c >= lo && c <= hi);
+        if (row) v = row[2] + c - row[0];
+    }
+    digitValues.set(c, v);
+    return v;
+}
+
+const ACCENTED = /[À-ɏḀ-ỿ]/u;
+
+/** One character as the scanner reads it: any script's digits as ASCII, fancy-font and full-width forms as plain ones, accents off. */
+function foldChar(ch, c) {
+    if (c < 0x80) return ch;
+    if (c === 0x2028 || c === 0x2029) return ' ';
+    if (ANY_DIGIT.test(ch)) {
+        const d = digitValue(ch, c);
+        if (d >= 0) return String(d);
+    }
+    if (c >= 0x0900 && c <= 0x0DFF) return ch; // Indic scripts stay as typed; the patterns below are written against them
+    let r = ch.normalize('NFKC');
+    if (ACCENTED.test(r)) r = r.normalize('NFD').replace(MARK_ALL, '');
+    return r;
+}
+
+/**
+ * { src, norm, from, to }: src is the (cut) input and norm what gets scanned, with invisible characters dropped and the rest
+ * folded. from[i] / to[i] give the stretch of src that norm[i] came from, so spans found in norm can be edited in src.
+ */
 function prepare(text) {
     if (typeof text !== 'string') return null;
-    const clean = text.slice(0, MAX_LEN).replace(INVISIBLE, '');
-    return { clean, folded: clean.replace(FOLDABLE, foldChar) };
+    const src = text.slice(0, MAX_LEN);
+    const from = [];
+    const to = [];
+    let norm = '';
+    let at = 0;
+    for (const ch of src) {
+        const start = at;
+        at += ch.length;
+        const c = ch.codePointAt(0);
+        let rep = ch;
+        if (c >= 0x80 || c < 0x20 || c === 0x7F) {
+            if (INVISIBLE.test(ch) || MARK.test(ch)) continue;
+            rep = foldChar(ch, c);
+        }
+        for (let k = 0; k < rep.length; k++) {
+            from.push(start);
+            to.push(at);
+        }
+        norm += rep;
+    }
+    return { src, norm, from, to };
+}
+
+/** The stretch of src behind norm[s, e), including hidden characters that trail it (a keycap's variation selector and ring). */
+function origRange(p, s, e) {
+    let end = p.to[e - 1];
+    const next = e < p.norm.length ? p.from[e] : p.src.length;
+    if (next > end) end = next;
+    return [p.from[s], end];
 }
 
 // Patterns without the g flag are used with test(); g patterns only with matchAll(), which keeps them stateless.
@@ -39,25 +115,81 @@ const anyOf = (list, text) => list.some(re => re.test(text));
 
 // ---------- phone numbers ----------
 
-// Optional +91 / 91 / 0 prefix (group 1), then ten digits starting 6-9 (group 2) with spaces, dots or dashes between.
-const MOBILE = /(?<!\d|\d[.\-])((?:(?:\+|00)[\s.\-]?)?\(?91\)?[\s.\-]{0,2}0?|0[\s.\-]?)?([6-9]\d(?:[\s.\-]{0,2}\d){8})(?!\d)/gu;
-const INTL = /(?<![\w+])\+\d{1,3}(?:[\s.\-()]{0,3}\d){8,13}(?!\d)/gu;
+// Up to three symbols, spaces or emoji between two digits (not a colon: 9:30 is a time).
+const SEP = String.raw`[^\p{L}\p{N}:]{0,3}`;
+
+// Optional +91 / 91 / 0 prefix (group 1), then ten digits starting 6-9 (group 2) with separators anywhere between them.
+const MOBILE = new RegExp(String.raw`(?<!\d|\d[.\-])((?:(?:\+|00)[\s.\-]?)?\(?91\)?${SEP}0?|0[^\p{L}\p{N}:]?)?([6-9](?:${SEP}\d){9})(?!\d)`, 'gu');
+const INTL = new RegExp(String.raw`(?<![\w+])\+\d{1,3}(?:${SEP}\d){8,13}(?!\d)`, 'gu');
 const LONG_DIGITS = /(?<!\d|\d[.,])\d{10,}/gu;
+const AMOUNT = /^\d{1,3}(?:,\d{2,3})+$/; // 8,000,000,000 is a sum, not a number to ring
 
-// Ten or more single digits spelled out, in English or Hinglish ("nine eight seven ...").
-const DIGIT_WORDS = 'zero|one|two|three|four|five|six|seven|eight|nine|ek|do|teen|char|chaar|paanch|panch|chhe|chhah|saat|aath|nau|shunya|sifar';
-const SPELLED = rx(String.raw`(?<![a-z\d])(?:(?:${DIGIT_WORDS}|\d)(?![a-z\d])[\s,.\-]*){10,}`, 'giu');
+// O or l between digits is somebody typing a 0 or a 1 ("98765O3210"); same length, so spans still line up.
+const LOOKALIKE = /(?<=\d)[OolI]{1,3}(?=\d)/gu;
+const lookalikeDigits = f => f.replace(LOOKALIKE, m => m.replace(/[Oo]/g, '0').replace(/[lI]/g, '1'));
 
-/** Non-overlapping phone spans { s, e, from }; `from` is where the number proper starts (after +91 etc.). */
-function phoneSpans(f) {
-    const spans = [];
-    const add = (s, e, from = s) => {
-        if (!spans.some(x => s < x.e && e > x.s)) spans.push({ s, e, from });
+// Digits spelled out, in English, Hinglish or Devanagari ("nine eight seven ...", "nau aath saat ...").
+const DIGIT_WORDS = 'zero|one|two|three|four|five|six|seven|eight|nine|ek|do|teen|char|chaar|paanch|panch|chhe|chhah|chheh|che|cheh|saat|aath|nau|shunya|sifar|शून्य|एक|दो|तीन|चार|पाँच|पांच|छह|छः|सात|आठ|नौ';
+const DIGIT_TOKEN = new RegExp(String.raw`(?<![\p{L}\p{M}\p{N}])(?:${DIGIT_WORDS}|\d)(?![\p{L}\p{M}\p{N}])`, 'giu');
+const TIGHT_GAP = /^[\s,.\-]*$/; // between digits and digit words that follow each other
+const MAX_FILLER = 12; // a few words may sit between two spelled digits ("nine, then eight")
+const WINDOW = 64; // eight digit words inside this many characters read as a number
+
+/** Runs of digit tokens { s, e, word } that look like a phone number: ten tight in a row, or eight words close together. */
+function spelledChains(f) {
+    const out = [];
+    let chain = [];
+    let run = 0;
+    let best = 0;
+    const flush = () => {
+        const words = chain.filter(t => t.word);
+        if (best >= 10 || words.some((t, i) => i + 7 < words.length && words[i + 7].e - t.s <= WINDOW)) out.push(chain);
+        chain = [];
+        best = 0;
     };
-    for (const m of f.matchAll(MOBILE)) add(m.index, m.index + m[0].length, m.index + (m[1] ? m[1].length : 0));
-    for (const m of f.matchAll(INTL)) add(m.index, m.index + m[0].length);
-    for (const m of f.matchAll(SPELLED)) add(m.index, m.index + m[0].replace(/[\s,.\-]+$/, '').length);
-    for (const m of f.matchAll(LONG_DIGITS)) add(m.index, m.index + m[0].length);
+    for (const m of f.matchAll(DIGIT_TOKEN)) {
+        const t = { s: m.index, e: m.index + m[0].length, word: m[0].length > 1 };
+        const prev = chain[chain.length - 1];
+        const gap = prev ? f.slice(prev.e, t.s) : '';
+        if (prev && TIGHT_GAP.test(gap)) run++;
+        else if (prev && prev.word && t.word && gap.length <= MAX_FILLER && !/\d/.test(gap)) run = 1;
+        else {
+            flush();
+            run = 1;
+        }
+        chain.push(t);
+        best = Math.max(best, run);
+    }
+    flush();
+    return out;
+}
+
+/** [start, end] pairs for the digits of f[s, e). */
+function digitUnits(f, s, e) {
+    const units = [];
+    for (let i = s; i < e; i++) {
+        const c = f.charCodeAt(i);
+        if (c >= 48 && c <= 57) units.push([i, i + 1]);
+    }
+    return units;
+}
+
+/** Non-overlapping phone spans { s, e, units }; units are the digits (or digit words) that masking replaces. */
+function phoneSpans(norm) {
+    const f = lookalikeDigits(norm);
+    const spans = [];
+    const add = (s, e, units) => {
+        if (!spans.some(x => s < x.e && e > x.s)) spans.push({ s, e, units });
+    };
+    for (const m of f.matchAll(MOBILE)) {
+        const body = m[2];
+        if (AMOUNT.test(body) || body.split('/').length > 2) continue; // a sum, or dates and scores like 7/10, 8/10
+        const e = m.index + m[0].length;
+        add(m.index, e, digitUnits(f, e - body.length, e));
+    }
+    for (const m of f.matchAll(INTL)) add(m.index, m.index + m[0].length, digitUnits(f, m.index, m.index + m[0].length));
+    for (const chain of spelledChains(f)) add(chain[0].s, chain[chain.length - 1].e, chain.map(t => [t.s, t.e]));
+    for (const m of f.matchAll(LONG_DIGITS)) add(m.index, m.index + m[0].length, digitUnits(f, m.index, m.index + m[0].length));
     return spans;
 }
 
@@ -251,7 +383,7 @@ const EXPLICIT = [
 export function scanMessage(text) {
     const p = prepare(text);
     if (!p) return { risky: false, kinds: [] };
-    const f = p.folded;
+    const f = p.norm;
     const addresses = addressSpans(f);
     const rest = blank(f, addresses); // links, handles and the like are judged without the emails and UPI ids
     const found = {
@@ -268,19 +400,6 @@ export function scanMessage(text) {
 }
 
 // ---------- masking ----------
-
-const UNIT = /\p{Nd}|[a-z]+/giu; // one digit in any script, or one spelled-out digit word
-
-/** Keeps the first two and last three digits (or spelled-out digit words) and bullets out the rest: 98•••••210. */
-function maskUnits(s, skip = 0) {
-    const body = s.slice(skip);
-    const total = (body.match(UNIT) || []).length;
-    let i = 0;
-    return s.slice(0, skip) + body.replace(UNIT, u => {
-        const k = i++;
-        return k < 2 || k >= total - 3 ? u : MASK;
-    });
-}
 
 /** The name part of an email or UPI id: keeps one or two characters and ends in bullets, so the result isn't an address any more. */
 function maskLocal(local) {
@@ -300,8 +419,8 @@ export function maskContact(text) {
     const p = prepare(text);
     if (!p) return '';
     const spans = [
-        ...phoneSpans(p.folded).map(x => ({ s: x.s, e: x.e, from: x.from, address: false })),
-        ...addressSpans(p.folded).map(x => ({ s: x.s, e: x.e, from: x.s, address: true })),
+        ...phoneSpans(p.norm).map(x => ({ s: x.s, e: x.e, units: x.units, address: false })),
+        ...addressSpans(p.norm).map(x => ({ s: x.s, e: x.e, units: [], address: true })),
     ].sort((a, b) => a.s - b.s || b.e - a.e);
 
     // Overlapping finds (a phone number inside a UPI id) become one span, treated as an address.
@@ -311,18 +430,150 @@ export function maskContact(text) {
         if (last && span.s < last.e) {
             last.e = Math.max(last.e, span.e);
             last.address ||= span.address;
-            last.from = last.s;
         } else {
             merged.push({ ...span });
         }
     }
 
+    // Edit the text as it was typed: only the masked digits, words and addresses change, never emoji or hidden characters elsewhere.
     let out = '';
     let pos = 0;
+    const put = (s, e, replacement) => {
+        const [from, to] = origRange(p, s, e);
+        out += p.src.slice(pos, from) + replacement;
+        pos = Math.max(pos, to);
+    };
     for (const m of merged) {
-        const piece = p.clean.slice(m.s, m.e);
-        out += p.clean.slice(pos, m.s) + (m.address ? maskAddress(piece) : maskUnits(piece, m.from - m.s));
-        pos = m.e;
+        if (m.address) {
+            put(m.s, m.e, maskAddress(p.norm.slice(m.s, m.e)));
+            continue;
+        }
+        // keep the first two and last three digits (or digit words): 98•••••210
+        m.units.forEach(([s, e], k) => {
+            if (k >= 2 && k < m.units.length - 3) put(s, e, MASK);
+        });
     }
-    return out + p.clean.slice(pos);
+    return out + p.src.slice(pos);
+}
+
+// ---------- profanity ----------
+
+// Look-alike digits and symbols read as the letter they imitate; * # % ^ ? stand for any one letter (f*ck) and become '_'.
+const LEET = { 0: 'o', 1: 'i', 3: 'e', 4: 'a', 5: 's', 7: 't', '@': 'a', $: 's', '!': 'i', '|': 'i', '+': 't', '*': '_', '#': '_', '%': '_', '^': '_', '?': '_' };
+const readLeet = t => t.replace(/[0-9@$!|+*#%^?]/g, c => LEET[c] ?? c);
+const TOKEN = /[\p{L}\p{M}\p{N}@$!|+*#%^?]+/gu;
+const EDGE_SYMBOLS = /^[@$!|+*#%^?]+|[@$!|+*#%^?]+$/gu;
+const MAX_TOKEN = 32; // longer than any word listed here; keeps the quantifier-heavy patterns cheap on junk
+
+// Judged on whole words so that class, assistant, Scunthorpe, cocktail, shiitake and Dickens stay innocent. Only stems that no
+// ordinary word contains are matched inside a word (SUB) or at its start (PREFIX). `+` allows stretched letters (fuuuck),
+// [x_] lets a * # % stand in for a letter (f*ck, sh*t). Latin spellings of Hindi abuse included; "chod", "gand"-less "ganda",
+// "choti", "chutti" (holiday), "bhosari" (a place), "haram" and the like are deliberately not in the lists.
+const BAD_SUB = [
+    String.raw`(?:f+|ph+)[uv_]*c+k`, // fuck, fck, f*ck, phuck, motherfucker
+    String.raw`f+[uv]+_+k`, // fu*k
+];
+const BAD_PREFIX = [
+    String.raw`(?:(?:so|su)nofa)?b+(?:[i_]+a?|ea)t+c+h`, // bitch, biatch, b*tch, bitchy, sonofabitch
+    String.raw`p+[o_]+r+n`, // porn, porno, pornography, pornhub
+    String.raw`m+[a_]*d+h*[ae_]*r+c+h+[o_]+d+`, // madarchod, maderchod, madharchod
+    String.raw`b+[aeih_]*n+c+h+[o_]+d+`, // behenchod, bhenchod, benchod
+    String.raw`bh+[o_]+n?s+[a_]?d`, // bhosdi, bhosdike, bhosad
+    String.raw`b+a+k+ch+o+d`, // bakchod, bakchodi
+    String.raw`h+a+r+a+m+(?:i+|zad|zaad|khor)`, // harami, haramzada, haramkhor
+];
+const BAD_WHOLE = [
+    String.raw`(?:bull|horse|dip|ape|bat|holy|chicken)?sh+[i_]+t+(?:s|y|ier|iest|ing|ed|head|face|faced|hole|bag|show|storm|post|load|er)?`,
+    String.raw`sh[i_]te`,
+    String.raw`d+[i_]+c+k+(?:s|head|heads|face|wad|ish)?`,
+    String.raw`c+[o_]+c+k+(?:s|sucker|suckers|sucking|head|blocker)?`,
+    String.raw`c+[u_]+n+t+(?:s|y|ish)?`,
+    String.raw`p+[u_]+s{2,}(?:y+|ie|ies)`,
+    String.raw`p+u+_{1,2}y+`,
+    String.raw`wh+[o_]+r+e+(?:s|d|house|monger|ish)?`,
+    String.raw`sl+[u_]+t+(?:s|y|ier|iest|ish)?`,
+    String.raw`f+a+g+(?:s|g?ots?|gy)?`,
+    String.raw`n+[i_]+g{2,}(?:a|as|ah|ahs|er|ers|uh|az|ar)`,
+    String.raw`r+e+t+a+r+d+(?:s|ed)?`,
+    String.raw`n+u+d+e+s?`,
+    String.raw`b+a+s+t+a+r+d+s?`,
+    String.raw`(?:a+s{2,}|a+r+s+e+)h+o+l+e+s?`,
+    String.raw`w+a+n+k+(?:e+r+s?|ing)?`,
+    String.raw`t+w+a+t+s?`,
+    String.raw`f+[uv]+[kq]+(?:e?r|in|ing|ed|s)?`, // fuk, fuq, fuking
+    String.raw`f+_{1,2}k+(?:ing|er|ed|s)?`, // f*k
+    // Hinglish
+    String.raw`mc|bc|mkc|bsdk|bhsdk|bkl`,
+    String.raw`ch(?:u+|oo+)t+(?:i+y+[aeou]*(?:pa|pan|panti)?|i+a+|iye)?`, // chut, chutiya, chootiya (not chutti, chute, chhut)
+    String.raw`g+a+n+d+(?:u+|fat|marau?)?`,
+    String.raw`l+u+n+d+s?`,
+    String.raw`l+a+[uvw]+d+[aeu]+`,
+    String.raw`r+a+n+d+(?:i+|wa|we|ya)`,
+    String.raw`jh+a+n+t+[ueo]*|jh+a+t+u+`,
+    String.raw`bh+a+d+[vw]+[aeiu]+`,
+    String.raw`ch+u+d+(?:ai|wa|asi|ayi)`,
+    String.raw`ku+t{2,}i+y+a+`,
+];
+const SUB_RX = new RegExp(BAD_SUB.join('|'), 'u');
+const PREFIX_RX = new RegExp(`^(?:${BAD_PREFIX.join('|')})`, 'u');
+const WHOLE_RX = new RegExp(`^(?:${BAD_WHOLE.join('|')})$`, 'u');
+const LONG_RX = /fuck|bitch/u;
+
+// Devanagari: nukta dots dropped, chandrabindu read as anusvara, n/ṇ + virama + ḍ as anusvara (लण्ड = लंड), then whole words.
+const devanagari = t => t.replace(/़/g, '').replace(/ँ/g, 'ं').replace(/[णन]्(?=ड)/g, 'ं');
+const DEV_WORDS = new Set([
+    'मादरचोद', 'बहनचोद', 'भेनचोद', 'बकचोद', 'भोसड़ी', 'भोसड़ीके', 'भोसड़ा', 'चूतिया', 'चुतिया', 'चूतिये', 'चुतिये', 'चूत', 'चुत',
+    'गांडू', 'गांड', 'लौड़ा', 'लंड', 'रंडी', 'हरामी', 'हरामखोर', 'हरामज़ादा', 'हरामज़ादे', 'झांट', 'भड़वा',
+].map(devanagari));
+const DEV_COMPOUND = /^(?:मादर|बहन|भेन|बक)चोद/u;
+
+/** One word, already lower-cased and with look-alike symbols read as letters. */
+function badWord(v) {
+    if (v.length < 2) return false;
+    if (/\p{Script=Devanagari}/u.test(v)) {
+        const d = devanagari(v);
+        return DEV_WORDS.has(d) || DEV_COMPOUND.test(d);
+    }
+    if (v.length > MAX_TOKEN) return LONG_RX.test(v.replace(/(.)\1+/gu, '$1').replace(/_/g, '')); // junk: collapse stretched letters first
+    if (v.replace(/_/g, '').length < 2) return false; // **** is censoring, not a word
+    return SUB_RX.test(v) || PREFIX_RX.test(v) || WHOLE_RX.test(v);
+}
+
+/** A word as typed, with and without the symbols hugging its ends ("shit!", "$hit"), and its CamelCase parts (LundKing). */
+function profaneToken(t) {
+    const lower = t.toLowerCase();
+    if (badWord(readLeet(lower)) || badWord(readLeet(lower.replace(EDGE_SYMBOLS, '')))) return true;
+    if (!/\p{Ll}\p{Lu}/u.test(t)) return false;
+    return t.split(/(?<=\p{Ll})(?=\p{Lu})/u).some(part => part.length >= 3 && badWord(readLeet(part.toLowerCase())));
+}
+
+/**
+ * True when the text contains a swear word: English, and Hindi in Latin letters or Devanagari. Works on whole words, so innocent
+ * words that merely contain one (class, cocktail, Scunthorpe) pass; copes with f*ck, sh1t, b!tch, fuuuck, "f u c k" and fancy fonts.
+ * It is a conservative list, not a complete one. Never throws; non-strings are clean.
+ */
+export function isProfane(text) {
+    const p = prepare(text);
+    if (!p) return false;
+    const seen = new Set();
+    const test = t => {
+        if (seen.has(t)) return false;
+        seen.add(t);
+        return profaneToken(t);
+    };
+    let run = ''; // one-character words in a row: "f u c k", "b.i.t.c.h"
+    let runEnd = -1;
+    for (const m of p.norm.matchAll(TOKEN)) {
+        const t = m[0];
+        if (t.length === 1 && (run === '' || m.index - runEnd <= 3)) {
+            run += t;
+            runEnd = m.index + 1;
+            continue;
+        }
+        if (run.length >= 3 && test(run)) return true;
+        run = t.length === 1 ? t : '';
+        runEnd = m.index + t.length;
+        if (t.length > 1 && test(t)) return true;
+    }
+    return run.length >= 3 && test(run);
 }

@@ -68,6 +68,13 @@ if ! $FB deploy --only hosting --project "$PROJECT" --non-interactive; then
     echo "   then run this script again. Everything else above was published."
 fi
 
+# Razorpay's live-mode review looks for a contact email, phone and address on the site.
+if grep -qE "^[[:space:]]*(email|phone|address):[[:space:]]*''" config.js; then
+    echo
+    echo "!! config.js → business is missing an email, phone or address. Razorpay (and the law) want them on legal.html."
+    echo "   Fill them in, push, and run this script again before going live."
+fi
+
 cat <<EOF
 
 ✔ Done.
