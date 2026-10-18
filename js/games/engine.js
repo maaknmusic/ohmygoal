@@ -155,7 +155,8 @@ export function createGameSession({
 
     function flush() {
         while (outbox.length) {
-            try { send?.(outbox.shift()); } catch { /* channel closed */ }
+            const msg = outbox.shift(); // taken first: with no send(), `send?.(outbox.shift())` would never drain the queue
+            try { send?.(msg); } catch { /* channel closed */ }
         }
     }
 

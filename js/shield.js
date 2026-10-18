@@ -2,6 +2,8 @@
 // Scam / personal-info shield for messages from strangers (India-focused).
 // scanMessage() says what a message contains; maskContact() hides phone
 // numbers, UPI ids and emails behind bullets for a "show anyway" toggle.
+// isProfane() spots swear words (also used for nicknames and word-chain words)
+// and stripInvisible() drops characters that show nothing.
 // Pure functions (no DOM). English, Hinglish and a little Devanagari.
 // It is a nudge for the reader, not a security boundary: it leans towards
 // warning, and anything it misses is still just text.
@@ -11,6 +13,7 @@ export const KINDS = Object.freeze(['phone', 'upi', 'social', 'link', 'email', '
 
 const MAX_LEN = 4000; // chat messages are short; longer input is cut here so scanning stays cheap
 const MASK = '•';
+const CUT_TAIL = 200; // a masked text that had to be cut also drops this many characters before the cut
 
 // ---------- text preparation ----------
 
@@ -75,10 +78,13 @@ function foldChar(ch, c) {
 /**
  * { src, norm, from, to }: src is the (cut) input and norm what gets scanned, with invisible characters dropped and the rest
  * folded. from[i] / to[i] give the stretch of src that norm[i] came from, so spans found in norm can be edited in src.
+ * Both are cut at about MAX_LEN, norm included, because one character can fold into many (U+FDFA becomes 18). With a
+ * tail, a cut text loses that many more characters at the end, so a number cut in half is never left showing.
  */
-function prepare(text) {
+function prepare(text, tail = 0) {
     if (typeof text !== 'string') return null;
-    const src = text.slice(0, MAX_LEN);
+    let src = text.slice(0, MAX_LEN);
+    let cut = text.length > MAX_LEN;
     const from = [];
     const to = [];
     let norm = '';
@@ -97,6 +103,17 @@ function prepare(text) {
             to.push(at);
         }
         norm += rep;
+        if (norm.length >= MAX_LEN) {
+            cut ||= at < src.length;
+            src = src.slice(0, at);
+            break;
+        }
+    }
+    if (cut && tail) {
+        const keep = Math.max(0, norm.length - tail);
+        norm = norm.slice(0, keep);
+        from.length = to.length = keep;
+        src = src.slice(0, keep ? to[keep - 1] : 0);
     }
     return { src, norm, from, to };
 }
@@ -122,7 +139,7 @@ const SEP = String.raw`[^\p{L}\p{N}:]{0,3}`;
 const MOBILE = new RegExp(String.raw`(?<!\d|\d[.\-])((?:(?:\+|00)[\s.\-]?)?\(?91\)?${SEP}0?|0[^\p{L}\p{N}:]?)?([6-9](?:${SEP}\d){9})(?!\d)`, 'gu');
 const INTL = new RegExp(String.raw`(?<![\w+])\+\d{1,3}(?:${SEP}\d){8,13}(?!\d)`, 'gu');
 const LONG_DIGITS = /(?<!\d|\d[.,])\d{10,}/gu;
-const AMOUNT = /^\d{1,3}(?:,\d{2,3})+$/; // 8,000,000,000 is a sum, not a number to ring
+const AMOUNT = /^(?:\d{1,3}(?:,\d{3})+|\d{1,2}(?:,\d{2})*,\d{3})$/; // 8,000,000,000 and 9,99,99,999 are sums, not numbers to ring
 
 // O or l between digits is somebody typing a 0 or a 1 ("98765O3210"); same length, so spans still line up.
 const LOOKALIKE = /(?<=\d)[OolI]{1,3}(?=\d)/gu;
@@ -174,6 +191,11 @@ function digitUnits(f, s, e) {
     return units;
 }
 
+/** 06/09/2024 8 30 or 7/10, 8/10, 9/10: several slashes among other separators. The same separator throughout (98/76/54/32/10) is a number. */
+function isDateOrScore(body) {
+    return body.split('/').length > 2 && new Set(body.match(/\D+/g)).size > 1;
+}
+
 /** Non-overlapping phone spans { s, e, units }; units are the digits (or digit words) that masking replaces. */
 function phoneSpans(norm) {
     const f = lookalikeDigits(norm);
@@ -183,7 +205,7 @@ function phoneSpans(norm) {
     };
     for (const m of f.matchAll(MOBILE)) {
         const body = m[2];
-        if (AMOUNT.test(body) || body.split('/').length > 2) continue; // a sum, or dates and scores like 7/10, 8/10
+        if (AMOUNT.test(body) || isDateOrScore(body)) continue;
         const e = m.index + m[0].length;
         add(m.index, e, digitUnits(f, e - body.length, e));
     }
@@ -416,7 +438,7 @@ function maskAddress(span) {
 
 /** Phone numbers, UPI ids and emails partially hidden (98•••••210, ra•••@okaxis) for a "show anyway" toggle. */
 export function maskContact(text) {
-    const p = prepare(text);
+    const p = prepare(text, CUT_TAIL);
     if (!p) return '';
     const spans = [
         ...phoneSpans(p.norm).map(x => ({ s: x.s, e: x.e, units: x.units, address: false })),
@@ -481,9 +503,9 @@ const MAX_TOKEN = 32; // longer than any word listed here; keeps the quantifier-
 const BAD_SUB = [
     String.raw`(?:f+|ph+)[uv_]*c+k`, // fuck, fck, f*ck, phuck, motherfucker
     String.raw`f+[uv]+_+k`, // fu*k
+    String.raw`b+(?:[i_]+a?|ea)t+c+h(?!a[rnmp])`, // bitch, biatch, b*tch, xXbitchXx, sonofabitch (not "bit character")
 ];
 const BAD_PREFIX = [
-    String.raw`(?:(?:so|su)nofa)?b+(?:[i_]+a?|ea)t+c+h`, // bitch, biatch, b*tch, bitchy, sonofabitch
     String.raw`p+[o_]+r+n`, // porn, porno, pornography, pornhub
     String.raw`m+[a_]*d+h*[ae_]*r+c+h+[o_]+d+`, // madarchod, maderchod, madharchod
     String.raw`b+[aeih_]*n+c+h+[o_]+d+`, // behenchod, bhenchod, benchod
@@ -511,6 +533,7 @@ const BAD_WHOLE = [
     String.raw`t+w+a+t+s?`,
     String.raw`f+[uv]+[kq]+(?:e?r|in|ing|ed|s)?`, // fuk, fuq, fuking
     String.raw`f+_{1,2}k+(?:ing|er|ed|s)?`, // f*k
+    String.raw`b+y?t+c+h+(?:es|y)?`, // btch
     // Hinglish
     String.raw`mc|bc|mkc|bsdk|bhsdk|bkl`,
     String.raw`ch(?:u+|oo+)t+(?:i+y+[aeou]*(?:pa|pan|panti)?|i+a+|iye)?`, // chut, chutiya, chootiya (not chutti, chute, chhut)
@@ -551,7 +574,12 @@ function badWord(v) {
 /** A word as typed, with and without the symbols hugging its ends ("shit!", "$hit"), and its CamelCase parts (LundKing). */
 function profaneToken(t) {
     const lower = t.toLowerCase();
-    if (badWord(readLeet(lower)) || badWord(readLeet(trimSymbols(lower)))) return true;
+    const trimmed = readLeet(trimSymbols(lower));
+    if (badWord(readLeet(lower)) || badWord(trimmed)) return true;
+    if (trimmed.length <= MAX_TOKEN) { // (the end-anchored pattern is quadratic on long runs)
+        const core = trimmed.replace(/^x+|x+$/g, ''); // gamer-tag padding: xXshitXx
+        if (core.length >= 4 && core !== trimmed && badWord(core)) return true;
+    }
     if (!/\p{Ll}\p{Lu}/u.test(t)) return false;
     return t.split(/(?<=\p{Ll})(?=\p{Lu})/u).some(part => part.length >= 3 && badWord(readLeet(part.toLowerCase())));
 }

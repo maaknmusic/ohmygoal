@@ -32,7 +32,7 @@ const DEV_MARK = /[ऀ-ःऺ-ॏॢॣ]/;
 // Contact channels glued into one word ("callmeonwhatsapp"): the shield only sees them between spaces.
 const CHANNEL = /whatsapp|whatsap|watsapp|instagram|snapchat|facebook|wechat/;
 // Everyday words the shield flags only because it reads a lone word as a message ("snap", "photos"): harmless on a word board.
-const EVERYDAY = new Set(['snap', 'discord', 'messenger', 'telegram', 'photos', 'pic', 'pics', 'selfie', 'selfies']);
+const EVERYDAY = new Set(['snap', 'discord', 'messenger', 'telegram', 'photo', 'photos', 'pic', 'pics', 'pix', 'selfie', 'selfies']);
 
 /** True for a word that must not reach the board: profanity, or the shield's view of a contact or an ask. */
 function blocked(word) {
@@ -46,7 +46,6 @@ const isPlayer = p => p === 'A' || p === 'B';
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 
 function normalize(raw) {
-    if (typeof raw !== 'string') return '';
     const w = raw.trim().normalize('NFC');
     return LATIN.test(w) ? w.toLowerCase() : w;
 }
@@ -60,6 +59,7 @@ export function lastLetter(word) {
 
 /** Judge a word against the chain: { ok, word, reason }. `word` is normalised ('' if not even letters). */
 export function checkWord(state, raw) {
+    if (typeof raw !== 'string') return { ok: false, word: '', reason: 'Letters only' };
     const word = normalize(raw);
     const letters = LATIN.test(word) || DEVANAGARI.test(word);
     const fail = reason => ({ ok: false, word: letters ? word : '', reason });

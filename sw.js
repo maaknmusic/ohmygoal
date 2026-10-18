@@ -1,6 +1,6 @@
 // Service worker: makes the app installable and lets the shell open offline.
 // Network-first, so users always get the latest version when online.
-const CACHE = 'anon-connect-v4';
+const CACHE = 'anon-connect-v5';
 const SHELL = ['./', 'index.html', 'styles.css', 'config.js', 'js/app.js', 'js/transport.js', 'js/geo.js', 'js/effects.js', 'js/safety.js', 'js/friends.js', 'js/premium.js',
     'js/cloud.js', 'js/access.js', 'js/fingerprint.js', 'js/ui.js', 'js/audio-meter.js', 'js/location.js', 'js/identity.js', 'js/icebreakers.js', 'js/shield.js', 'js/landing.js',
     'js/games/index.js', 'js/games/engine.js', 'js/games/ui.js', 'js/games/tictactoe.js', 'js/games/rps.js', 'js/games/connect4.js', 'js/games/handcricket.js', 'js/games/wordchain.js',
