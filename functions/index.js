@@ -87,6 +87,10 @@ async function razorpay(path, { method = 'GET', body } = {}) {
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
         logger.error('Razorpay API error', { path, status: res.status, error: json?.error });
+        // 4xx (e.g. unknown payment) is a final answer; 5xx / rate limits are worth retrying.
+        if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+            throw new HttpsError('failed-precondition', 'The payment provider rejected this request.');
+        }
         throw new HttpsError('unavailable', 'The payment provider is unavailable. Please try again.');
     }
     return json;
@@ -188,7 +192,7 @@ export const verifyPayment = onCall({ secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SE
  * Razorpay webhook (set it up for the "order.paid" event). Backup path so a pass is granted
  * even if the buyer closed the page before verifyPayment ran.
  */
-export const razorpayWebhook = onRequest({ secrets: [RAZORPAY_WEBHOOK_SECRET] }, async (req, res) => {
+export const razorpayWebhook = onRequest({ secrets: [RAZORPAY_WEBHOOK_SECRET, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET] }, async (req, res) => {
     if (req.method !== 'POST') { res.status(405).send('Method not allowed'); return; }
     const signature = req.get('x-razorpay-signature') || '';
     if (!req.rawBody || !safeEqual(hmacHex(RAZORPAY_WEBHOOK_SECRET.value(), req.rawBody), signature)) {
@@ -206,10 +210,19 @@ export const razorpayWebhook = onRequest({ secrets: [RAZORPAY_WEBHOOK_SECRET] },
         const oSnap = await orderRef(payment.order_id).get();
         if (!oSnap.exists) { res.status(200).send('unknown order'); return; }
         const order = oSnap.data();
-        if (payment.amount !== order.amount || payment.currency !== CURRENCY || payment.status !== 'captured') {
-            logger.warn('Webhook payment does not match order', { orderId: payment.order_id });
-            res.status(200).send('mismatch');
-            return;
+        if (order.status !== 'paid') {
+            // Don't trust the webhook body alone: confirm with Razorpay's API that this payment was
+            // really captured for this order and amount (so a leaked webhook secret can't fake a payment).
+            try {
+                await confirmCaptured(String(payment.id), payment.order_id, order);
+            } catch (e) {
+                if (e instanceof HttpsError && e.code !== 'unavailable') {
+                    logger.warn('Webhook payment not confirmed by Razorpay', { orderId: payment.order_id, reason: e.message });
+                    res.status(200).send('not confirmed');
+                    return;
+                }
+                throw e; // provider unavailable: let Razorpay retry
+            }
         }
         const result = await grantOrder(payment.order_id, payment.id);
         res.status(200).send(result.alreadyGranted ? 'already granted' : 'granted');
