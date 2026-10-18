@@ -14,6 +14,12 @@ Random one-on-one **video or text** chat with strangers. A static site (plain HT
   - **Bans that stick**: age-check and nudity penalties are decided on the server and applied to the person's **IP address, device and account**, so a private window, a cleared browser or a new account doesn't reset them. Banned people see a countdown and can request a review.
   - Report, block, profanity masking, a warning before sharing personal info, rate limiting, and XSS-safe rendering.
 - **Friends & accounts**: sign in with Google (upgrades the anonymous account). Adding a friend needs **both** people to agree (enforced by Firestore rules). Friends get a list with online status, saved text chat, and **video calls** that ring.
+- **Video, voice or text**: voice chat is audio only (low data, nobody sees you), with avatars whose rings pulse with each person's voice. It needs the updated `firestore.rules` (`bash deploy.sh --rules-only`) because voice is its own matching pool.
+- **Games** inside any chat, over the same peer-to-peer connection (no server): Tic-Tac-Toe, Stone-Paper-Scissors (commit-reveal, so nobody can peek), Connect Four, Hand Cricket (odd-even super over) and Word Chain (English or Devanagari). Invite, accept, rematch; they appear as glass over the video or docked in the panel.
+- **Reactions and conversation starters**: emoji that float up over the video for both people (double-tap for ❤️), and tappable icebreaker questions based on your shared interests.
+- **Scam shield**: phone numbers, UPI IDs, links, social handles, money/OTP talk and photo requests from strangers are masked behind a heads-up card (with "Show anyway" and "Block & next"). Safety sheet with India's 1930 helpline.
+- **Anonymous identity**: a generated handle and emoji avatar (dice to re-roll), nothing personal collected.
+- **Themes**: dark and light, plus colour themes (Rani and Monsoon free; Diwali, Holi, Chai and Mumbai are Premium).
 - **Extras**: live "people online" count, installable app (PWA, works offline), dark/light theme, sounds, keyboard shortcuts, and a layout that works on phones.
 
 ## Files
@@ -25,6 +31,9 @@ Random one-on-one **video or text** chat with strangers. A static site (plain HT
 | `js/app.js` | App logic and UI |
 | `js/transport.js` | Matching, signalling, presence (Firebase or local demo) |
 | `js/effects.js`, `js/safety.js`, `js/friends.js`, `js/geo.js`, `js/premium.js` | Features |
+| `js/games/` | Two-player game engine (`engine.js`), the five games and their UI (`ui.js`) |
+| `js/identity.js`, `js/icebreakers.js`, `js/shield.js`, `js/audio-meter.js`, `js/ui.js`, `js/landing.js` | Handles/avatars, conversation starters, scam shield, voice rings, bottom sheets, landing page behaviour |
+| `css/landing.css`, `css/chat.css` | Landing page and chat screen styles (`styles.css` holds the shared design tokens) |
 | `js/access.js`, `js/fingerprint.js`, `js/cloud.js` | Server-side bans: access check, device fingerprint, Cloud Functions calls |
 | `admin.html`, `js/admin.js` | **Admin page**: unban requests, bans, IP whitelist, reports |
 | `firestore.rules` | Database security rules: publish with `bash deploy.sh --rules-only` (or paste into the console) |

@@ -7,9 +7,16 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
 
 const byId = id => (typeof id === 'string' ? document.getElementById(id) : id);
 
+/** Forget sheets that other code hid directly, so they can be opened again. */
+function prune() {
+    for (let i = stack.length - 1; i >= 0; i--) if (stack[i].bg.classList.contains('hidden')) stack.splice(i, 1);
+}
+
 export function openSheet(id) {
     const bg = byId(id);
-    if (!bg || stack.some(s => s.bg === bg)) return;
+    if (!bg) return;
+    prune();
+    if (stack.some(s => s.bg === bg)) return;
     stack.push({ bg, from: document.activeElement });
     bg.classList.remove('hidden');
     bg.dispatchEvent(new CustomEvent('sheet:open'));
@@ -27,8 +34,8 @@ export function closeSheet(id) {
     if (from && document.contains(from)) from.focus({ preventScroll: true });
 }
 
-export const topSheet = () => stack.at(-1)?.bg || null;
-export const anySheetOpen = () => stack.length > 0;
+export const topSheet = () => { prune(); return stack.at(-1)?.bg || null; };
+export const anySheetOpen = () => { prune(); return stack.length > 0; };
 export function closeAllSheets() { [...stack].reverse().forEach(s => closeSheet(s.bg)); }
 
 document.addEventListener('click', e => {
