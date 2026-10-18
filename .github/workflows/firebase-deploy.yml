@@ -1,12 +1,11 @@
-# Optional: automatically publish firestore.rules and the payment functions when they change.
+# Optional: automatically publish the website, firestore.rules and the Cloud Functions when main changes.
 # Does nothing until you add a repository secret FIREBASE_SERVICE_ACCOUNT (see README → "Automatic deploys").
 # Razorpay keys are NOT stored here: set them once with deploy.sh (they live in Google Secret Manager).
-name: Deploy Firebase rules & functions
+name: Deploy Firebase (website, rules, functions)
 
 on:
   push:
     branches: [main]
-    paths: ['firestore.rules', 'firebase.json', 'functions/**', '.github/workflows/firebase-deploy.yml']
   workflow_dispatch:
 
 concurrency: firebase-deploy
@@ -39,3 +38,6 @@ jobs:
         run: |
           npm ci --prefix functions --no-audit --no-fund
           npx --yes firebase-tools@15.32.1 deploy --only functions --project ohmygoal-c8a4a --non-interactive --force
+      - name: Deploy website (Firebase Hosting)
+        if: steps.creds.outputs.skip != 'true'
+        run: npx --yes firebase-tools@15.32.1 deploy --only hosting --project ohmygoal-c8a4a --non-interactive

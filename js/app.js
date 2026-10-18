@@ -11,7 +11,9 @@ import { generateHandle, generateAvatar, sanitizeAvatar, sanitizeHandle, avatarS
 import { pickPrompts } from './icebreakers.js';
 import { scanMessage, maskContact } from './shield.js';
 import { meterStream } from './audio-meter.js';
+import { callable } from './cloud.js';
 import { initLanding } from './landing.js';
+import { getApproxCell, parseLocMessage, locMessage, distanceBetweenCells, describeDistance } from './location.js';
 
 // =====================================================================
 // Config
@@ -110,6 +112,7 @@ const el = {
     overlayChips: $('overlayChips'), overlayTip: $('overlayTip'), endPauseBtn: $('endPauseBtn'), endReportBtn: $('endReportBtn'),
     reactBar: $('reactBar'), reactLayer: $('reactLayer'), reactBtn: $('reactBtn'), gamesBtn: $('gamesBtn'), gameStage: $('gameStage'), gameDock: $('gameDock'),
     icebreakers: $('icebreakers'), gamesBtnText: $('gamesBtnText'),
+    locCheck: $('locCheck'), likeBtn: $('likeBtn'), endLikeBtn: $('endLikeBtn'), myVibes: $('myVibes'),
     voiceStage: $('voiceStage'), voiceAvatarThem: $('voiceAvatarThem'), voiceNameThem: $('voiceNameThem'), voiceAvatarMe: $('voiceAvatarMe'),
     ringThem: $('ringThem'), ringMe: $('ringMe'), voiceTime: $('voiceTime'), nextSlotStage: $('nextSlotStage'), nextSlotComposer: $('nextSlotComposer'),
 };
@@ -606,6 +609,9 @@ function setPhase(phase, info = {}) {
     el.chat.dataset.phase = phase;
     const live = phase === 'connected';
     el.reactBtn.disabled = !live;
+    el.likeBtn.disabled = !live || Boolean(S.session?.liked);
+    if (phase === 'searching' || phase === 'connecting') el.likeBtn.classList.remove('on');
+    el.endLikeBtn.classList.toggle('hidden', !(phase === 'ended' && info.report && S.last && !S.last.liked && S.transport?.kind === 'firebase'));
     el.gamesBtn.disabled = !live;
     el.gamesBtnText.disabled = !live;
     if (!live) { el.reactBar.classList.add('hidden'); el.reactBtn.classList.remove('on'); }
@@ -693,6 +699,14 @@ async function startSearch(note) {
 
     const ac = new AbortController();
     S.searchAbort = ac;
+    if (S.loc) {
+        // Permission was granted earlier, so this is quick; don't let a slow GPS hold up the search for long.
+        await Promise.race([
+            refreshCell().catch(e => { S.loc = false; myCell = null; el.locCheck.checked = false; store.set('loc', false); toast(LOC_ERRORS[e?.code] || 'Distance turned off.', true); }),
+            new Promise(r => setTimeout(r, 4000)),
+        ]);
+        if (ac.signal.aborted || S.searchAbort !== ac) return;
+    }
     // The matching queue only accepts people with a current access pass (see firestore.rules).
     if (access) {
         const st = await access.fresh().catch(e => (console.warn('access check failed', e), null));
@@ -875,7 +889,7 @@ function attachChannel(sess, dc) {
         el.avatar.textContent = (sess.friend?.name || 'S')[0].toUpperCase();
         el.avatar.style.background = '';
         if (sess.friend && sess.role === 'offerer') friends?.clearCall(sess.friend.id);
-        sendData({ t: 'hello', nick: S.nick, avatar: S.avatar, interests: S.interests, country: S.country, gender: S.gender, timed: S.timed, premium: isPremium() });
+        sendData({ t: 'hello', nick: S.nick, avatar: S.avatar, loc: locOffer(), interests: S.interests, country: S.country, gender: S.gender, timed: S.timed, premium: isPremium() });
         if (S.timed && !sess.friend) startRound(sess);
         sendData({ t: 'av', muted: S.muted, camOff: S.camOff });
         sess.games = createGamesUi({
@@ -966,7 +980,7 @@ function onPeerData(sess, msg) {
             const interests = Array.isArray(msg.interests) ? msg.interests.map(String).slice(0, MAX_INTERESTS) : [];
             const country = /^[A-Z]{2}$/.test(msg.country || '') ? msg.country : '';
             const gender = ['male', 'female'].includes(msg.gender) ? msg.gender : '';
-            sess.partner = { nick, interests, country, gender, avatar };
+            sess.partner = { nick, interests, country, gender, avatar, loc: msg.loc === true };
             el.partnerName.textContent = nick;
             el.partnerFlag.textContent = country ? flagOf(country) : '';
             el.partnerFlag.title = country ? countryName(country) : '';
@@ -979,6 +993,12 @@ function onPeerData(sess, msg) {
             });
             renderMatchCard(sess.partner, interests.filter(i => S.interests.includes(i)));
             if (!sess.friend) showIcebreakers();
+            maybeSendCell(sess);
+            if (!sess.friend) likeCount(sess.partnerId).then(n => {
+                if (!n || sess !== S.session) return;
+                document.querySelector('.match-card')?.appendChild(h('div', 'vibes', vibesText(n)));
+            });
+            if (locOffer() && !sess.partner.loc) document.querySelector('.match-card')?.appendChild(h('div', 'hint', 'They haven’t turned on distance.'));
             break;
         }
         case 'msg':
@@ -1003,6 +1023,15 @@ function onPeerData(sess, msg) {
         case 'react':
             receiveReaction(sess, msg);
             break;
+        case 'loc':
+            receiveCell(sess, msg);
+            break;
+        case 'like':
+            if (sess.likeShown) break; // a notification only: counts come from the database
+            sess.likeShown = true;
+            sys(`💜 ${sess.partner?.nick || 'Stranger'} sent you a good vibe.`, 'good');
+            SOUND.match();
+            break;
         case 'game':
             sess.games?.receive(msg);
             break;
@@ -1020,7 +1049,7 @@ function renderPartnerSub(sess) {
     const flags = [];
     if (sess.partnerAv?.muted && S.mode !== 'text') flags.push('muted');
     if (sess.partnerAv?.camOff && S.mode === 'video') flags.push('camera off');
-    el.partnerSub.textContent = ['Connected', clock, ...flags].join(' · ');
+    el.partnerSub.textContent = ['Connected', clock, sess.distText ? `📍 ${sess.distText}` : '', ...flags].filter(Boolean).join(' · ');
 }
 
 function startStats(sess) {
@@ -1316,6 +1345,59 @@ async function translateInto(wrap, btn, text) {
 }
 
 // =====================================================================
+// Approximate distance. Off by default, and only ever shared with a partner who also turned it on.
+// The phone rounds its position to a grid square (config location.cellDeg, ~5 km) the moment it is read and
+// only that square goes to the partner, over the private connection. Nothing is stored or sent to our servers,
+// and distances are shown in coarse bands, never exact.
+// =====================================================================
+const CELL_DEG = CFG.location?.cellDeg || 0.05;
+S.loc = store.get('loc', false);
+let myCell = null; // in memory only
+el.locCheck.checked = S.loc;
+const LOC_ERRORS = {
+    denied: 'Location is blocked. Allow it in your browser settings to show distance.',
+    unavailable: 'Couldn’t find your location right now.',
+    timeout: 'Finding your location took too long.',
+    unsupported: 'This device can’t share an approximate location.',
+};
+async function refreshCell() {
+    myCell = await getApproxCell({ cellDeg: CELL_DEG });
+    return myCell;
+}
+el.locCheck.onchange = async () => {
+    if (!el.locCheck.checked) { S.loc = false; myCell = null; store.set('loc', false); return; }
+    try {
+        await refreshCell();
+        S.loc = true;
+        store.set('loc', true);
+        toast('Distance on. Only an approximate area is shared, and only with people who share theirs.');
+    } catch (e) {
+        el.locCheck.checked = false;
+        S.loc = false;
+        toast(LOC_ERRORS[e?.code] || 'Couldn’t turn on distance.', true);
+    }
+};
+/** Called once the chat channel is open: tell the partner we offer distance. */
+const locOffer = () => S.loc && myCell !== null;
+function maybeSendCell(sess) {
+    // Only to a partner who said they share too, and only once per chat.
+    if (!locOffer() || !sess.partner?.loc || sess.locSent) return;
+    sess.locSent = true;
+    sendData(locMessage(myCell));
+}
+function receiveCell(sess, msg) {
+    if (!locOffer() || sess.partnerCell || !sess.partner?.loc) return; // we never read a location we didn't ask for, or that they didn't offer
+    const cell = parseLocMessage(msg, CELL_DEG);
+    if (!cell) return;
+    sess.partnerCell = cell;
+    sess.distText = describeDistance(distanceBetweenCells(myCell, cell, CELL_DEG));
+    if (!sess.distText) return;
+    document.querySelector('.match-card .where')?.append(document.createTextNode(` · 📍 ${sess.distText}`));
+    if (!document.querySelector('.match-card .where')) document.querySelector('.match-card')?.insertBefore(h('div', 'where', `📍 ${sess.distText}`), document.querySelector('.match-card .hint'));
+    renderPartnerSub(sess);
+}
+
+// =====================================================================
 // Voice chat: two avatars whose rings pulse with each person's voice
 // =====================================================================
 function startVoiceStage(sess) {
@@ -1398,6 +1480,64 @@ el.shareBtn.onclick = async () => {
     } catch (e) { if (e.name === 'AbortError') return; }
     window.open(`https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`, '_blank', 'noopener');
 };
+
+// =====================================================================
+// Good vibes: a like for someone you actually chatted with. The server checks the chat was real, limits how many
+// you can send, and keeps the count, so numbers can't be faked from a browser.
+// =====================================================================
+const MIN_LIKE_MS = 30000;
+/** A person's total, read from the database (never from what they tell us). null = unknown. */
+async function likeCount(uid) {
+    const fb = S.transport?.fb;
+    if (!fb || !uid) return null;
+    try {
+        const snap = await fb.fs.getDoc(fb.fs.doc(fb.db, ...fb.base, 'reputation', uid));
+        return snap.exists() ? Math.max(0, Number(snap.data().likes) || 0) : 0;
+    } catch { return null; }
+}
+const vibesText = n => `💜 ${n.toLocaleString()} good vibe${n === 1 ? '' : 's'}`;
+async function sendLike(t) {
+    if (!t || t.liked || t.liking) return;
+    if (t === S.session && Date.now() - t.startedAt < MIN_LIKE_MS) { toast('Chat for 30 seconds first, then you can send a good vibe.', true); return; }
+    t.liking = true;
+    try {
+        if (S.transport.kind === 'firebase') {
+            const fn = await callable(S.transport, 'likeUser', PREMIUM_CFG.functionsRegion);
+            await fn({ roomId: t.roomId });
+        }
+        t.liked = true;
+        if (t === S.session) sendData({ t: 'like' });
+        const who = t.partner?.nick || t.nick;
+        toast(`💜 Good vibe sent${who ? ` to ${who}` : ''}.`);
+        el.likeBtn.classList.add('on');
+        el.likeBtn.disabled = true;
+        el.endLikeBtn.classList.add('hidden');
+    } catch (e) {
+        console.warn('like failed', e);
+        const msg = { 'functions/resource-exhausted': 'That’s a lot of good vibes for today. Come back tomorrow.', 'functions/failed-precondition': e?.message }[e?.code];
+        toast(msg || 'Couldn’t send a good vibe. Try again.', true);
+    } finally {
+        t.liking = false;
+    }
+}
+el.likeBtn.onclick = () => sendLike(S.session);
+el.endLikeBtn.onclick = () => sendLike(S.last);
+el.menuSheet.addEventListener('sheet:open', async () => {
+    const n = S.transport?.kind === 'firebase' ? await likeCount(S.transport.uid) : null;
+    el.myVibes.textContent = n === null ? '–' : n.toLocaleString();
+});
+// Phones: the header buttons that don't fit live in a "This chat" sheet and forward to the real buttons.
+$('moreSheet').addEventListener('sheet:open', () => {
+    document.querySelectorAll('[data-proxy]').forEach(b => b.classList.toggle('hidden', $(b.dataset.proxy)?.classList.contains('hidden')));
+});
+document.querySelectorAll('[data-proxy]').forEach(b => {
+    b.onclick = () => {
+        closeSheet($('moreSheet'));
+        const target = $(b.dataset.proxy);
+        if (!target || target.disabled || target.classList.contains('hidden')) { toast('Not available right now.', true); return; }
+        target.click();
+    };
+});
 
 // =====================================================================
 // Report & block

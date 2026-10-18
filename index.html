@@ -711,6 +711,7 @@
                 </div>
 
                 <label class="toggle"><input type="checkbox" id="timedCheck"><span class="switch"></span><span><b>Quick rounds</b> · 60 s per chat, both tap “+1 min” to keep talking</span></label>
+                <label class="toggle"><input type="checkbox" id="locCheck"><span class="switch"></span><span><b>Show how far I am</b> · only if they share too. Your phone rounds your spot to a ~5 km square and sends just that, straight to them. Never stored.</span></label>
             </div>
             <div class="sheet-foot"><button type="button" class="btn btn-primary" data-sheet-close>Done</button></div>
         </div>
@@ -785,10 +786,12 @@
                 </div>
             </div>
             <div class="panel-actions">
+                <button id="likeBtn" class="icon-btn" title="Send a good vibe" aria-label="Send a good vibe" disabled><i class="icon" data-icon="heart"></i></button>
                 <button id="addFriendBtn" class="icon-btn hidden" title="Add as friend" aria-label="Add as friend" disabled><i class="icon" data-icon="userPlus"></i></button>
                 <button id="reportBtn" class="icon-btn" title="Report" aria-label="Report" disabled><i class="icon" data-icon="flag"></i></button>
                 <button id="blockBtn" class="icon-btn" title="Block (never match again)" aria-label="Block" disabled><i class="icon" data-icon="ban"></i></button>
                 <button id="safetyBtn" class="icon-btn" title="Safety tips" aria-label="Safety tips" data-sheet-open="safetySheet"><i class="icon" data-icon="shield"></i></button>
+                <button id="chatMoreBtn" class="icon-btn chat-more" title="More" aria-label="More" data-sheet-open="moreSheet"><i class="icon" data-icon="menu"></i></button>
             </div>
         </header>
 
@@ -806,6 +809,7 @@
                     <div class="overlay-actions">
                         <button class="btn btn-primary hidden" id="overlayNewBtn">Find someone new</button>
                         <button class="btn btn-ghost btn-sm hidden" id="endPauseBtn">Pause</button>
+                        <button class="btn btn-ghost btn-sm hidden" id="endLikeBtn"><i class="icon" data-icon="heart"></i>Good vibe</button>
                         <button class="btn btn-ghost btn-sm hidden" id="endReportBtn"><i class="icon" data-icon="flag"></i>Report</button>
                     </div>
                 </div>
@@ -909,12 +913,29 @@
                     <button id="hideIpBtn" class="menu-item" type="button"><i class="icon" data-icon="shield"></i><span>Hide my IP address</span><small id="hideIpLabel">On</small></button>
                     <button id="soundBtn" class="menu-item" type="button"><i class="icon" data-icon="volume"></i><span>Sounds</span><small id="soundLabel">On</small></button>
                     <button id="installBtn" class="menu-item hidden" type="button"><i class="icon" data-icon="download"></i><span>Install the app</span></button>
+                    <div class="menu-item static" id="vibesRow"><i class="icon" data-icon="heart"></i><span>Good vibes you’ve received</span><small id="myVibes">–</small></div>
                     <button id="shareBtn" class="menu-item" type="button"><i class="icon" data-icon="users"></i><span>Invite friends</span></button>
                     <button class="menu-item" type="button" data-sheet-open="safetySheet"><i class="icon" data-icon="shield"></i><span>Safety &amp; help</span></button>
                     <a class="menu-item" href="legal.html" target="_blank" rel="noopener"><i class="icon" data-icon="flag"></i><span>Terms, privacy &amp; refunds</span></a>
                 </div>
                 <div class="menu-sub">Colour theme</div>
                 <div class="accent-grid" id="accentGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- More (phones): the header buttons that don't fit -->
+    <div id="moreSheet" class="sheet-bg hidden" role="dialog" aria-modal="true" aria-labelledby="moreTitle">
+        <div class="sheet">
+            <div class="sheet-grab"></div>
+            <div class="sheet-head"><h3 id="moreTitle">This chat</h3><button class="icon-btn" data-sheet-close aria-label="Close"><i class="icon" data-icon="x"></i></button></div>
+            <div class="sheet-body">
+                <div class="menu-list">
+                    <button class="menu-item" type="button" data-proxy="addFriendBtn"><i class="icon" data-icon="userPlus"></i><span>Add as friend</span></button>
+                    <button class="menu-item" type="button" data-proxy="reportBtn"><i class="icon" data-icon="flag"></i><span>Report</span></button>
+                    <button class="menu-item" type="button" data-proxy="blockBtn"><i class="icon" data-icon="ban"></i><span>Block (never match again)</span></button>
+                    <button class="menu-item" type="button" data-sheet-open="safetySheet"><i class="icon" data-icon="shield"></i><span>Safety tips</span></button>
+                </div>
             </div>
         </div>
     </div>

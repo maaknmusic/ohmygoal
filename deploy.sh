@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploys the Firestore security rules and the Premium payment functions to Firebase.
+# Deploys the Firestore security rules, the Cloud Functions (payments, bans, admin) and the website to Firebase.
 #
 # Easiest place to run it: Google Cloud Shell (https://shell.cloud.google.com), signed in
 # with the Google account that owns the Firebase project:
@@ -60,10 +60,19 @@ $FB deploy --only functions --project "$PROJECT" --non-interactive --force
 echo "==> Publishing security rules"
 $FB deploy --only firestore:rules --project "$PROJECT" --non-interactive
 
+# The website itself, on your own address (https://$PROJECT.web.app) with security headers. The admin page should
+# only ever be opened from here: raw.githack.com is shared with every other GitHub project.
+echo "==> Publishing the website (Firebase Hosting)"
+if ! $FB deploy --only hosting --project "$PROJECT" --non-interactive; then
+    echo "!! Hosting deploy failed. If it says the site does not exist, run:  $FB hosting:sites:create $PROJECT --project $PROJECT"
+    echo "   then run this script again. Everything else above was published."
+fi
+
 cat <<EOF
 
 ✔ Done.
-Admin page: https://raw.githack.com/maaknmusic/ohmygoal/main/admin.html
+Website:    https://$PROJECT.web.app
+Admin page: https://$PROJECT.web.app/admin.html   (open it only from here)
 Webhook URL for Razorpay (Settings → Webhooks → Add, event "order.paid"):
   https://asia-south1-$PROJECT.cloudfunctions.net/razorpayWebhook
 EOF

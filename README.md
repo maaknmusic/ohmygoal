@@ -101,7 +101,7 @@ Premium passes (₹49 / 7 days, ₹149 / 30 days, ₹349 / 90 days) are **one-ti
 
 Browsers can't read MAC addresses, so the device is identified by a fingerprint: a hash of the browser, screen, graphics card and similar traits. It survives private windows and clearing site data, but not switching to a different browser or device. Phones of the same model and browser version often have the same fingerprint, so a device ban only applies **on the same network neighbourhood** (IPv4 /24, IPv6 /48). That catches someone who reconnects to get a new IP, without banning strangers with the same phone elsewhere. IPv6 addresses are banned by their /64 block, since one home or phone usually has a whole block.
 
-**Admin page:** `admin.html` (live: https://raw.githack.com/maaknmusic/ohmygoal/main/admin.html). Sign in with a Google account listed in the `ADMIN_EMAILS` secret, which `deploy.sh` asks for (to change it later: `bash deploy.sh --reset-secrets`). There you can:
+**Admin page:** `admin.html`, at **https://ohmygoal-c8a4a.web.app/admin.html** once `deploy.sh` has published the website to Firebase Hosting. Open it only from there: `raw.githack.com` is one address shared with every other GitHub project, so another site on it could read your admin sign-in. Sign in with a Google account listed in the `ADMIN_EMAILS` secret, which `deploy.sh` asks for (to change it later: `bash deploy.sh --reset-secrets`). There you can:
 - **Unban requests:** approve (removes the bans and resets their strike counters, so they can try the age check again), approve and whitelist their IP, or reject.
 - **Active bans:** unban, whitelist the IP, or add a ban by IP address or user ID.
 - **IP whitelist:** for shared networks. On a whitelisted IP only **account** bans apply (no IP or device bans), so a banned person there could get back in with a private window. Whitelist only when innocent people on that network are being blocked.
@@ -113,7 +113,7 @@ The page also shows **your IP as the server sees it**. Check that it matches you
 
 ### Automatic deploys (optional)
 `.github/workflows/firebase-deploy.yml` republishes the rules and functions whenever they change on GitHub. To enable it:
-1. Google Cloud console → *IAM & Admin → Service accounts* → create one with the roles **Firebase Admin**, **Cloud Functions Admin**, **Service Account User** and **Secret Manager Secret Accessor**.
+1. Google Cloud console → *IAM & Admin → Service accounts* → create one with the roles **Firebase Admin**, **Firebase Hosting Admin**, **Cloud Functions Admin**, **Service Account User** and **Secret Manager Secret Accessor**.
 2. Create a JSON key for it.
 3. In GitHub, add the key as the repository secret **FIREBASE_SERVICE_ACCOUNT**.
 
