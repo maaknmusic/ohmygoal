@@ -1034,7 +1034,7 @@ document.addEventListener('keydown', e => {
 // Frames are analysed in the browser only; nothing is uploaded or stored.
 // =====================================================================
 const AGE = {
-    enabled: true, passAge: 25, minAge: 18, maxAttempts: 3, lockHours: 24, validDays: 30,
+    enabled: true, passAge: 21, minAge: 18, maxAttempts: 3, cooldownMinutes: 15, lockHours: 24, validDays: 30,
     recheckDuringVideo: true, fallbackUrl: '',
     libUrl: 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.esm.js',
     modelUrl: 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model/',
@@ -1264,7 +1264,7 @@ function finishAttempt(age) {
     stopVerifyCamera();
     vEl.msg.textContent = '';
     if (age == null) {
-        return showVerifyResult('warn', 'We couldn’t finish the check. Make sure your face is well lit, remove hats or sunglasses, and try again.', { retry: true });
+        return showVerifyResult('warn', 'We couldn’t finish the check. Face a light source (a window or lamp in front of you), take off sunglasses, and try again.', { retry: true });
     }
     setStep('age', 'done');
     if (age >= AGE.passAge) {
@@ -1282,12 +1282,13 @@ function finishAttempt(age) {
     const attempts = store.get('ageAttempts', 0) + 1;
     store.set('ageAttempts', attempts);
     if (attempts >= AGE.maxAttempts) {
-        store.set('ageLockUntil', Date.now() + AGE.lockHours * 3600000);
+        // Inconclusive isn't a fail: a short cooldown, not the long lockout used for under-age results.
+        store.set('ageLockUntil', Date.now() + AGE.cooldownMinutes * 60000);
         store.set('ageAttempts', 0);
         renderAgeStatus();
-        return showVerifyResult('bad', `We couldn’t confirm you’re over ${AGE.minAge} after ${AGE.maxAttempts} tries. Please try again in ${AGE.lockHours} hours${AGE.fallbackUrl ? ' or verify with an ID document' : ''}.`);
+        return showVerifyResult('warn', `We couldn’t confirm you’re over ${AGE.minAge} after ${AGE.maxAttempts} tries. Please try again in ${AGE.cooldownMinutes} minutes with brighter, even light on your face${AGE.fallbackUrl ? ', or verify with an ID document' : ''}.`);
     }
-    showVerifyResult('warn', `Inconclusive: we couldn’t confirm you’re over ${AGE.minAge}. Try again facing a light source, without hats or glasses. (${AGE.maxAttempts - attempts} attempt${AGE.maxAttempts - attempts === 1 ? '' : 's'} left)`, { retry: true });
+    showVerifyResult('warn', `Inconclusive: we couldn’t confirm you’re over ${AGE.minAge}. Try again with a light source in front of you (not behind), without sunglasses, looking straight at the camera. (${AGE.maxAttempts - attempts} attempt${AGE.maxAttempts - attempts === 1 ? '' : 's'} left)`, { retry: true });
 }
 
 function closeVerify() {

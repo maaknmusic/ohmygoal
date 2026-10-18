@@ -77,10 +77,11 @@ window.APP_CONFIG = {
 
     ageCheck: {
         enabled: true,
-        passAge: 25,        // estimated age needed to pass (margin for model error, like "Challenge 25")
+        passAge: 21,        // estimated age needed to pass (margin for model error; 25 = stricter "Challenge 25")
         minAge: 18,         // estimates below this are denied and the device is locked out
-        maxAttempts: 3,     // inconclusive attempts allowed before a lockout
-        lockHours: 24,
+        maxAttempts: 3,     // inconclusive attempts allowed before a short cooldown
+        cooldownMinutes: 15, // wait after maxAttempts inconclusive results
+        lockHours: 24,      // lockout when the estimate is under minAge
         validDays: 30,      // how long a successful check is remembered on this device
         recheckDuringVideo: true, // periodically re-estimate age of the camera feed during video chats
         fallbackUrl: '',    // optional: link to an ID-document verification provider for inconclusive results
