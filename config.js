@@ -59,9 +59,9 @@ window.APP_CONFIG = {
         functionsRegion: 'asia-south1',
         checkoutUrl: 'https://checkout.razorpay.com/v1/checkout.js',
         plans: [
-            { id: 'week', label: '7 days', price: '₹49' },
-            { id: 'month', label: '30 days', price: '₹149', note: 'Most popular' },
-            { id: 'quarter', label: '90 days', price: '₹349', note: 'Best value' },
+            { id: 'week', label: '7 days', price: '₹49', days: 7 },
+            { id: 'month', label: '30 days', price: '₹149', days: 30, note: 'Most popular' },
+            { id: 'quarter', label: '90 days', price: '₹349', days: 90, note: 'Best value' },
         ],
     },
 

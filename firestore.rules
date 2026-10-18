@@ -44,7 +44,7 @@ service cloud.firestore {
       function validQueue(d) {
         return d.keys().hasOnly(['mode', 'interests', 'blocked', 'gender', 'country', 'genderFilter',
                                  'countryFilter', 'premium', 'ts', 'roomId'])
-          && d.mode in ['video', 'text']
+          && d.mode in ['video', 'voice', 'text']
           && d.get('interests', []) is list && d.get('interests', []).size() <= 5
           && d.get('blocked', []) is list && d.get('blocked', []).size() <= 100
           && d.get('gender', 'x') in ['male', 'female', 'x']
@@ -101,7 +101,7 @@ service cloud.firestore {
       match /rooms/{roomId} {
         allow create: if request.auth != null
           && request.resource.data.keys().hasOnly(['mode', 'users', 'created', 'friendship'])
-          && request.resource.data.mode in ['video', 'text']
+          && request.resource.data.mode in ['video', 'voice', 'text']
           && request.resource.data.users is list
           && request.resource.data.users.size() == 2
           && request.auth.uid in request.resource.data.users

@@ -5,6 +5,12 @@ import { NudityGuard } from './safety.js';
 import { Friends, pairIdOf } from './friends.js';
 import { Premium } from './premium.js';
 import { Access } from './access.js';
+import { openSheet, closeSheet, closeAllSheets, anySheetOpen } from './ui.js';
+import { createGamesUi } from './games/ui.js';
+import { generateHandle, generateAvatar, sanitizeAvatar, sanitizeHandle, avatarStyle } from './identity.js';
+import { pickPrompts } from './icebreakers.js';
+import { scanMessage, maskContact } from './shield.js';
+import { meterStream } from './audio-meter.js';
 
 // =====================================================================
 // Config
@@ -49,6 +55,11 @@ const ICONS = {
     userPlus: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/>',
     download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
     volumeOff: '<path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/>',
+    menu: '<line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/>',
+    gamepad: '<line x1="6" x2="10" y1="12" y2="12"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="15" x2="15.01" y1="13" y2="13"/><line x1="18" x2="18.01" y1="11" y2="11"/><rect width="20" height="12" x="2" y="6" rx="2"/>',
+    heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+    x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+    chevronLeft: '<path d="m15 18-6-6 6-6"/>',
 };
 function setIcon(el, name) {
     el.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
@@ -90,6 +101,12 @@ const el = {
     shield: $('shield'), shieldTitle: $('shieldTitle'), shieldSub: $('shieldSub'), shieldActions: $('shieldActions'),
     shieldSkip: $('shieldSkip'), shieldReport: $('shieldReport'), fxBtn: $('fxBtn'), fxPanel: $('fxPanel'), fxClose: $('fxClose'), fxStatus: $('fxStatus'),
     round: $('round'), roundFill: $('roundFill'), roundTime: $('roundTime'), roundNote: $('roundNote'), extendBtn: $('extendBtn'),
+    exitBtn: $('exitBtn'), shareBtn: $('shareBtn'), themeLabel: $('themeLabel'), soundLabel: $('soundLabel'), accentGrid: $('accentGrid'), menuSheet: $('menuSheet'),
+    overlayChips: $('overlayChips'), overlayTip: $('overlayTip'), endPauseBtn: $('endPauseBtn'), endReportBtn: $('endReportBtn'),
+    reactBar: $('reactBar'), reactLayer: $('reactLayer'), reactBtn: $('reactBtn'), gamesBtn: $('gamesBtn'), gameStage: $('gameStage'), gameDock: $('gameDock'),
+    icebreakers: $('icebreakers'), gamesBtnText: $('gamesBtnText'),
+    voiceStage: $('voiceStage'), voiceAvatarThem: $('voiceAvatarThem'), voiceNameThem: $('voiceNameThem'), voiceAvatarMe: $('voiceAvatarMe'),
+    ringThem: $('ringThem'), ringMe: $('ringMe'), voiceTime: $('voiceTime'), nextSlotStage: $('nextSlotStage'), nextSlotComposer: $('nextSlotComposer'),
 };
 
 function h(tag, cls, text) {
@@ -156,18 +173,66 @@ const S = {
     skipTimer: null,
 };
 
+// Anonymous identity: a friendly generated handle + emoji avatar, rerolled with the dice button.
+if (!S.nick) { S.nick = generateHandle(); store.set('nick', S.nick); }
+S.avatar = sanitizeAvatar(store.get('avatar', null)) || generateAvatar();
+store.set('avatar', S.avatar);
+function applyAvatar(node, who) {
+    const a = who?.avatar;
+    node.textContent = a ? a.e : (who?.nick || '?')[0].toUpperCase();
+    node.style.background = a ? avatarStyle(a) : '';
+}
+
 // =====================================================================
 // Theme & sound
 // =====================================================================
 function applyTheme(theme) {
     document.documentElement.dataset.theme = theme;
     setIcon(el.themeBtn.querySelector('.icon'), theme === 'dark' ? 'sun' : 'moon');
+    el.themeLabel.textContent = theme === 'dark' ? 'Dark' : 'Light';
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#090a12' : '#f6f5fb');
     store.set('theme', theme);
 }
 applyTheme(store.get('theme', matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'));
 el.themeBtn.onclick = () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
 
-function renderSoundBtn() { setIcon(el.soundBtn.querySelector('.icon'), S.sound ? 'volume' : 'volumeOff'); }
+// Colour themes: two are free, the rest are Premium.
+const ACCENTS = [
+    { id: 'rani', name: 'Rani', sw: 'linear-gradient(135deg,#e0286f,#ff7aa8)', free: true },
+    { id: 'monsoon', name: 'Monsoon', sw: 'linear-gradient(135deg,#0a7f9c,#2dd4bf)', free: true },
+    { id: 'diwali', name: 'Diwali', sw: 'linear-gradient(135deg,#d9650b,#ffb020)' },
+    { id: 'holi', name: 'Holi', sw: 'linear-gradient(135deg,#a424d6,#ff5da2)' },
+    { id: 'chai', name: 'Chai', sw: 'linear-gradient(135deg,#b4531a,#e8b27a)' },
+    { id: 'mumbai', name: 'Mumbai', sw: 'linear-gradient(135deg,#3d5cff,#2dd4bf)' },
+];
+const currentAccent = () => document.documentElement.dataset.accent || 'rani';
+function applyAccent(id) {
+    if (id === 'rani') delete document.documentElement.dataset.accent;
+    else document.documentElement.dataset.accent = id;
+    store.set('accent', id);
+    renderAccents();
+}
+function renderAccents() {
+    el.accentGrid.replaceChildren(...ACCENTS.map(a => {
+        const locked = !a.free && !isPremium();
+        const b = h('button', 'accent-opt' + (a.id === currentAccent() ? ' on' : '') + (locked ? ' locked' : ''));
+        b.type = 'button';
+        b.setAttribute('aria-pressed', String(a.id === currentAccent()));
+        const sw = h('i');
+        sw.style.setProperty('--sw', a.sw);
+        b.append(sw, h('span', '', a.name));
+        b.onclick = () => {
+            if (locked) { closeSheet(el.menuSheet); return openPaywall('theme'); }
+            applyAccent(a.id);
+        };
+        return b;
+    }));
+}
+
+function renderSoundBtn() {
+    setIcon(el.soundBtn.querySelector('.icon'), S.sound ? 'volume' : 'volumeOff');
+    el.soundLabel.textContent = S.sound ? 'On' : 'Off';
+}
 renderSoundBtn();
 el.soundBtn.onclick = () => { S.sound = !S.sound; store.set('sound', S.sound); renderSoundBtn(); };
 
@@ -213,18 +278,18 @@ async function ensureMedia() {
     if (S.localStream) return true;
     try {
         S.localStream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+            video: S.mode === 'video' ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } : false,
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         });
     } catch (e) {
         console.warn('getUserMedia failed', e);
-        toast('Camera/microphone unavailable — switched to text only.', true);
+        toast(S.mode === 'voice' ? 'Microphone unavailable, switched to text only.' : 'Camera/microphone unavailable, switched to text only.', true);
         setMode('text');
         return false;
     }
     el.localVideo.srcObject = S.localStream;
     applyTrackState();
-    if (fxActive()) applyEffects({});
+    if (S.mode === 'video' && fxActive()) applyEffects({});
     try {
         S.videoDevices = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
     } catch { S.videoDevices = []; }
@@ -466,9 +531,37 @@ el.shieldReport.onclick = () => {
 // =====================================================================
 // Matching & connection lifecycle
 // =====================================================================
+const TIPS_ALL = [
+    'A real question gets better chats than “hi”. Try “what’s the best thing you ate this week?”',
+    'Esc twice skips to the next person.',
+    'Never share OTPs, UPI IDs or your phone number with a stranger.',
+    'Add interests in your preferences to meet people who like what you like.',
+    'Report anything that feels off. Every report is reviewed.',
+    'Nothing here is recorded. Video goes straight between you and them.',
+];
+function startTips() {
+    stopTips();
+    const tips = S.mode === 'video' ? [...TIPS_ALL, 'Try an effect while you wait: tap the sparkles in the controls.']
+        : S.mode === 'voice' ? [...TIPS_ALL, 'Voice only: nobody sees you. Headphones make calls clearer.'] : TIPS_ALL;
+    let i = Math.floor(Math.random() * tips.length);
+    const show = () => { el.overlayTip.textContent = tips[i++ % tips.length]; };
+    show();
+    el.overlayTip.classList.remove('hidden');
+    S.tipTimer = setInterval(show, 6000);
+}
+function stopTips() {
+    clearInterval(S.tipTimer);
+    el.overlayTip.classList.add('hidden');
+}
+
 function setPhase(phase, info = {}) {
     S.phase = phase;
+    el.chat.dataset.phase = phase;
     const live = phase === 'connected';
+    el.reactBtn.disabled = !live;
+    el.gamesBtn.disabled = !live;
+    el.gamesBtnText.disabled = !live;
+    if (!live) { el.reactBar.classList.add('hidden'); el.reactBtn.classList.remove('on'); }
     el.msgInput.disabled = !live;
     el.sendBtn.disabled = !live;
     el.emojiBtn.disabled = !live;
@@ -479,7 +572,12 @@ function setPhase(phase, info = {}) {
     el.overlay.classList.toggle('hidden', live);
     el.overlaySpinner.classList.toggle('hidden', phase === 'ended');
     el.overlayNewBtn.classList.toggle('hidden', phase !== 'ended');
-    el.quality.classList.toggle('hidden', !live || S.mode !== 'video');
+    el.endReportBtn.classList.toggle('hidden', !(phase === 'ended' && info.report));
+    el.endPauseBtn.classList.toggle('hidden', !(phase === 'ended' && info.countdown));
+    el.overlayChips.classList.toggle('hidden', !(phase === 'searching' && S.interests.length));
+    if (phase === 'searching') el.overlayChips.replaceChildren(...S.interests.map(t => h('span', '', '#' + t)));
+    if (phase === 'searching') startTips(); else stopTips();
+    el.quality.classList.toggle('hidden', !live || S.mode === 'text');
     el.statusDot.className = 'status-dot ' + (live ? 'on' : phase === 'ended' ? '' : 'wait');
     disarmSkip();
 
@@ -489,6 +587,7 @@ function setPhase(phase, info = {}) {
         el.partnerName.textContent = 'Searching…';
         el.partnerSub.textContent = 'Finding a match';
         el.avatar.textContent = '?';
+        el.avatar.style.background = '';
         el.partnerFlag.textContent = '';
         el.partnerBadge.classList.add('hidden');
         el.nextBtn.textContent = 'Stop';
@@ -514,6 +613,7 @@ function setPhase(phase, info = {}) {
 }
 
 function clearMessages() {
+    hideIcebreakers();
     el.messages.replaceChildren();
     hideTyping();
 }
@@ -546,7 +646,7 @@ async function startSearch(note) {
         if (st && applyAccess(st)) return;
     }
 
-    if (S.mode === 'video' && !(await ensureMedia())) {
+    if (S.mode !== 'text' && !(await ensureMedia())) {
         // ensureMedia already switched us to text mode
     }
     const filtered = S.genderFilter !== 'any' || S.countryFilter !== 'any';
@@ -579,7 +679,7 @@ async function startSearch(note) {
             const st = await access.check();
             if (ac.signal.aborted || S.searchAbort !== ac) return;
             if (applyAccess(st)) { ac.abort(); return; }
-            if (S.mode === 'video' && !S.localStream && !(await ensureMedia())) { /* switched to text */ }
+            if (S.mode !== 'text' && !S.localStream && !(await ensureMedia())) { /* switched to text */ }
             match = await searchAs(myProfile());
         }
         clearTimeout(slowHint);
@@ -611,8 +711,8 @@ async function connect({ roomId, role, bus, partnerId, friend = null }) {
         pendingCandidates: [], ended: false, startedAt: 0, statsTimer: null, connectTimer: null, clockTimer: null,
     };
 
-    if (S.mode === 'video' && S.localStream) {
-        const send = new MediaStream([...S.localStream.getAudioTracks(), outVideoTrack()].filter(Boolean));
+    if (S.mode !== 'text' && S.localStream) {
+        const send = new MediaStream([...S.localStream.getAudioTracks(), S.mode === 'video' ? outVideoTrack() : null].filter(Boolean));
         send.getTracks().forEach(t => pc.addTrack(t, send));
     }
     setPhase('connecting');
@@ -686,13 +786,28 @@ function attachChannel(sess, dc) {
         sys(sess.friend ? `You're on a call with ${sess.friend.name}.` : "You're now chatting with a stranger. Say hi! 👋", 'good');
         el.partnerName.textContent = sess.friend?.name || 'Stranger';
         el.avatar.textContent = (sess.friend?.name || 'S')[0].toUpperCase();
+        el.avatar.style.background = '';
         if (sess.friend && sess.role === 'offerer') friends?.clearCall(sess.friend.id);
-        sendData({ t: 'hello', nick: S.nick, interests: S.interests, country: S.country, gender: S.gender, timed: S.timed, premium: isPremium() });
+        sendData({ t: 'hello', nick: S.nick, avatar: S.avatar, interests: S.interests, country: S.country, gender: S.gender, timed: S.timed, premium: isPremium() });
         if (S.timed && !sess.friend) startRound(sess);
         sendData({ t: 'av', muted: S.muted, camOff: S.camOff });
+        sess.games = createGamesUi({
+            send: sendData,
+            say: (text, kind) => { if (sess === S.session) sys(text, kind || ''); },
+            getContainer: () => (S.mode !== 'text' && matchMedia('(min-width: 900px)').matches ? el.gameStage : el.gameDock),
+            getName: () => sess.partner?.nick || 'Stranger',
+            attention: kind => {
+                SOUND.message();
+                if (kind === 'invite') toast(`🎮 ${sess.partner?.nick || 'Stranger'} invited you to play a game.`);
+                el.gamesBtn.classList.add('on'); el.gamesBtnText.classList.add('on');
+                setTimeout(() => { el.gamesBtn.classList.remove('on'); el.gamesBtnText.classList.remove('on'); }, 4000);
+            },
+        });
         SOUND.match();
         sess.clockTimer = setInterval(() => renderPartnerSub(sess), 1000);
-        if (S.mode === 'video') { startStats(sess); startAgeRecheck(sess); }
+        if (S.mode !== 'text') startStats(sess);
+        if (S.mode === 'video') startAgeRecheck(sess);
+        if (S.mode === 'voice') startVoiceStage(sess);
     };
     dc.onmessage = e => {
         if (sess.ended) return;
@@ -708,29 +823,59 @@ function sendData(obj) {
     if (dc?.readyState === 'open') dc.send(JSON.stringify(obj));
 }
 
+function hideIcebreakers() { el.icebreakers.classList.add('hidden'); el.icebreakers.replaceChildren(); }
+function showIcebreakers() {
+    const prompts = pickPrompts({ interests: S.interests, lang: 'en', count: 3 });
+    if (!prompts.length) return;
+    el.icebreakers.replaceChildren(...prompts.map(t => {
+        const b = h('button', 'ibreak', t);
+        b.type = 'button';
+        b.title = 'Send this as your first message';
+        b.onclick = () => { el.msgInput.value = t; sendMessage(); };
+        return b;
+    }));
+    el.icebreakers.classList.remove('hidden');
+}
+
+function renderMatchCard(p, shared) {
+    const card = h('div', 'match-card');
+    const av = h('div', 'avatar');
+    applyAvatar(av, p);
+    card.append(av, h('h4', '', p.nick));
+    const where = [p.country ? `${flagOf(p.country)} ${countryName(p.country)}` : '', p.gender === 'male' ? 'Male' : p.gender === 'female' ? 'Female' : ''].filter(Boolean).join(' · ');
+    if (where) card.appendChild(h('div', 'where', where));
+    if (shared.length) {
+        const chips = h('div', 'shared-chips');
+        chips.append(...shared.map(t => h('span', '', '#' + t)));
+        card.append(h('div', 'hint', 'You both like'), chips);
+    } else {
+        card.appendChild(h('div', 'hint', 'Say hi 👋 You can skip or report anytime.'));
+    }
+    el.messages.appendChild(card);
+    scrollMessages();
+}
+
 function onPeerData(sess, msg) {
     switch (msg.t) {
         case 'hello': {
-            const nick = String(msg.nick || '').trim().slice(0, 20) || 'Stranger';
+            const nick = sanitizeHandle(msg.nick) || 'Stranger';
+            const avatar = sanitizeAvatar(msg.avatar);
             const interests = Array.isArray(msg.interests) ? msg.interests.map(String).slice(0, MAX_INTERESTS) : [];
             const country = /^[A-Z]{2}$/.test(msg.country || '') ? msg.country : '';
             const gender = ['male', 'female'].includes(msg.gender) ? msg.gender : '';
-            sess.partner = { nick, interests, country, gender };
+            sess.partner = { nick, interests, country, gender, avatar };
             el.partnerName.textContent = nick;
             el.partnerFlag.textContent = country ? flagOf(country) : '';
             el.partnerFlag.title = country ? countryName(country) : '';
-            el.avatar.textContent = nick[0].toUpperCase();
-            if (country) sys(`${flagOf(country)} ${nick} is from ${countryName(country)}${gender ? ` · ${gender === 'male' ? '♂' : '♀'}` : ''}`);
+            applyAvatar(el.avatar, sess.partner);
+            if (S.mode === 'voice') { applyAvatar(el.voiceAvatarThem, sess.partner); el.voiceNameThem.textContent = nick; }
             if (msg.timed && !sess.round && !sess.friend) startRound(sess);
             // A Premium badge is only shown after checking the partner's pass in the database.
             if (msg.premium && premium) premium.verify(sess.partnerId).then(ok => {
                 if (ok && sess === S.session) el.partnerBadge.classList.remove('hidden');
             });
-            const shared = interests.filter(i => S.interests.includes(i));
-            if (shared.length) {
-                const line = sys('You both like ');
-                line.appendChild(h('span', 'shared', shared.join(', ')));
-            }
+            renderMatchCard(sess.partner, interests.filter(i => S.interests.includes(i)));
+            if (!sess.friend) showIcebreakers();
             break;
         }
         case 'msg':
@@ -752,6 +897,12 @@ function onPeerData(sess, msg) {
             sess.partnerExtend = true;
             tryExtend(sess);
             break;
+        case 'react':
+            receiveReaction(sess, msg);
+            break;
+        case 'game':
+            sess.games?.receive(msg);
+            break;
         case 'av':
             sess.partnerAv = { muted: !!msg.muted, camOff: !!msg.camOff };
             renderPartnerSub(sess);
@@ -764,7 +915,7 @@ function renderPartnerSub(sess) {
     const secs = Math.floor((Date.now() - sess.startedAt) / 1000);
     const clock = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
     const flags = [];
-    if (sess.partnerAv?.muted && S.mode === 'video') flags.push('muted');
+    if (sess.partnerAv?.muted && S.mode !== 'text') flags.push('muted');
     if (sess.partnerAv?.camOff && S.mode === 'video') flags.push('camera off');
     el.partnerSub.textContent = ['Connected', clock, ...flags].join(' · ');
 }
@@ -783,7 +934,8 @@ function startStats(sess) {
             if (rtt == null) return;
             const q = rtt < 150 ? 'good' : rtt < 350 ? 'ok' : 'poor';
             el.qdot.className = 'qdot ' + q;
-            el.qtext.textContent = `${q === 'good' ? 'Good' : q === 'ok' ? 'Fair' : 'Poor'} · ${rtt} ms`;
+            el.qtext.textContent = q === 'good' ? 'Good' : q === 'ok' ? 'Fair' : 'Poor';
+            el.quality.title = `Round-trip time: ${rtt} ms`;
         } catch { /* ignore */ }
     }, 2000);
 }
@@ -801,6 +953,9 @@ function endSession({ notify }) {
     clearInterval(sess.roundTimer);
     clearInterval(sess.safetyTimer);
     clearInterval(sess.selfTimer);
+    sess.games?.dispose();
+    sess.stopMeters?.forEach(stop => stop?.());
+    clearInterval(sess.voiceTimer);
     if (sess.friend && sess.role === 'offerer') friends?.clearCall(sess.friend.id); // stop the friend's phone ringing
     el.partnerBadge.classList.add('hidden');
     clearTimeout(sess.safetyFailOpen);
@@ -809,6 +964,7 @@ function endSession({ notify }) {
     try { sess.dc?.close(); } catch { /* ignore */ }
     try { sess.pc.close(); } catch { /* ignore */ }
     sess.bus.close();
+    if (!sess.friend) S.last = { partnerId: sess.partnerId, roomId: sess.roomId, at: Date.now() };
     S.session = null;
     el.remoteVideo.srcObject = null;
     hideTyping();
@@ -826,9 +982,20 @@ function partnerLeft(title, sub = '') {
         setPhase('ended', { title, sub: sub || 'Press “Find someone new” to meet strangers.' });
         return;
     }
-    setPhase('ended', { title, sub: sub || 'Finding someone new in a moment…' });
-    S.autoNextTimer = setTimeout(() => { if (S.phase === 'ended') startSearch(); }, 2500);
+    let left = 3;
+    setPhase('ended', { title, sub: sub || `Next chat in ${left}…`, report: true, countdown: true });
+    // A countdown with Pause, so someone who needs a breath (or to report) isn't rushed along.
+    S.autoNextTimer = setInterval(() => {
+        if (S.phase !== 'ended') return clearInterval(S.autoNextTimer);
+        if (--left <= 0) { clearInterval(S.autoNextTimer); startSearch(); return; }
+        if (!sub) el.overlaySub.textContent = `Next chat in ${left}…`;
+    }, 1000);
 }
+el.endPauseBtn.onclick = () => {
+    clearInterval(S.autoNextTimer);
+    el.endPauseBtn.classList.add('hidden');
+    el.overlaySub.textContent = 'Paused. Report them if you need to, or press “Find someone new” when you’re ready.';
+};
 
 // Quick rounds: a countdown per chat. Time is only added when BOTH people tap "+1 min".
 function startRound(sess) {
@@ -906,11 +1073,36 @@ el.overlayNewBtn.onclick = () => startSearch();
 // =====================================================================
 // Messaging
 // =====================================================================
+const RISK_COPY = {
+    money: 'They brought up money, OTPs or payments. Never send either.',
+    'explicit-ask': 'They asked for photos or private video. You never have to, and you can report this.',
+    default: 'They shared contact details or a link. Moving to another app is how many scams start.',
+};
+function riskCard(scan, bubble, original) {
+    const kind = scan.kinds.includes('explicit-ask') ? 'explicit-ask' : scan.kinds.includes('money') ? 'money' : 'default';
+    const card = h('div', 'alert-card');
+    card.append(h('b', '', 'Heads up. '), document.createTextNode(RISK_COPY[kind]));
+    const row = h('div', 'row');
+    const show = h('button', 'btn btn-ghost btn-sm', 'Show anyway');
+    show.type = 'button';
+    show.onclick = () => { bubble.textContent = maskProfanity(original); bubble.classList.remove('masked'); show.remove(); };
+    const block = h('button', 'btn btn-ghost btn-sm', 'Block & next');
+    block.type = 'button';
+    block.onclick = () => { blockCurrent(); startSearch(); };
+    row.append(show, block);
+    card.appendChild(row);
+    return card;
+}
+
 function addMessage(who, text) {
+    hideIcebreakers();
     const wrap = h('div', 'msg ' + who);
-    const shown = who === 'them' ? maskProfanity(text) : text;
+    const scan = who === 'them' ? scanMessage(text) : { risky: false, kinds: [] };
+    const shown = who === 'them' ? maskProfanity(scan.risky ? maskContact(text) : text) : text;
     if (EMOJI_ONLY.test(shown)) wrap.classList.add('emoji-only');
-    wrap.appendChild(h('div', 'bubble', shown));
+    const bubble = h('div', 'bubble' + (scan.risky ? ' masked' : ''), shown);
+    wrap.appendChild(bubble);
+    if (scan.risky) wrap.appendChild(riskCard(scan, bubble, text));
     const meta = h('div', 'meta', new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     if (who === 'them' && canTranslate && !wrap.classList.contains('emoji-only')) {
         const btn = h('button', '', 'Translate');
@@ -930,7 +1122,7 @@ function sendMessage() {
     S.msgTimes = S.msgTimes.filter(t => now - t < 4000);
     if (S.msgTimes.length >= 6) { toast('Slow down a little 🙂', true); return; }
 
-    if (PII.test(text) && !S.piiConfirmed) {
+    if ((PII.test(text) || scanMessage(text).risky) && !S.piiConfirmed) {
         S.piiConfirmed = true;
         el.piiWarn.classList.remove('hidden');
         return;
@@ -1017,8 +1209,90 @@ async function translateInto(wrap, btn, text) {
 }
 
 // =====================================================================
+// Voice chat: two avatars whose rings pulse with each person's voice
+// =====================================================================
+function startVoiceStage(sess) {
+    applyAvatar(el.voiceAvatarMe, { avatar: S.avatar, nick: S.nick });
+    applyAvatar(el.voiceAvatarThem, sess.partner || { nick: sess.friend?.name || 'Stranger' });
+    el.voiceNameThem.textContent = sess.partner?.nick || sess.friend?.name || 'Stranger';
+    const ring = (node, on) => lvl => { node.style.setProperty('--lvl', on() ? lvl.toFixed(2) : '0'); };
+    sess.stopMeters = [
+        meterStream(S.localStream, ring(el.ringMe, () => !S.muted)),
+        meterStream(el.remoteVideo.srcObject, ring(el.ringThem, () => true)),
+    ];
+    // The remote stream may arrive just after the channel opens.
+    el.remoteVideo.addEventListener('loadedmetadata', function again() {
+        el.remoteVideo.removeEventListener('loadedmetadata', again);
+        if (sess.ended) return;
+        sess.stopMeters[1]?.();
+        sess.stopMeters[1] = meterStream(el.remoteVideo.srcObject, ring(el.ringThem, () => true));
+    });
+    sess.voiceTimer = setInterval(() => {
+        const secs = Math.floor((Date.now() - sess.startedAt) / 1000);
+        el.voiceTime.textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+    }, 1000);
+}
+
+// =====================================================================
+// Reactions: emoji that float up over the video for both of you
+// =====================================================================
+const REACTIONS = ['❤️', '😂', '🔥', '👏', '🙏', '😮'];
+el.reactBar.append(...REACTIONS.map(e => {
+    const b = h('button', '', e);
+    b.type = 'button';
+    b.setAttribute('aria-label', `Send ${e}`);
+    b.onclick = () => sendReaction(e);
+    return b;
+}));
+el.gamesBtn.onclick = el.gamesBtnText.onclick = () => S.session?.games?.toggle();
+el.reactBtn.onclick = () => {
+    el.reactBar.classList.toggle('hidden');
+    el.reactBtn.classList.toggle('on', !el.reactBar.classList.contains('hidden'));
+};
+function floatEmoji(e) {
+    if (S.mode === 'text') return false;
+    const node = h('span', 'float-emoji', e);
+    node.style.left = `${12 + Math.random() * 70}%`;
+    node.style.setProperty('--dx', `${Math.round(Math.random() * 80 - 40)}px`);
+    el.reactLayer.appendChild(node);
+    node.addEventListener('animationend', () => node.remove());
+    return true;
+}
+function sendReaction(e) {
+    if (S.phase !== 'connected' || !REACTIONS.includes(e)) return;
+    const now = Date.now();
+    S.reactTimes = (S.reactTimes || []).filter(t => now - t < 4000);
+    if (S.reactTimes.length >= 8) return;
+    S.reactTimes.push(now);
+    sendData({ t: 'react', e });
+    floatEmoji(e);
+}
+function receiveReaction(sess, msg) {
+    if (!REACTIONS.includes(msg.e)) return;
+    const now = Date.now();
+    sess.reactTimes = (sess.reactTimes || []).filter(t => now - t < 4000);
+    if (sess.reactTimes.length >= 10) return; // the other side is spamming
+    sess.reactTimes.push(now);
+    if (!floatEmoji(msg.e)) sys(`${sess.partner?.nick || 'Stranger'} sent ${msg.e}`);
+    SOUND.message();
+}
+el.videoWrap.addEventListener('dblclick', () => sendReaction('❤️'));
+
+el.shareBtn.onclick = async () => {
+    const url = location.origin + location.pathname.replace(/index\.html$/, '');
+    const text = 'Come chat with me on Anonymous Connect: free random video & text chat, age-checked and private.';
+    try {
+        if (navigator.share) { await navigator.share({ title: 'Anonymous Connect', text, url }); return; }
+    } catch (e) { if (e.name === 'AbortError') return; }
+    window.open(`https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`, '_blank', 'noopener');
+};
+
+// =====================================================================
 // Report & block
 // =====================================================================
+/** 'Priya Sharma' / 'priya@gmail.com' -> 'P•••' so a screen share doesn't reveal who you are. */
+const maskName = name => { const t = String(name || '').trim(); return t ? t[0].toUpperCase() + '•••' : 'Google'; };
+
 function blockCurrent() {
     const id = S.session?.partnerId;
     if (!id) return;
@@ -1032,17 +1306,22 @@ el.blockBtn.onclick = () => {
     toast('Blocked. You won’t be matched with them again.');
     startSearch();
 };
-el.reportBtn.onclick = () => { if (S.session) el.reportModal.classList.remove('hidden'); };
-el.reportCancel.onclick = () => el.reportModal.classList.add('hidden');
+/** The person to report: the current partner, or the one who just left (so a quick disconnect can still be reported). */
+const reportTarget = () => S.session || (S.last && Date.now() - S.last.at < 120000 ? S.last : null);
+el.reportBtn.onclick = () => { if (reportTarget()) openSheet(el.reportModal); };
+el.endReportBtn.onclick = el.reportBtn.onclick;
+el.reportCancel.onclick = () => closeSheet(el.reportModal);
 el.reportSubmit.onclick = async () => {
-    el.reportModal.classList.add('hidden');
-    const sess = S.session;
-    if (!sess) return;
+    closeSheet(el.reportModal);
+    const target = reportTarget();
+    if (!target) return;
     const reason = document.querySelector('input[name="reason"]:checked')?.value || 'other';
-    blockCurrent();
-    S.transport.report({ partnerId: sess.partnerId, roomId: sess.roomId, reason })
-        .then(() => toast('Thanks — report sent.'))
+    S.blocked.add(target.partnerId);
+    store.set('blocked', [...S.blocked].slice(-200));
+    S.transport.report({ partnerId: target.partnerId, roomId: target.roomId, reason })
+        .then(() => toast('Thanks, report sent.'))
         .catch(() => toast('Could not send report.', true));
+    S.last = null;
     startSearch();
 };
 
@@ -1050,12 +1329,12 @@ el.reportSubmit.onclick = async () => {
 // Keyboard shortcuts
 // =====================================================================
 document.addEventListener('keydown', e => {
-    if (el.chat.classList.contains('hidden')) return;
+    if (el.chat.classList.contains('hidden') || anySheetOpen()) return;
     if (e.key === 'Escape') {
-        if (!el.reportModal.classList.contains('hidden')) { el.reportModal.classList.add('hidden'); return; }
+        if (!el.drawer.classList.contains('hidden')) { el.drawer.classList.add('hidden'); return; }
         e.preventDefault();
         onNext();
-    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'm' && S.mode === 'video') {
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'm' && S.mode !== 'text') {
         e.preventDefault();
         el.micBtn.click();
     }
@@ -1414,7 +1693,8 @@ function showBanned(ban) {
     endSession({ notify: true });
     stopMedia();
     closeVerify();
-    [el.welcome, el.chat, el.leaveBtn, el.modeChip, el.drawer, el.paywall].forEach(x => x.classList.add('hidden'));
+    closeAllSheets();
+    [el.welcome, el.chat, el.leaveBtn, el.modeChip, el.drawer].forEach(x => x.classList.add('hidden'));
     bEl.screen.classList.remove('hidden');
     const reason = BAN_REASONS[ban?.reason] ? ban.reason : 'admin';
     bEl.reason.textContent = BAN_REASONS[reason] + (ban?.note ? ` Note from the moderator: ${ban.note}` : '');
@@ -1482,6 +1762,7 @@ bEl.form.onsubmit = async e => {
 // Welcome screen
 // =====================================================================
 function setMode(mode) {
+    if (!['video', 'voice', 'text'].includes(mode)) mode = 'video';
     if (mode === 'video' && videoBannedUntil()) {
         toast(`Video chat is locked until ${new Date(videoBannedUntil()).toLocaleString()}. Text chat is available.`, true);
         mode = 'text';
@@ -1490,8 +1771,11 @@ function setMode(mode) {
     store.set('mode', mode);
     document.querySelectorAll('.seg').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
     el.chat.classList.toggle('text-mode', mode === 'text');
-    el.modeChip.textContent = mode === 'video' ? 'Video chat' : 'Text chat';
-    if (mode === 'text') stopMedia();
+    el.chat.classList.toggle('voice-mode', mode === 'voice');
+    el.modeChip.textContent = { video: 'Video chat', voice: 'Voice chat', text: 'Text chat' }[mode];
+    (mode === 'text' ? el.nextSlotComposer : el.nextSlotStage).appendChild(el.nextBtn);
+    // Leaving video: release the camera. Leaving text for voice/video: the mic/camera is requested on search.
+    if (mode === 'text' || (mode === 'voice' && S.localStream?.getVideoTracks().length)) stopMedia();
 }
 document.querySelectorAll('.seg').forEach(b => (b.onclick = () => setMode(b.dataset.mode)));
 
@@ -1507,7 +1791,24 @@ function renderTags() {
         el.tags.insertBefore(chip, el.tagInput);
     });
     el.tagInput.placeholder = S.interests.length >= MAX_INTERESTS ? '' : 'music, gaming, travel…';
+    document.querySelectorAll('#interestChips .ichip').forEach(b => {
+        const on = S.interests.includes(b.dataset.tag);
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-pressed', String(on));
+    });
+    const summary = $('prefsSummary');
+    if (summary) summary.textContent = S.interests.length ? `${S.interests.length} interest${S.interests.length === 1 ? '' : 's'}` : '';
 }
+document.querySelectorAll('#interestChips .ichip').forEach(b => {
+    b.onclick = () => {
+        const i = S.interests.indexOf(b.dataset.tag);
+        if (i >= 0) S.interests.splice(i, 1);
+        else if (S.interests.length < MAX_INTERESTS) S.interests.push(b.dataset.tag);
+        else toast(`Up to ${MAX_INTERESTS} interests.`, true);
+        store.set('interests', S.interests);
+        renderTags();
+    };
+});
 function addTag(raw) {
     const tag = raw.trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 24);
     if (!tag || S.interests.includes(tag) || S.interests.length >= MAX_INTERESTS) return;
@@ -1557,12 +1858,30 @@ el.timedCheck.onchange = () => { S.timed = el.timedCheck.checked; store.set('tim
 renderCountryFilter();
 
 el.nickInput.value = S.nick;
+const avatarPreview = $('avatarPreview');
+const renderMyAvatar = () => { if (avatarPreview) applyAvatar(avatarPreview, { avatar: S.avatar, nick: S.nick }); };
+renderMyAvatar();
+$('diceBtn')?.addEventListener('click', () => {
+    S.nick = generateHandle(); S.avatar = generateAvatar();
+    el.nickInput.value = S.nick;
+    store.set('nick', S.nick); store.set('avatar', S.avatar);
+    renderMyAvatar();
+});
 el.ageCheck.checked = store.get('ageConfirmed', false);
-const refreshStart = () => { el.startBtn.disabled = !(el.ageCheck.checked && S.transport); };
+const refreshStart = () => { el.startBtn.disabled = !S.transport; };
 el.ageCheck.onchange = () => { store.set('ageConfirmed', el.ageCheck.checked); refreshStart(); };
 
 el.startBtn.onclick = async () => {
-    S.nick = el.nickInput.value.trim().slice(0, 20);
+    if (!el.ageCheck.checked) {
+        // Nudge instead of leaving a dead, disabled button.
+        toast('Please confirm you’re 18 or older to continue.', true);
+        const box = el.ageCheck.closest('label, .check') || el.ageCheck;
+        box.classList.remove('nudge'); void box.offsetWidth; box.classList.add('nudge');
+        el.ageCheck.focus();
+        return;
+    }
+    S.nick = sanitizeHandle(el.nickInput.value) || generateHandle();
+    el.nickInput.value = S.nick;
     store.set('nick', S.nick);
     if (el.tagInput.value) { addTag(el.tagInput.value); el.tagInput.value = ''; }
     if (access) {
@@ -1584,6 +1903,15 @@ function enterChat() {
     el.leaveBtn.classList.remove('hidden');
     el.modeChip.classList.remove('hidden');
     startSearch();
+}
+
+el.exitBtn.onclick = () => el.leaveBtn.click();
+const stickyStart = $('stickyStartBtn');
+if (stickyStart) {
+    const sync = () => { stickyStart.textContent = el.startBtn.textContent; stickyStart.disabled = el.startBtn.disabled; };
+    new MutationObserver(sync).observe(el.startBtn, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['disabled'] });
+    stickyStart.onclick = () => el.startBtn.click();
+    sync();
 }
 
 el.leaveBtn.onclick = () => {
@@ -1630,6 +1958,10 @@ function initFriends() {
     if (PREMIUM_CFG.enabled) {
         premium = new Premium(S.transport, friends, PREMIUM_CFG);
         premium.onChange(renderPremium);
+        premium.waitReady().then(() => {
+            const a = ACCENTS.find(x => x.id === currentAccent());
+            if (a && !a.free && !isPremium()) applyAccent('rani');
+        });
         el.premiumBtn.classList.remove('hidden');
         renderPremium();
     }
@@ -1643,6 +1975,7 @@ const PAYWALL_REASONS = {
     filters: 'Gender and country filters are a Premium feature.',
     effects: 'This effect is part of Premium.',
     menu: 'Get more out of every chat.',
+    theme: 'Colour themes are part of Premium.',
 };
 let selectedPlan = null;
 let purchasing = false;
@@ -1661,8 +1994,9 @@ function renderPremium() {
         el.genderFilter.value = S.genderFilter;
         el.countryFilter.value = S.countryFilter;
     }
-    if (S.localStream) applyEffects({}); // re-apply: Premium effects switch on/off with the plan
+    if (S.localStream && S.mode === 'video') applyEffects({}); // re-apply: Premium effects switch on/off with the plan
     renderFxPanel();
+    renderAccents();
     renderPaywall();
 }
 
@@ -1670,10 +2004,21 @@ function renderPaywall() {
     if (!premium) return;
     const plans = PREMIUM_CFG.plans || [];
     selectedPlan ||= (plans.find(p => p.note === 'Most popular') || plans[0])?.id;
+    const rupees = p => Number(String(p.price).replace(/\D/g, '')) || 0;
+    const perDay = p => (p.days ? rupees(p) / p.days : 0);
+    const basePerDay = perDay(plans[0] || {});
     el.plans.replaceChildren(...plans.map(p => {
-        const card = h('div', 'plan' + (p.id === selectedPlan ? ' active' : ''));
+        const card = h('button', 'plan' + (p.id === selectedPlan ? ' active' : ''));
+        card.type = 'button';
         card.dataset.plan = p.id;
+        card.setAttribute('role', 'radio');
+        card.setAttribute('aria-checked', String(p.id === selectedPlan));
         card.append(h('b', '', p.price), h('span', '', p.label));
+        if (p.days) {
+            const day = perDay(p);
+            const save = basePerDay && p.id !== plans[0].id ? Math.round((1 - day / basePerDay) * 100) : 0;
+            card.appendChild(h('em', '', `≈ ₹${day < 10 ? day.toFixed(1).replace('.0', '') : Math.round(day)}/day${save > 0 ? ` · save ${save}%` : ''}`));
+        }
         if (p.note) card.appendChild(h('i', '', p.note));
         card.onclick = () => { selectedPlan = p.id; renderPaywall(); };
         return card;
@@ -1698,11 +2043,11 @@ function openPaywall(reason = 'menu') {
         ? `You're Premium until ${new Date(premium.premiumUntil).toLocaleDateString()}. Buying again adds more time.`
         : PAYWALL_REASONS[reason] || PAYWALL_REASONS.menu;
     renderPaywall();
-    el.paywall.classList.remove('hidden');
+    openSheet(el.paywall);
 }
 
 el.premiumBtn.onclick = () => openPaywall('menu');
-el.paywallClose.onclick = () => el.paywall.classList.add('hidden');
+el.paywallClose.onclick = () => closeSheet(el.paywall);
 
 el.paywallCta.onclick = async () => {
     if (purchasing) return;
@@ -1710,7 +2055,7 @@ el.paywallCta.onclick = async () => {
         if (await signInFlow()) {
             await premium.waitReady(); // a returning Premium user may already have a pass
             renderPaywall();
-            if (isPremium()) { el.paywall.classList.add('hidden'); toast('👑 Welcome back! Your Premium is active.'); }
+            if (isPremium()) { closeSheet(el.paywall); toast('👑 Welcome back! Your Premium is active.'); }
         }
         return;
     }
@@ -1719,7 +2064,7 @@ el.paywallCta.onclick = async () => {
     el.paywallCta.textContent = 'Opening secure checkout…';
     try {
         const until = await premium.buy(selectedPlan);
-        el.paywall.classList.add('hidden');
+        closeSheet(el.paywall);
         toast(`👑 Premium is active until ${new Date(until).toLocaleDateString()}. Thank you!`);
         SOUND.match();
     } catch (e) {
@@ -1742,7 +2087,7 @@ el.paywallCta.onclick = async () => {
 async function signInFlow() {
     try {
         await friends.signIn();
-        toast(`Signed in as ${friends.displayName}.`);
+        toast(`Signed in as ${maskName(friends.displayName)}.`);
         return true;
     } catch (e) {
         console.warn('sign-in failed', e);
@@ -1997,19 +2342,19 @@ setInterval(() => { if (friends) checkIncomingCalls(); }, 3000);
 function checkIncomingCalls() {
     const call = friends.incomingCalls().find(f => !handledCalls.has(f.call.roomId));
     if (!call || S.session?.friend) {
-        if (!call) { el.callModal.classList.add('hidden'); clearInterval(ringTimer); ringTimer = null; }
+        if (!call) { closeSheet(el.callModal); clearInterval(ringTimer); ringTimer = null; }
         return;
     }
     el.callName.textContent = call.name;
     el.callAvatar.textContent = friendInitial(call);
     el.callModal.dataset.pair = call.id;
-    el.callModal.classList.remove('hidden');
+    openSheet(el.callModal);
     if (!ringTimer) { SOUND.match(); ringTimer = setInterval(() => SOUND.match(), 2000); }
 }
 
 function takeCall() {
     const f = friends.friends.find(x => x.id === el.callModal.dataset.pair);
-    el.callModal.classList.add('hidden');
+    closeSheet(el.callModal);
     clearInterval(ringTimer);
     ringTimer = null;
     if (f?.call) handledCalls.add(f.call.roomId);
@@ -2046,7 +2391,7 @@ async function refreshOnline() {
         el.onlineChip.classList.remove('hidden');
     } catch (e) {
         console.warn('online count failed', e);
-        el.onlineCount.closest('.online-pill').classList.add('hidden');
+        el.onlineCount.closest('.online-pill')?.classList.add('hidden');
     }
 }
 
@@ -2074,6 +2419,7 @@ window.addEventListener('appinstalled', () => el.installBtn.classList.add('hidde
 // =====================================================================
 // Boot
 // =====================================================================
+renderAccents();
 setMode(S.mode);
 renderTags();
 renderAgeStatus();

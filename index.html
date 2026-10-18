@@ -1,36 +1,52 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Anonymous Connect</title>
-    <meta name="description" content="Random video and text chat with people around the world. Free, no sign-up, age-verified and private by design.">
-    <meta name="theme-color" content="#4f46e5">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+    <title>Anonymous Connect: random video &amp; text chat</title>
+    <meta name="description" content="Meet new people with random video and text chat. Free, age-checked on your device, peer-to-peer and never recorded.">
+    <meta name="theme-color" content="#090a12">
+    <meta name="color-scheme" content="dark light">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icons/icon-192.png" type="image/png">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <script>
+        // Apply the saved theme before first paint so there is no flash of the wrong one.
+        try {
+            var t = JSON.parse(localStorage.getItem('ac.theme')), a = JSON.parse(localStorage.getItem('ac.accent'));
+            document.documentElement.dataset.theme = t || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+            if (a) document.documentElement.dataset.accent = a;
+        } catch (e) { /* defaults */ }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="css/landing.css">
+    <link rel="stylesheet" href="css/chat.css">
     <script src="config.js"></script>
 </head>
 <body>
 
     <header class="topbar">
-        <div class="brand">
+        <a class="brand" href="./" aria-label="Anonymous Connect home">
             <div class="brand-dot"><i class="icon" data-icon="chat"></i></div>
-            Anonymous Connect
-        </div>
+            <span class="brand-name">Anonymous Connect</span>
+        </a>
+        <nav class="topbar-nav" id="topbarNav" aria-label="Sections">
+            <a href="#how">How it works</a>
+            <a href="#features">Features</a>
+            <a href="#safety">Safety</a>
+            <a href="#premium">Premium</a>
+            <a href="#faq">FAQ</a>
+        </nav>
         <div class="topbar-actions">
             <span id="onlineChip" class="chip online hidden"><span class="live-dot"></span><span id="onlineChipCount">0</span> online</span>
             <span id="modeChip" class="chip hidden"></span>
-            <button id="installBtn" class="btn btn-ghost btn-sm hidden" title="Install as an app"><i class="icon" data-icon="download"></i><span>Install</span></button>
             <button id="premiumBtn" class="btn btn-sm btn-premium hidden" title="Premium">👑 <span id="premiumBtnText">Go Premium</span></button>
-            <button id="friendsBtn" class="icon-btn hidden" title="Friends"><i class="icon" data-icon="users"></i><span class="badge hidden" id="friendsBadge"></span></button>
-            <button id="soundBtn" class="icon-btn" title="Toggle sounds"><i class="icon" data-icon="volume"></i></button>
-            <button id="themeBtn" class="icon-btn" title="Toggle theme"><i class="icon" data-icon="moon"></i></button>
-            <button id="leaveBtn" class="btn btn-ghost hidden" title="Leave and go back">Leave</button>
+            <button id="friendsBtn" class="icon-btn hidden" title="Friends" aria-label="Friends"><i class="icon" data-icon="users"></i><span class="badge hidden" id="friendsBadge"></span></button>
+            <button id="menuBtn" class="icon-btn" title="Menu" aria-label="Menu" data-sheet-open="menuSheet"><i class="icon" data-icon="menu"></i></button>
+            <button id="leaveBtn" class="btn btn-ghost btn-sm hidden" title="Leave and go back">Leave</button>
         </div>
     </header>
 
@@ -177,17 +193,40 @@
     </main>
 
     <!-- ===================== CHAT ===================== -->
-    <main id="chat" class="hidden">
+    <main id="chat" class="hidden" data-phase="idle">
+        <header class="chat-head" id="chatHead">
+            <button id="exitBtn" class="icon-btn exit-btn" title="Leave chat" aria-label="Leave chat"><i class="icon" data-icon="chevronLeft"></i></button>
+            <div class="partner">
+                <div class="avatar" id="avatar">?</div>
+                <div style="min-width:0">
+                    <div class="partner-name"><span id="partnerName">Searching…</span> <span id="partnerFlag" class="flag"></span> <span id="partnerBadge" class="pro-badge hidden" title="Verified Premium member">👑</span></div>
+                    <div class="partner-sub"><span class="status-dot wait" id="statusDot"></span><span id="partnerSub">Finding a match</span></div>
+                </div>
+            </div>
+            <div class="panel-actions">
+                <button id="addFriendBtn" class="icon-btn hidden" title="Add as friend" aria-label="Add as friend" disabled><i class="icon" data-icon="userPlus"></i></button>
+                <button id="reportBtn" class="icon-btn" title="Report" aria-label="Report" disabled><i class="icon" data-icon="flag"></i></button>
+                <button id="blockBtn" class="icon-btn" title="Block (never match again)" aria-label="Block" disabled><i class="icon" data-icon="ban"></i></button>
+                <button id="safetyBtn" class="icon-btn" title="Safety tips" aria-label="Safety tips" data-sheet-open="safetySheet"><i class="icon" data-icon="shield"></i></button>
+            </div>
+        </header>
+
         <section class="stage">
             <div class="video-wrap" id="videoWrap">
                 <video id="remoteVideo" autoplay playsinline></video>
                 <video id="localVideo" autoplay playsinline muted></video>
-                <div class="quality hidden" id="quality"><span class="qdot" id="qdot"></span><span id="qtext">—</span></div>
+                <div class="quality hidden" id="quality"><span class="qdot" id="qdot"><i></i><i></i><i></i></span><span id="qtext">—</span></div>
                 <div class="overlay" id="overlay">
                     <div class="spinner" id="overlaySpinner"></div>
                     <div class="overlay-title" id="overlayTitle">Looking for someone…</div>
                     <div class="overlay-sub" id="overlaySub"></div>
-                    <button class="btn btn-primary hidden" id="overlayNewBtn">Find someone new</button>
+                    <div class="overlay-chips hidden" id="overlayChips"></div>
+                    <div class="overlay-tip hidden" id="overlayTip"></div>
+                    <div class="overlay-actions">
+                        <button class="btn btn-primary hidden" id="overlayNewBtn">Find someone new</button>
+                        <button class="btn btn-ghost btn-sm hidden" id="endPauseBtn">Pause</button>
+                        <button class="btn btn-ghost btn-sm hidden" id="endReportBtn"><i class="icon" data-icon="flag"></i>Report</button>
+                    </div>
                 </div>
                 <div class="shield hidden" id="shield">
                     <i class="icon" data-icon="shield"></i>
@@ -198,15 +237,28 @@
                         <button class="btn btn-danger btn-sm" id="shieldReport">Report</button>
                     </div>
                 </div>
-                <div class="stage-controls">
-                    <button id="micBtn" class="icon-btn" title="Mute microphone"><i class="icon" data-icon="mic"></i></button>
-                    <button id="camBtn" class="icon-btn" title="Turn camera off"><i class="icon" data-icon="video"></i></button>
-                    <button id="switchCamBtn" class="icon-btn hidden" title="Switch camera"><i class="icon" data-icon="switch"></i></button>
-                    <button id="fxBtn" class="icon-btn" title="Effects: backgrounds, masks, filters"><i class="icon" data-icon="sparkles"></i></button>
-                    <button id="fullBtn" class="icon-btn" title="Fullscreen"><i class="icon" data-icon="max"></i></button>
+                <div class="voice-stage" id="voiceStage">
+                    <div class="voice-peer"><div class="voice-ring" id="ringThem"><div class="avatar" id="voiceAvatarThem">?</div></div><b id="voiceNameThem">Stranger</b></div>
+                    <div class="voice-time" id="voiceTime">0:00</div>
+                    <div class="voice-peer small"><div class="voice-ring" id="ringMe"><div class="avatar" id="voiceAvatarMe">🙂</div></div><span>You</span></div>
+                </div>
+                <div class="react-layer" id="reactLayer" aria-hidden="true"></div>
+                <div class="react-bar hidden" id="reactBar" role="toolbar" aria-label="Send a reaction"></div>
+                <div class="game-stage hidden" id="gameStage"></div>
+                <div class="stage-dock">
+                    <div class="stage-tools">
+                        <button id="micBtn" class="icon-btn" title="Mute microphone" aria-label="Mute microphone"><i class="icon" data-icon="mic"></i></button>
+                        <button id="camBtn" class="icon-btn" title="Turn camera off" aria-label="Turn camera off"><i class="icon" data-icon="video"></i></button>
+                        <button id="switchCamBtn" class="icon-btn hidden" title="Switch camera" aria-label="Switch camera"><i class="icon" data-icon="switch"></i></button>
+                        <button id="fxBtn" class="icon-btn" title="Effects: backgrounds, masks, filters" aria-label="Effects"><i class="icon" data-icon="sparkles"></i></button>
+                        <button id="gamesBtn" class="icon-btn" title="Play a game" aria-label="Play a game" disabled><i class="icon" data-icon="gamepad"></i></button>
+                        <button id="reactBtn" class="icon-btn" title="Send a reaction" aria-label="Send a reaction" disabled><i class="icon" data-icon="heart"></i></button>
+                        <button id="fullBtn" class="icon-btn" title="Fullscreen" aria-label="Fullscreen"><i class="icon" data-icon="max"></i></button>
+                    </div>
+                    <div class="stage-next" id="nextSlotStage"><button id="nextBtn" class="btn btn-primary btn-next" title="Skip to the next person (Esc)">Next</button></div>
                 </div>
                 <div class="fx-panel hidden" id="fxPanel">
-                    <div class="fx-head"><b>Effects</b><span id="fxStatus"></span><button id="fxClose" class="icon-btn" title="Close">×</button></div>
+                    <div class="fx-head"><b>Effects</b><span id="fxStatus"></span><button id="fxClose" class="icon-btn" title="Close" aria-label="Close effects">×</button></div>
                     <div class="fx-row"><span>Background</span><div class="fx-opts" data-kind="background"></div></div>
                     <div class="fx-row"><span>Mask</span><div class="fx-opts" data-kind="mask"></div></div>
                     <div class="fx-row"><span>Filter</span><div class="fx-opts" data-kind="filter"></div></div>
@@ -216,21 +268,6 @@
         </section>
 
         <section class="panel">
-            <div class="panel-head">
-                <div class="partner">
-                    <div class="avatar" id="avatar">?</div>
-                    <div style="min-width:0">
-                        <div class="partner-name"><span id="partnerName">Searching…</span> <span id="partnerFlag" class="flag"></span> <span id="partnerBadge" class="pro-badge hidden" title="Verified Premium member">👑</span></div>
-                        <div class="partner-sub"><span class="status-dot wait" id="statusDot"></span><span id="partnerSub">Finding a match</span></div>
-                    </div>
-                </div>
-                <div class="panel-actions">
-                    <button id="addFriendBtn" class="icon-btn hidden" title="Add as friend" disabled><i class="icon" data-icon="userPlus"></i></button>
-                    <button id="reportBtn" class="icon-btn" title="Report" disabled><i class="icon" data-icon="flag"></i></button>
-                    <button id="blockBtn" class="icon-btn" title="Block (never match again)" disabled><i class="icon" data-icon="ban"></i></button>
-                </div>
-            </div>
-
             <div class="round hidden" id="round">
                 <div class="round-bar"><div id="roundFill"></div></div>
                 <span class="round-time" id="roundTime">1:00</span>
@@ -238,14 +275,17 @@
                 <button class="btn btn-sm btn-primary" id="extendBtn">+1 min</button>
             </div>
 
+            <div class="game-dock hidden" id="gameDock"></div>
             <div id="messages" aria-live="polite"></div>
+            <div class="icebreakers hidden" id="icebreakers" aria-label="Conversation starters"></div>
             <div id="piiWarn" class="pii-warn hidden">This looks like personal info (email/phone/link). Press Send again if you really want to share it.</div>
 
             <div class="composer">
-                <button id="nextBtn" class="btn btn-primary" title="Skip to the next person (Esc)">Next</button>
-                <input id="msgInput" class="input" maxlength="500" placeholder="Type a message…" autocomplete="off" disabled>
-                <button id="emojiBtn" class="icon-btn" title="Emoji" disabled><i class="icon" data-icon="smile"></i></button>
-                <button id="sendBtn" class="icon-btn" title="Send" disabled><i class="icon" data-icon="send"></i></button>
+                <div class="composer-next" id="nextSlotComposer"></div>
+                <input id="msgInput" class="input" maxlength="500" placeholder="Type a message…" autocomplete="off" aria-label="Message" disabled>
+                <button id="gamesBtnText" class="icon-btn composer-games" title="Play a game" aria-label="Play a game" disabled><i class="icon" data-icon="gamepad"></i></button>
+                <button id="emojiBtn" class="icon-btn" title="Emoji" aria-label="Emoji" disabled><i class="icon" data-icon="smile"></i></button>
+                <button id="sendBtn" class="icon-btn" title="Send" aria-label="Send" disabled><i class="icon" data-icon="send"></i></button>
                 <div class="emoji-pop hidden" id="emojiPop"></div>
             </div>
             <div class="kbd"><b>Enter</b> send · <b>Esc</b> next (press twice) · <b>Ctrl+M</b> mute</div>
@@ -255,9 +295,9 @@
     <!-- Friends drawer -->
     <aside id="drawer" class="drawer hidden" aria-label="Friends">
         <div class="drawer-head">
-            <button id="drawerBack" class="icon-btn hidden" title="Back">‹</button>
+            <button id="drawerBack" class="icon-btn hidden" title="Back" aria-label="Back"><i class="icon" data-icon="chevronLeft"></i></button>
             <b id="drawerTitle">Friends</b>
-            <button id="drawerClose" class="icon-btn" title="Close">×</button>
+            <button id="drawerClose" class="icon-btn" title="Close" aria-label="Close friends"><i class="icon" data-icon="x"></i></button>
         </div>
         <div id="drawerAccount" class="drawer-account"></div>
         <div id="friendList" class="friend-list"></div>
@@ -270,58 +310,115 @@
             <div id="fcMessages" class="fc-messages"></div>
             <div class="fc-note">Friend chats are saved so you can read them later. Random chats never are.</div>
             <div class="composer">
-                <input id="fcInput" class="input" maxlength="1000" placeholder="Message…" autocomplete="off">
-                <button id="fcSend" class="icon-btn" title="Send"><i class="icon" data-icon="send"></i></button>
+                <input id="fcInput" class="input" maxlength="1000" placeholder="Message…" autocomplete="off" aria-label="Message your friend">
+                <button id="fcSend" class="icon-btn" title="Send" aria-label="Send"><i class="icon" data-icon="send"></i></button>
             </div>
         </div>
     </aside>
 
-    <!-- Premium paywall -->
-    <div id="paywall" class="modal-bg hidden">
-        <div class="modal paywall">
-            <button class="icon-btn paywall-close" id="paywallClose" title="Close">×</button>
-            <div class="paywall-crown">👑</div>
-            <h3>Go Premium</h3>
-            <p id="paywallReason">Get more out of every chat.</p>
-            <ul class="perks">
-                <li>🎯 <b>Gender filter</b>: choose to talk to women or men</li>
-                <li>🌍 <b>Country filter</b>: meet people from a specific country</li>
-                <li>⚡ <b>Priority matching</b>: get matched first</li>
-                <li>✨ <b>All effects</b>: every background, mask and filter</li>
-                <li>👑 <b>Premium badge</b>: verified, shown to the people you meet</li>
-            </ul>
-            <div class="plans" id="plans"></div>
-            <button class="btn btn-primary btn-block" id="paywallCta">Continue with Google</button>
-            <div class="hint paywall-hint" id="paywallHint">One-time payment, no auto-renewal. Secure checkout by Razorpay: UPI, cards, netbanking and wallets. <a href="legal.html#refunds" target="_blank">Refund policy</a></div>
+    <!-- Menu -->
+    <div id="menuSheet" class="sheet-bg hidden" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
+        <div class="sheet">
+            <div class="sheet-grab"></div>
+            <div class="sheet-head"><h3 id="menuTitle">Menu</h3><button class="icon-btn" data-sheet-close aria-label="Close"><i class="icon" data-icon="x"></i></button></div>
+            <div class="sheet-body">
+                <div class="menu-list">
+                    <button id="themeBtn" class="menu-item" type="button"><i class="icon" data-icon="moon"></i><span>Light / dark</span><small id="themeLabel">Dark</small></button>
+                    <button id="soundBtn" class="menu-item" type="button"><i class="icon" data-icon="volume"></i><span>Sounds</span><small id="soundLabel">On</small></button>
+                    <button id="installBtn" class="menu-item hidden" type="button"><i class="icon" data-icon="download"></i><span>Install the app</span></button>
+                    <button id="shareBtn" class="menu-item" type="button"><i class="icon" data-icon="users"></i><span>Invite friends</span></button>
+                    <button class="menu-item" type="button" data-sheet-open="safetySheet"><i class="icon" data-icon="shield"></i><span>Safety &amp; help</span></button>
+                    <a class="menu-item" href="legal.html"><i class="icon" data-icon="flag"></i><span>Terms, privacy &amp; refunds</span></a>
+                </div>
+                <div class="menu-sub">Colour theme</div>
+                <div class="accent-grid" id="accentGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Safety & help -->
+    <div id="safetySheet" class="sheet-bg hidden" role="dialog" aria-modal="true" aria-labelledby="safetyTitle">
+        <div class="sheet">
+            <div class="sheet-grab"></div>
+            <div class="sheet-head"><h3 id="safetyTitle">Stay safe</h3><button class="icon-btn" data-sheet-close aria-label="Close"><i class="icon" data-icon="x"></i></button></div>
+            <div class="sheet-body">
+                <p>Strangers are strangers. A few habits keep chats fun:</p>
+                <ul class="safety-list">
+                    <li><b>Never share</b> your phone number, UPI ID, OTPs, address or social handles. Scams start by moving you to another app.</li>
+                    <li><b>Nobody needs money</b> from you here. Don’t send any, and don’t click links from strangers.</li>
+                    <li><b>Report and block</b> in one tap (flag and ban icons). We review reports, and repeat offenders are banned by device and network.</li>
+                    <li><b>Your video is never recorded</b> and goes directly between you and your partner. Partner video stays blurred until our on-device check passes.</li>
+                    <li><b>Asked for photos or threatened?</b> Stop replying, block, and report. In India call <b>1930</b> (cybercrime helpline) or visit <a href="https://cybercrime.gov.in" target="_blank" rel="noopener">cybercrime.gov.in</a>.</li>
+                </ul>
+                <p class="hint">We never sell unbans or verification. Appeals are free.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Premium -->
+    <div id="paywall" class="sheet-bg hidden" role="dialog" aria-modal="true" aria-labelledby="paywallTitle">
+        <div class="sheet">
+            <div class="sheet-grab"></div>
+            <div class="sheet-head"><h3 class="sr-only" id="paywallTitle">Go Premium</h3><span style="flex:1"></span><button class="icon-btn" id="paywallClose" aria-label="Close"><i class="icon" data-icon="x"></i></button></div>
+            <div class="sheet-body">
+                <div class="paywall-hero">
+                    <div class="paywall-crown">👑</div>
+                    <h3>Go Premium</h3>
+                    <p id="paywallReason">Get more out of every chat.</p>
+                </div>
+                <table class="compare" aria-label="Free vs Premium">
+                    <thead><tr><th></th><th>Free</th><th class="pro">Premium</th></tr></thead>
+                    <tbody>
+                        <tr><td>Video, voice &amp; text chat</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+                        <tr><td>Games &amp; reactions</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+                        <tr><td>All safety tools</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+                        <tr><td>Gender &amp; country filters</td><td class="no">–</td><td class="yes">✓</td></tr>
+                        <tr><td>Priority matching</td><td class="no">–</td><td class="yes">✓</td></tr>
+                        <tr><td>Every effect &amp; colour theme</td><td class="no">–</td><td class="yes">✓</td></tr>
+                        <tr><td>👑 Premium badge</td><td class="no">–</td><td class="yes">✓</td></tr>
+                    </tbody>
+                </table>
+                <div class="plans" id="plans" role="radiogroup" aria-label="Choose a plan"></div>
+                <button class="btn btn-gold btn-block btn-lg" id="paywallCta">Continue with Google</button>
+                <div class="pay-methods" aria-label="Payment methods"><span>UPI</span><span>GPay</span><span>PhonePe</span><span>Paytm</span><span>Cards</span><span>Netbanking</span></div>
+                <div class="hint paywall-hint" id="paywallHint">One-time payment, no auto-renewal. Secure checkout by Razorpay. <a href="legal.html#refunds" target="_blank" rel="noopener">Refund policy</a></div>
+                <div class="paywall-promise">Not for sale, ever: safety tools, age verification and unbans.</div>
+            </div>
         </div>
     </div>
 
     <!-- Incoming friend call -->
-    <div id="callModal" class="modal-bg hidden">
-        <div class="modal call-modal">
-            <div class="avatar big" id="callAvatar">?</div>
-            <h3><span id="callName">Friend</span> is calling…</h3>
-            <p>Video call from your friend.</p>
-            <div class="modal-actions">
+    <div id="callModal" class="sheet-bg hidden" role="dialog" aria-modal="true" aria-labelledby="callTitle">
+        <div class="sheet call-sheet">
+            <div class="sheet-grab"></div>
+            <div class="sheet-body" style="padding-top:var(--space-6)">
+                <div class="avatar big" id="callAvatar">?</div>
+                <h3 id="callTitle" style="margin:0 0 4px;font-size:22px"><span id="callName">Friend</span> is calling…</h3>
+                <p>Video call from your friend.</p>
+            </div>
+            <div class="sheet-foot">
                 <button class="btn btn-danger" id="callDecline">Decline</button>
                 <button class="btn btn-primary" id="callAccept">Accept</button>
             </div>
         </div>
     </div>
 
-    <!-- Report modal -->
-    <div id="reportModal" class="modal-bg hidden">
-        <div class="modal">
-            <h3>Report this person</h3>
-            <p>Reports are reviewed by moderators. They’ll also be blocked and you’ll move to someone new.</p>
-            <div class="reasons" id="reasons">
-                <label><input type="radio" name="reason" value="sexual" checked> Nudity or sexual content</label>
-                <label><input type="radio" name="reason" value="minor"> Appears to be under 18</label>
-                <label><input type="radio" name="reason" value="harassment"> Harassment or hate speech</label>
-                <label><input type="radio" name="reason" value="spam"> Spam or scam</label>
-                <label><input type="radio" name="reason" value="other"> Something else</label>
+    <!-- Report -->
+    <div id="reportModal" class="sheet-bg hidden" role="dialog" aria-modal="true" aria-labelledby="reportTitle">
+        <div class="sheet">
+            <div class="sheet-grab"></div>
+            <div class="sheet-head"><h3 id="reportTitle">Report this person</h3><button class="icon-btn" data-sheet-close aria-label="Close"><i class="icon" data-icon="x"></i></button></div>
+            <div class="sheet-body">
+                <p>Moderators review reports. They’ll also be blocked and you’ll move on to someone new.</p>
+                <div class="reasons" id="reasons">
+                    <label><input type="radio" name="reason" value="sexual" checked> Nudity or sexual content</label>
+                    <label><input type="radio" name="reason" value="minor"> Appears to be under 18</label>
+                    <label><input type="radio" name="reason" value="harassment"> Harassment or hate speech</label>
+                    <label><input type="radio" name="reason" value="spam"> Spam or scam</label>
+                    <label><input type="radio" name="reason" value="other"> Something else</label>
+                </div>
             </div>
-            <div class="modal-actions">
+            <div class="sheet-foot">
                 <button class="btn btn-ghost" id="reportCancel">Cancel</button>
                 <button class="btn btn-danger" id="reportSubmit">Report &amp; skip</button>
             </div>
