@@ -4,9 +4,10 @@
 // sanitizeHandle() / sanitizeAvatar() before it is shown.
 // =====================================================================
 
-import { scanMessage } from './shield.js';
+import { scanMessage, isProfane, stripInvisible } from './shield.js';
 
 const MAX_HANDLE = 20;
+const MAX_DIGITS = 5; // six or more digits in a nickname is a phone number or an id, whatever else is around them
 const DEFAULT_HUE = 210;
 
 // Kept to 8 + 9 letters at most, so word + word + two digits always fits in MAX_HANDLE.
@@ -36,8 +37,10 @@ const SKIP_NUMBERS = new Set([69, 88]); // innuendo / hate-symbol numbers
 // Words that must not appear where a word and a thing meet (ToofaniGecko, SitaraPenguin); inside one word they are fine.
 const SEAM = /nig|rape|tit|cum|sex|ass|mc|bc|fag|anal|anus|dick|boob|porn|slut|piss|poop|shit|fuck|chut|gand|lund|randi|bhos/g;
 
-// Marks and fillers that show nothing but survive the character filter (variation selectors, blank Hangul and Khmer letters).
-const BLANK = /[\u034F\u115F\u1160\u17B4\u17B5\u180B-\u180F\u3164\uFE00-\uFE0F\uFFA0\u{E0100}-\u{E01EF}]/gu;
+// Names that pose as the service or its staff would borrow trust from the stranger reading them ("Admin", "OhMyGoal Support").
+const OFFICIAL = new Set(['admin', 'administrator', 'moderator', 'support', 'official', 'staff', 'helpdesk', 'verified', 'police', 'cybercell']);
+const OFFICIAL_BRAND = /ohmygoal|customercare|cybercell|trustandsafety/;
+const LEET_DIGITS = { 0: 'o', 1: 'i', 3: 'e', 4: 'a', 5: 's', 7: 't' };
 
 // Friendly animal and nature emoji, all single code points (no variation selectors).
 export const AVATAR_EMOJI = Object.freeze([
@@ -95,15 +98,23 @@ export function sanitizeAvatar(x) {
     return typeof e === 'string' && EMOJI_SET.has(e) && isHue(h) ? { e, h: h + 0 } : null; // + 0 turns -0 into 0
 }
 
+/** True for a name that poses as the service or its staff: whole words only (Admin, Admin2, RahulAdmin, Adm1n; not Badminton). */
+function impersonates(name) {
+    const readDigits = t => t.replace(/[013457]/g, d => LEET_DIGITS[d]);
+    const words = name.split(/[ ._-]+|(?<=\p{Ll})(?=\p{Lu})/u).map(w => w.toLowerCase());
+    if (words.some(w => OFFICIAL.has(readDigits(w)) || OFFICIAL.has(w.replace(/\d+/g, '')))) return true;
+    return OFFICIAL_BRAND.test(readDigits(name.toLowerCase()).replace(/[^a-z]/g, ''));
+}
+
 /**
- * A display name the peer chose: letters (any script), digits, spaces and . _ - only,
- * at most 20 characters. Returns '' when nothing usable is left or the name trips the
- * scam shield (a phone number, Instagram id or link in a nickname); the app shows 'Stranger'.
+ * A display name the peer chose: letters (any script), digits, spaces and . _ - only, at most 20 characters, with every
+ * invisible character dropped. Returns '' when nothing usable is left, when the name carries six or more digits, trips the
+ * scam shield (a phone number, Instagram id or link in a nickname), swears, or poses as the service or its staff; the app
+ * shows 'Stranger'. The full text is judged as well as the 20 characters that would be shown.
  */
 export function sanitizeHandle(s) {
     if (typeof s !== 'string') return '';
-    const clean = s.slice(0, 200).normalize('NFKC')
-        .replace(BLANK, '')
+    const clean = stripInvisible(s.slice(0, 200).normalize('NFKC'))
         .replace(/\s+/g, ' ')
         .replace(/[^\p{L}\p{M}\p{N} ._-]/gu, '')
         .replace(/(^|[^\p{L}\p{M}])\p{M}+/gu, '$1') // combining marks need a letter to sit on...
@@ -112,7 +123,11 @@ export function sanitizeHandle(s) {
         .trim()
         .normalize('NFC'); // removed characters can leave a letter next to a mark it now composes with
     const out = [...clean].slice(0, MAX_HANDLE).join('').trim();
-    return /[\p{L}\p{N}]/u.test(out) && !scanMessage(out).risky ? out : '';
+    if (!/[\p{L}\p{N}]/u.test(out) || (out.match(/\p{N}/gu) || []).length > MAX_DIGITS) return '';
+    for (const text of out === clean ? [out] : [out, clean]) {
+        if (scanMessage(text).risky || isProfane(text) || impersonates(text)) return '';
+    }
+    return out;
 }
 
 /** CSS background for an avatar bubble: a two-stop gradient from its hue. */

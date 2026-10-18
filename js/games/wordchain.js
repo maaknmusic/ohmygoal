@@ -12,6 +12,11 @@
 //   virama, ...). Words are NFC-normalised. Last letter = last base character after dropping
 //   trailing marks, e.g. गाना -> न, विद्या -> य, सम्राट् -> ट.
 // Length is counted in characters (UTF-16 units; all allowed letters are in the BMP).
+//
+// Words are shown to the other player as typed, so a swear word or a contact-sharing word is refused like any bad word
+// ('Not allowed', a heart, and the word itself is not kept in `last`). Both sides run the same shield.js, so they agree.
+
+import { isProfane, scanMessage } from '../shield.js';
 
 export const HEARTS = 3;
 export const MIN_LENGTH = 2;
@@ -24,12 +29,25 @@ const LATIN = /^[A-Za-z]+$/;
 const DEVANAGARI = /^[ऄ-हॠॡ][ऄ-हॠॡऀ-ःऺ-ॏॢॣ]*$/;
 const DEV_MARK = /[ऀ-ःऺ-ॏॢॣ]/;
 
+// Contact channels glued into one word ("callmeonwhatsapp"): the shield only sees them between spaces.
+const CHANNEL = /whatsapp|whatsap|watsapp|instagram|snapchat|facebook|wechat/;
+// Everyday words the shield flags only because it reads a lone word as a message ("snap", "photos"): harmless on a word board.
+const EVERYDAY = new Set(['snap', 'discord', 'messenger', 'telegram', 'photos', 'pic', 'pics', 'selfie', 'selfies']);
+
+/** True for a word that must not reach the board: profanity, or the shield's view of a contact or an ask. */
+function blocked(word) {
+    const lower = word.toLowerCase();
+    if (isProfane(word) || CHANNEL.test(lower)) return true;
+    return !EVERYDAY.has(lower) && scanMessage(word).risky;
+}
+
 const other = p => (p === 'A' ? 'B' : 'A');
 const isPlayer = p => p === 'A' || p === 'B';
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 
 function normalize(raw) {
-    const w = String(raw).trim().normalize('NFC');
+    if (typeof raw !== 'string') return '';
+    const w = raw.trim().normalize('NFC');
     return LATIN.test(w) ? w.toLowerCase() : w;
 }
 
@@ -46,10 +64,11 @@ export function checkWord(state, raw) {
     const letters = LATIN.test(word) || DEVANAGARI.test(word);
     const fail = reason => ({ ok: false, word: letters ? word : '', reason });
     if (!letters) return fail(word.length < MIN_LENGTH ? 'Too short' : 'Letters only');
+    if (blocked(word)) return { ok: false, word: '', reason: 'Not allowed' }; // never echoed back to the board
     if (word.length < MIN_LENGTH) return fail('Too short');
     if (word.length > MAX_LENGTH) return fail('Too long');
-    if (state.need && word[0] !== state.need) return fail(`Must start with ${state.need}`);
-    if (state.words.includes(word)) return fail('Already used');
+    if (state?.need && word[0] !== state.need) return fail(`Must start with ${state.need}`);
+    if (Array.isArray(state?.words) && state.words.includes(word)) return fail('Already used');
     return { ok: true, word, reason: '' };
 }
 

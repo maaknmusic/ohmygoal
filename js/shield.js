@@ -462,7 +462,16 @@ export function maskContact(text) {
 const LEET = { 0: 'o', 1: 'i', 3: 'e', 4: 'a', 5: 's', 7: 't', '@': 'a', $: 's', '!': 'i', '|': 'i', '+': 't', '*': '_', '#': '_', '%': '_', '^': '_', '?': '_' };
 const readLeet = t => t.replace(/[0-9@$!|+*#%^?]/g, c => LEET[c] ?? c);
 const TOKEN = /[\p{L}\p{M}\p{N}@$!|+*#%^?]+/gu;
-const EDGE_SYMBOLS = /^[@$!|+*#%^?]+|[@$!|+*#%^?]+$/gu;
+const SYMBOL = /[@$!|+*#%^?]/u;
+
+/** The word without the symbols hugging its ends ("shit!!" -> "shit"); a loop, since an end-anchored pattern is quadratic on long runs. */
+function trimSymbols(t) {
+    let a = 0;
+    let b = t.length;
+    while (a < b && SYMBOL.test(t[a])) a++;
+    while (b > a && SYMBOL.test(t[b - 1])) b--;
+    return t.slice(a, b);
+}
 const MAX_TOKEN = 32; // longer than any word listed here; keeps the quantifier-heavy patterns cheap on junk
 
 // Judged on whole words so that class, assistant, Scunthorpe, cocktail, shiitake and Dickens stay innocent. Only stems that no
@@ -542,7 +551,7 @@ function badWord(v) {
 /** A word as typed, with and without the symbols hugging its ends ("shit!", "$hit"), and its CamelCase parts (LundKing). */
 function profaneToken(t) {
     const lower = t.toLowerCase();
-    if (badWord(readLeet(lower)) || badWord(readLeet(lower.replace(EDGE_SYMBOLS, '')))) return true;
+    if (badWord(readLeet(lower)) || badWord(readLeet(trimSymbols(lower)))) return true;
     if (!/\p{Ll}\p{Lu}/u.test(t)) return false;
     return t.split(/(?<=\p{Ll})(?=\p{Lu})/u).some(part => part.length >= 3 && badWord(readLeet(part.toLowerCase())));
 }
