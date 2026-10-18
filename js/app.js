@@ -1868,7 +1868,7 @@ el.callAccept.onclick = async () => {
 async function refreshOnline() {
     if (!S.transport) return;
     try {
-        const n = await S.transport.onlineCount();
+        const n = Math.max(1, await S.transport.onlineCount()); // you're online too, even before your first ping lands
         const text = n.toLocaleString();
         el.onlineCount.textContent = text;
         document.getElementById('onlineLabel').textContent = n === 1 ? 'person online now' : 'people online now';
@@ -1916,6 +1916,7 @@ try {
     el.demoNote.classList.toggle('hidden', S.transport.kind !== 'local');
     el.startBtn.textContent = 'Start chatting';
     refreshOnline();
+    setTimeout(refreshOnline, 4000); // again once our own presence ping has been saved
     setInterval(refreshOnline, S.transport.kind === 'local' ? 3000 : ONLINE_REFRESH_MS);
     if (S.transport.kind === 'firebase') initFriends();
 } catch (e) {
