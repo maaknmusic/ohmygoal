@@ -326,7 +326,6 @@
                 </article>
 
                 <article class="lp-tile lp-tile--voice reveal">
-                    <span class="lp-soon">Coming soon</span>
                     <div class="lp-voice" aria-hidden="true"><span class="lp-v-a">🐼</span><span class="lp-v-b">🦉</span></div>
                     <div class="lp-tile-copy">
                         <span class="lp-tile-ico"><svg class="lp-i"><use href="#lp-i-headset"/></svg></span>
@@ -993,7 +992,7 @@
     </div>
 
     <!-- Incoming friend call -->
-    <div id="callModal" class="sheet-bg hidden" role="dialog" aria-modal="true" aria-labelledby="callTitle">
+    <div id="callModal" class="sheet-bg hidden" role="dialog" aria-modal="true" aria-labelledby="callTitle" data-no-dismiss>
         <div class="sheet call-sheet">
             <div class="sheet-grab"></div>
             <div class="sheet-body" style="padding-top:var(--space-6)">
@@ -1031,7 +1030,7 @@
         </div>
     </div>
 
-    <div id="toasts"></div>
+    <div id="toasts" role="region" aria-label="Notifications"></div>
 
     <script type="module" src="js/app.js"></script>
 </body>

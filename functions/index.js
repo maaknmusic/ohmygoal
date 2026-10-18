@@ -17,6 +17,8 @@ import { db, APP_ID } from './common.js';
 
 // Bans, access passes, unban requests and the admin API.
 export { checkAccess, reportViolation, requestUnban, admin } from './moderation.js';
+// "Good vibe" likes after a chat.
+export { likeUser } from './likes.js';
 
 const RAZORPAY_KEY_ID = defineSecret('RAZORPAY_KEY_ID');
 const RAZORPAY_KEY_SECRET = defineSecret('RAZORPAY_KEY_SECRET');

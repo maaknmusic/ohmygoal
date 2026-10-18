@@ -47,14 +47,14 @@ document.addEventListener('click', e => {
         return;
     }
     // A click on the dimmed backdrop itself closes the sheet.
-    if (e.target.classList?.contains('sheet-bg') && stack.some(s => s.bg === e.target)) closeSheet(e.target);
+    if (e.target.classList?.contains('sheet-bg') && !e.target.hasAttribute('data-no-dismiss') && stack.some(s => s.bg === e.target)) closeSheet(e.target);
 });
 
 // Capture phase: the open sheet gets Esc and Tab first, so chat shortcuts (Esc = next) never fire behind it.
 document.addEventListener('keydown', e => {
     const top = topSheet();
     if (!top) return;
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeSheet(top); return; }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!top.hasAttribute('data-no-dismiss')) closeSheet(top); return; }
     if (e.key !== 'Tab') return;
     const items = [...top.querySelectorAll(FOCUSABLE)].filter(x => x.offsetParent !== null);
     if (!items.length) return;

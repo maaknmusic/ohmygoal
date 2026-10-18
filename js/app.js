@@ -126,6 +126,7 @@ function h(tag, cls, text) {
 
 function toast(text, bad = false) {
     const t = h('div', 'toast' + (bad ? ' bad' : ''), text);
+    t.setAttribute('role', bad ? 'alert' : 'status');
     el.toasts.appendChild(t);
     setTimeout(() => t.remove(), 4000);
 }
@@ -355,8 +356,10 @@ function applyTrackState() {
     if (S.effects?.track) S.effects.track.enabled = !S.camOff;
     el.micBtn.classList.toggle('active', S.muted);
     el.camBtn.classList.toggle('active', S.camOff);
-    el.micBtn.title = S.muted ? 'Unmute microphone' : 'Mute microphone';
-    el.camBtn.title = S.camOff ? 'Turn camera on' : 'Turn camera off';
+    el.micBtn.title = el.micBtn.ariaLabel = S.muted ? 'Unmute microphone' : 'Mute microphone';
+    el.camBtn.title = el.camBtn.ariaLabel = S.camOff ? 'Turn camera on' : 'Turn camera off';
+    el.micBtn.setAttribute('aria-pressed', String(S.muted));
+    el.camBtn.setAttribute('aria-pressed', String(S.camOff));
     setIcon(el.micBtn.querySelector('.icon'), S.muted ? 'micOff' : 'mic');
     setIcon(el.camBtn.querySelector('.icon'), S.camOff ? 'videoOff' : 'video');
     el.localVideo.classList.toggle('cam-off', S.camOff);
@@ -614,7 +617,7 @@ function setPhase(phase, info = {}) {
     el.endLikeBtn.classList.toggle('hidden', !(phase === 'ended' && info.report && S.last && !S.last.liked && S.transport?.kind === 'firebase'));
     el.gamesBtn.disabled = !live;
     el.gamesBtnText.disabled = !live;
-    if (!live) { el.reactBar.classList.add('hidden'); el.reactBtn.classList.remove('on'); }
+    if (!live) { el.reactBar.classList.add('hidden'); el.reactBtn.classList.remove('on'); hideIcebreakers(); }
     el.msgInput.disabled = !live;
     el.sendBtn.disabled = !live;
     el.emojiBtn.disabled = !live;
@@ -1594,6 +1597,10 @@ el.reportSubmit.onclick = async () => {
 document.addEventListener('keydown', e => {
     if (el.chat.classList.contains('hidden') || anySheetOpen() || e.repeat) return;
     if (e.key === 'Escape') {
+        // Whatever is open closes first; only a bare Esc means "next".
+        const popovers = [el.emojiPop, el.reactBar, el.fxPanel];
+        const open = popovers.find(p => !p.classList.contains('hidden'));
+        if (open) { open.classList.add('hidden'); el.reactBtn.classList.toggle('on', !el.reactBar.classList.contains('hidden')); e.preventDefault(); return; }
         if (!el.drawer.classList.contains('hidden')) { el.drawer.classList.add('hidden'); return; }
         e.preventDefault();
         onNext();
@@ -2061,7 +2068,8 @@ function renderTags() {
         b.setAttribute('aria-pressed', String(on));
     });
     const summary = $('prefsSummary');
-    if (summary) summary.textContent = S.interests.length ? `${S.interests.length} interest${S.interests.length === 1 ? '' : 's'}` : '';
+    if (summary) summary.textContent = S.interests.length ? `${S.interests.length} interest${S.interests.length === 1 ? '' : 's'}` : 'Optional';
+    $('prefsChips')?.replaceChildren(...S.interests.map(t => h('span', '', t)));
 }
 document.querySelectorAll('#interestChips .ichip').forEach(b => {
     b.onclick = () => {
@@ -2272,7 +2280,14 @@ function renderPaywall() {
     const rupees = p => Number(String(p.price).replace(/\D/g, '')) || 0;
     const perDay = p => (p.days ? rupees(p) / p.days : 0);
     const basePerDay = perDay(plans[0] || {});
-    el.plans.replaceChildren(...plans.map(p => {
+    const syncCards = () => el.plans.querySelectorAll('.plan').forEach(c => {
+        const on = c.dataset.plan === selectedPlan;
+        c.classList.toggle('active', on);
+        c.setAttribute('aria-checked', String(on));
+        c.tabIndex = on ? 0 : -1;
+    });
+    if (el.plans.children.length === plans.length && plans.every((p, i) => el.plans.children[i].dataset.plan === p.id)) syncCards();
+    else el.plans.replaceChildren(...plans.map(p => {
         const card = h('button', 'plan' + (p.id === selectedPlan ? ' active' : ''));
         card.type = 'button';
         card.dataset.plan = p.id;
@@ -2285,7 +2300,17 @@ function renderPaywall() {
             card.appendChild(h('em', '', `≈ ₹${day < 10 ? day.toFixed(1).replace('.0', '') : Math.round(day)}/day${save > 0 ? ` · save ${save}%` : ''}`));
         }
         if (p.note) card.appendChild(h('i', '', p.note));
+        card.tabIndex = p.id === selectedPlan ? 0 : -1;
         card.onclick = () => { selectedPlan = p.id; renderPaywall(); };
+        card.onkeydown = e => {
+            const dir = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+            if (!dir) return;
+            e.preventDefault();
+            const i = (plans.findIndex(x => x.id === p.id) + dir + plans.length) % plans.length;
+            selectedPlan = plans[i].id;
+            renderPaywall();
+            el.plans.children[i]?.focus();
+        };
         return card;
     }));
     const plan = plans.find(p => p.id === selectedPlan);
@@ -2312,6 +2337,11 @@ function openPaywall(reason = 'menu') {
 }
 
 el.premiumBtn.onclick = () => openPaywall('menu');
+document.querySelectorAll('[data-open-premium]').forEach(b => b.addEventListener('click', () => {
+    const plan = (PREMIUM_CFG.plans || []).find(p => p.days === Number(b.dataset.plan));
+    if (plan) selectedPlan = plan.id;
+    openPaywall('menu');
+}));
 el.paywallClose.onclick = () => closeSheet(el.paywall);
 
 el.paywallCta.onclick = async () => {

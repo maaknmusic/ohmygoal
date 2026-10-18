@@ -27,6 +27,7 @@ const RPS = { stone: ['🪨', 'Stone'], paper: ['📄', 'Paper'], scissors: ['�
 export function createGamesUi({ send, say, getContainer, getName, attention }) {
     let pickerOpen = false;
     let dismissed = false;
+    let quitArmedUntil = 0;
     let tick = null;
     let call = 'odd';               // hand cricket: the caller's odd/even choice
     let lastPhase = 'idle';
@@ -96,11 +97,17 @@ export function createGamesUi({ send, say, getContainer, getName, attention }) {
         head.append(h('span', 'gc-emoji', v.game.emoji), h('b', '', v.game.name), h('span', 'gc-timer', ''));
         head.lastChild.dataset.timer = '1';
         if (!v.deadline) head.lastChild.classList.add('hidden');
-        const close = btn('gc-x', '×', () => {
-            if (v.phase === 'playing') session.forfeit();
-            else if (v.phase === 'inviting' || v.phase === 'invited') session.decline();
+        // Quitting a running game takes two taps, so a stray tap doesn't hand your opponent the win.
+        const armed = v.phase === 'playing' && Date.now() < quitArmedUntil;
+        const close = btn('gc-x' + (armed ? ' armed' : ''), armed ? 'Quit?' : '×', () => {
+            if (v.phase === 'playing') {
+                if (Date.now() < quitArmedUntil) { quitArmedUntil = 0; session.forfeit(); return; }
+                quitArmedUntil = Date.now() + 3000;
+                setTimeout(render, 3050);
+                render();
+            } else if (v.phase === 'inviting' || v.phase === 'invited') session.decline();
             else { dismissed = true; render(); }
-        }, v.phase === 'playing' ? 'Quit the game' : 'Close');
+        }, armed ? 'Tap again to quit the game' : v.phase === 'playing' ? 'Quit the game' : 'Close');
         head.appendChild(close);
         root.appendChild(head);
     }
@@ -166,7 +173,7 @@ export function createGamesUi({ send, say, getContainer, getName, attention }) {
         const grid = h('div', 'ttt');
         const win = new Set(v.state.line || []);
         v.state.board.forEach((who, i) => {
-            const cell = btn('ttt-cell' + (who ? ' ' + mark(v, who) : '') + (win.has(i) ? ' win' : ''), who ? v.state.marks[who] : '', () => session.move(i), `Cell ${i + 1}`);
+            const cell = btn('ttt-cell' + (who ? ' ' + mark(v, who) : '') + (win.has(i) ? ' win' : ''), who ? v.state.marks[who] : '', () => session.move(i), `Row ${Math.floor(i / 3) + 1}, column ${(i % 3) + 1}, ${who ? (who === v.me ? 'yours' : 'theirs') : 'empty'}`);
             cell.disabled = !v.canMove || Boolean(who);
             grid.appendChild(cell);
         });
@@ -178,7 +185,7 @@ export function createGamesUi({ send, say, getContainer, getName, attention }) {
         const win = new Set(v.state.line || []);
         const grid = h('div', 'c4');
         for (let c = 0; c < COLS; c++) {
-            const col = btn('c4-col', '', () => session.move(c), `Drop in column ${c + 1}`);
+            const col = btn('c4-col', '', () => session.move(c), `Drop in column ${c + 1} of ${COLS}`);
             col.disabled = !v.canMove || v.state.board[c] !== null;
             for (let r = 0; r < ROWS; r++) {
                 const who = v.state.board[r * COLS + c];

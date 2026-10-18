@@ -40,6 +40,14 @@ service cloud.firestore {
         allow list, write: if false;
       }
 
+      // ---------------- Reputation ("good vibe" likes) ----------------
+      // Written only by the likeUser Cloud Function. Readable one uid at a time (a partner's like
+      // count), never listable, so nobody can enumerate or rank users.
+      match /reputation/{uid} {
+        allow get: if request.auth != null;
+        allow list, write: if false;
+      }
+
       // ---------------- Matchmaking queue ----------------
       function validQueue(d) {
         return d.keys().hasOnly(['mode', 'interests', 'blocked', 'gender', 'country', 'genderFilter',

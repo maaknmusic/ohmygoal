@@ -107,11 +107,11 @@
 .stage-next { display: flex; }
 .stage .icon-btn { color: #fff; border-color: var(--vline); background: rgba(255, 255, 255, 0.06); }
 .stage .icon-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); }
-.stage .icon-btn.active { background: #e5384f; border-color: #e5384f; }
+.stage .icon-btn.active { background: #d12a45; border-color: #d12a45; }
 #fxBtn.on, #gamesBtn.on, #reactBtn.on { background: var(--primary); border-color: var(--primary); }
 .btn-next { min-width: 112px; height: 48px; padding: 0 24px; font-size: 16px; font-weight: 800; border-radius: var(--r-lg); letter-spacing: -0.01em; }
-#nextBtn.confirm { background: var(--danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 35%, transparent); }
-#nextBtn.confirm:hover:not(:disabled) { background: var(--danger); }
+#nextBtn.confirm { background: var(--danger-btn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger-btn) 35%, transparent); }
+#nextBtn.confirm:hover:not(:disabled) { background: var(--danger-btn); }
 
 /* Reactions */
 .react-bar {
@@ -154,7 +154,7 @@
 
 /* Game surfaces (video: glass over the lower video; text: docked above the messages) */
 .game-stage { position: absolute; left: 50%; transform: translateX(-50%); bottom: 86px; z-index: 6; width: min(400px, calc(100% - 24px)); }
-.game-dock { padding: 10px 12px 0; }
+.game-dock { padding: 10px 12px 0; max-height: 46dvh; overflow-y: auto; overscroll-behavior: contain; }
 
 /* ---------- Conversation panel ---------- */
 .panel {
@@ -195,7 +195,7 @@
 }
 @keyframes pop2 { from { opacity: 0; transform: translateY(8px) scale(0.98); } }
 .match-card .avatar { width: 60px; height: 60px; font-size: 30px; }
-.match-card h4 { margin: 4px 0 0; font-family: var(--font-display); font-size: 18px; letter-spacing: -0.02em; }
+.match-card h4 { margin: 4px 0 0; max-width: 100%; font-family: var(--font-display); font-size: 18px; letter-spacing: -0.02em; overflow-wrap: anywhere; }
 .match-card .where { font-size: 13px; color: var(--muted); }
 .match-card .shared-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 4px; }
 .match-card .shared-chips span { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--primary-soft); color: var(--primary-text); }
@@ -236,6 +236,8 @@
         position: absolute; top: 0; left: 0; right: 0; z-index: 9; border: 0; border-radius: 0; color: #fff;
         padding: calc(8px + env(safe-area-inset-top)) 10px 22px; background: linear-gradient(rgba(5, 6, 13, 0.78), transparent);
     }
+    .chat-head { pointer-events: none; }
+    .chat-head > *, .chat-head .panel-actions > * { pointer-events: auto; }
     .chat-head .partner-sub { color: rgba(255, 255, 255, 0.78); }
     .chat-head .icon-btn { color: #fff; border-color: var(--vline); background: rgba(10, 12, 24, 0.45); }
     #chat.text-mode .chat-head { position: relative; background: var(--panel); color: var(--text); border-bottom: 1px solid var(--border); padding: calc(8px + env(safe-area-inset-top)) 10px 8px; }
@@ -247,7 +249,8 @@
     #localVideo { top: auto; right: auto; left: 10px; bottom: 84px; width: 27%; max-width: 112px; aspect-ratio: 3 / 4; }
     #chat[data-phase="searching"] #localVideo { left: 0; bottom: auto; top: 0; max-width: none; }
     .stage-dock { display: contents; }
-    .stage-tools { position: absolute; right: 10px; bottom: 84px; flex-direction: column; z-index: 6; }
+    .stage-tools { position: absolute; right: 10px; bottom: 84px; max-height: calc(100% - 150px); flex-direction: column; flex-wrap: wrap-reverse; justify-content: flex-end; z-index: 6; }
+    #chat[data-phase="ended"] .stage-tools, #chat[data-phase="ended"] #localVideo { display: none; }
     .stage-tools .icon-btn { background: var(--vglass); backdrop-filter: blur(8px); }
     .stage-next { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 6; }
     #fullBtn { display: none; }
@@ -257,6 +260,18 @@
     .panel { grid-column: auto; flex: 1; border: 0; border-radius: 0; box-shadow: none; background: transparent; min-height: 0; }
     #messages { min-height: 0; }
     .kbd { display: none; }
+    /* In text chats the Next button gets a row of its own above the field */
+    #chat.text-mode .composer { flex-wrap: wrap; }
+    #chat.text-mode .composer-next { flex: 1 0 100%; }
+    #chat.text-mode .composer-next .btn { width: 100%; }
+}
+/* Soft keyboard open: give the conversation the room */
+@media (max-width: 899px) and (max-height: 560px) {
+    .stage { flex: 0 0 34%; min-height: 150px; }
+    .stage-dock .stage-tools { display: none; }
+    #localVideo { bottom: 64px; max-width: 80px; }
+    .stage-next { bottom: 8px; }
+    .react-bar, .game-stage, .fx-panel { bottom: 58px; }
 }
 @media (max-width: 420px) {
     .partner-name { font-size: 16px; }
@@ -365,3 +380,4 @@
     #addFriendBtn, #reportBtn, #blockBtn, #safetyBtn { display: none !important; }
     .chat-more { display: grid; }
 }
+.gc-x.armed { width: auto; padding: 0 10px; background: var(--danger-btn); border-color: var(--danger-btn); color: #fff; font-size: 13px; font-weight: 700; }

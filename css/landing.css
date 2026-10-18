@@ -726,8 +726,8 @@
     #welcome .lp-never { grid-template-columns: 1fr auto; align-items: center; }
 }
 @media (min-width: 900px) {
-    #welcome .lp-sticky { display: none; }
-    #welcome .lp-foot { padding-bottom: 44px; }
+    #welcome .lp-foot { padding-bottom: calc(44px + 72px); }
+    #welcome #stickyStartBtn { display: block; max-width: 520px; margin-inline: auto; }
     #welcome .lp-rooms { grid-template-columns: repeat(4, 1fr); }
     #welcome .lp-card { padding: 22px; gap: 14px; }
     #welcome .lp-safe-grid { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 28px; align-items: start; }
@@ -749,6 +749,11 @@
     #welcome .lp-games { grid-template-columns: repeat(5, 1fr); gap: 14px; }
     #welcome .lp-gv--ttt { grid-template-columns: repeat(3, 34px); grid-auto-rows: 34px; }
     #welcome .lp-gv--c4 { grid-template-columns: repeat(6, 18px); grid-auto-rows: 18px; gap: 4px; }
+}
+@media (min-width: 900px) and (min-height: 720px) {
+    /* Tall desktop windows always have Start in view; short ones keep the bar */
+    #welcome .lp-sticky { display: none; }
+    #welcome .lp-foot { padding-bottom: 44px; }
 }
 @media (min-width: 1040px) and (max-height: 840px) {
     #welcome .lp-h1 { font-size: clamp(2.2rem, 1.3rem + 3vw, 3.5rem); }
@@ -776,7 +781,11 @@
     #welcome .lp-faq summary { font-size: 16px; }
 }
 @media (max-width: 380px) {
+    #welcome { --lp-gut: 14px; }
     #welcome .lp-card-top span:last-child { display: none; }
+    #welcome .lp-trust { font-size: 12.5px; }
+    #welcome .lp-plan { column-gap: 10px; padding: 16px; }
+    #welcome .lp-plan .lp-btn { min-width: 100px; padding: 0 12px; }
     #welcome .lp-pf-row, #prefsSheet .lp-pf-row { grid-template-columns: 1fr; }
 }
 
