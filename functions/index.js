@@ -173,7 +173,7 @@ export const verifyPayment = onCall({ secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SE
     }
     // 1. Razorpay signs "<order_id>|<payment_id>" with our key secret.
     if (!safeEqual(hmacHex(RAZORPAY_KEY_SECRET.value(), `${orderId}|${paymentId}`), signature)) {
-        logger.warn('Bad payment signature', { uid, orderId });
+        logger.warn('Bad payment signature');
         throw new HttpsError('permission-denied', 'Payment could not be verified.');
     }
     // 2. The order must belong to the caller.
@@ -185,6 +185,25 @@ export const verifyPayment = onCall({ secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SE
     if (oSnap.data().status !== 'paid') await confirmCaptured(paymentId, orderId, oSnap.data());
     const result = await grantOrder(orderId, paymentId);
     return { premiumUntil: result.premiumUntil, alreadyGranted: result.alreadyGranted };
+});
+
+/**
+ * Is my chat partner's Premium badge real? Answers yes/no, and only about the other person in a room the caller is in,
+ * so Premium status (and when it ends) can't be looked up for arbitrary users.
+ */
+export const partnerPremium = onCall(async request => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Please reload the page.');
+    const roomId = request.data?.roomId;
+    if (typeof roomId !== 'string' || !/^[A-Za-z0-9]{10,40}$/.test(roomId)) throw new HttpsError('invalid-argument', 'Unknown chat.');
+    const room = await db.doc(`artifacts/${APP_ID.value()}/public/data/rooms/${roomId}`).get();
+    const users = room.data()?.users;
+    if (!Array.isArray(users) || users.length !== 2 || !users.includes(request.auth.uid)) {
+        throw new HttpsError('permission-denied', 'Not your chat.');
+    }
+    const other = users.find(u => u !== request.auth.uid);
+    if (typeof other !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(other)) return { premium: false };
+    const e = await entitlementRef(other).get();
+    return { premium: (e.data()?.premiumUntil || 0) > Date.now() };
 });
 
 /**

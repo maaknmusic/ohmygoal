@@ -16,6 +16,7 @@ import net from 'node:net';
 import { logger } from 'firebase-functions/v2';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
+import { Timestamp } from 'firebase-admin/firestore';
 import { db, publicDoc, privateDoc, privateCol, publicCol } from './common.js';
 
 const ADMIN_EMAILS = defineSecret('ADMIN_EMAILS'); // comma-separated Google emails
@@ -141,8 +142,9 @@ async function ban(id, { scope, ms, reason, by = 'system', note = '' }) {
     const { uid, ip, fp } = id;
     const until = Date.now() + ms;
     const whitelisted = await isWhitelisted(ip);
+    const keys = keysOf(id, whitelisted);
     const batch = db.batch();
-    for (const [type, value] of keysOf(id, whitelisted)) {
+    for (const [type, value] of keys) {
         const ref = banRef(scope, type, value);
         const existing = (await ref.get()).data();
         if (existing && existing.until > until) continue; // never shorten an existing ban
@@ -152,7 +154,9 @@ async function ban(id, { scope, ms, reason, by = 'system', note = '' }) {
         });
     }
     await batch.commit();
-    logger.info('ban', { reason, scope, uid, ip, by });
+    // No uid, IP or admin email in the logs: those live only in the access-controlled database.
+    logger.info('ban', { reason, scope, by: by === 'system' ? 'system' : 'admin', keys: keys.length });
+    return keys.length;
 }
 
 /** Count an event for each key in a time window; returns the highest count. */
@@ -188,7 +192,10 @@ async function refreshAccess(id) {
     await privateDoc(`clients/${id.uid}`).set({ ip: id.ip, fp: id.fp, lastSeen: Date.now() }, { merge: true });
     return {
         allowed: !full,
-        ban: full ? { scope: 'all', reason: full.reason, note: full.note || '', until: full.until } : null,
+        // A ban found through a shared IP or device but issued to another account does not reveal that person's reason or note.
+        ban: full ? (!full.uid || full.uid === id.uid
+            ? { scope: 'all', reason: full.reason, note: full.note || '', until: full.until }
+            : { scope: 'all', reason: 'admin', note: '', until: full.until }) : null,
         videoBanUntil,
         whitelisted,
     };
@@ -241,9 +248,11 @@ export const requestUnban = onCall(async request => {
     const open = await privateCol('unbanRequests').where('uid', '==', id.uid).where('status', '==', 'open').limit(1).get();
     if (!open.empty) return { requestId: open.docs[0].id, duplicate: true };
     if (id.ip) {
-        const fromIp = await privateCol('unbanRequests').where('ip', '==', id.ip).limit(50).get();
-        const today = fromIp.docs.filter(d => d.data().createdAt > Date.now() - DAY).length;
-        if (today >= 3) throw new HttpsError('resource-exhausted', 'Too many requests from your network today.');
+        const used = (await counterRef('appeal', 'ip', id.ip).get()).data();
+        if (used && Date.now() - used.windowStart <= DAY && used.count >= 3) {
+            throw new HttpsError('resource-exhausted', 'Too many requests from your network today.');
+        }
+        await bump('appeal', [['ip', id.ip]], DAY);
     }
     const ref = await privateCol('unbanRequests').add({
         uid: id.uid, ip: id.ip, fp: id.fp, message, contact, status: 'open', createdAt: Date.now(),
@@ -283,6 +292,31 @@ async function unbanIdentity(id) {
     }
 }
 
+/**
+ * Keeps the promise in the privacy policy: appeals and visit records are not kept forever.
+ * Runs (a little at a time) whenever the admin overview is opened.
+ */
+const RETENTION = [
+    ['unbanRequests', 'createdAt', 90 * DAY],   // appeals: 90 days
+    ['clients', 'lastSeen', 90 * DAY],          // IP / device record of a visit: 90 days since the last visit
+    ['bans', 'until', 30 * DAY],                // bans are removed 30 days after they expired
+    ['counters', 'windowStart', 7 * DAY],       // strike / try / appeal counters
+    ['likeCounters', 'times', null],            // (kept: tiny, self-trimming)
+    ['likePairs', 'at', 2 * DAY],
+    ['likeLog', 'at', 2 * DAY],
+];
+async function sweepOldRecords() {
+    const now = Date.now();
+    for (const [col, field, age] of RETENTION) {
+        if (!age) continue;
+        const snap = await privateCol(col).where(field, '<', now - age).limit(200).get();
+        if (snap.empty) continue;
+        const batch = db.batch();
+        snap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+    }
+}
+
 export const admin = onCall({ secrets: [ADMIN_EMAILS] }, async request => {
     const email = requireAdmin(request);
     const { action } = request.data || {};
@@ -295,7 +329,8 @@ export const admin = onCall({ secrets: [ADMIN_EMAILS] }, async request => {
                 privateCol('unbanRequests').orderBy('createdAt', 'desc').limit(100).get(),
                 privateCol('bans').where('until', '>', now).orderBy('until', 'desc').limit(300).get(),
                 privateCol('whitelist').orderBy('addedAt', 'desc').limit(500).get(),
-                publicCol('reports').orderBy('ts', 'desc').limit(100).get(),
+                publicCol('reports').where('ts', '<=', Timestamp.now()).orderBy('ts', 'desc').limit(100).get(),
+                sweepOldRecords().catch(e => logger.warn('sweep failed', { message: e.message })),
             ]);
             const reportList = docs(reports).map(r => ({ ...r, ts: r.ts?.toMillis?.() || 0 }));
             const reported = [...new Set(reportList.map(r => r.reported).filter(Boolean))];
@@ -346,7 +381,8 @@ export const admin = onCall({ secrets: [ADMIN_EMAILS] }, async request => {
                 fp ||= c.fp || '';
             }
             if (!uid && !ip && !fp) throw new HttpsError('invalid-argument', 'Give an IP address or a user.');
-            await ban({ uid, ip, fp }, { scope, ms: hours * HOUR, reason, by: email, note: String(request.data.note || '').slice(0, 300) });
+            const written = await ban({ uid, ip, fp }, { scope, ms: hours * HOUR, reason, by: email, note: String(request.data.note || '').slice(0, 300) });
+            if (!written) throw new HttpsError('failed-precondition', 'That IP address is on the whitelist (a shared network). Remove it from the whitelist first, or ban a user ID instead.');
             if (uid) await publicDoc(`access/${uid}`).delete().catch(() => {});
             await log('ban', { uid, ip, fp, hours, scope, reason });
             return { ok: true };

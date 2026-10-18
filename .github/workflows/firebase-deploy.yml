@@ -30,14 +30,14 @@ jobs:
             printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
             echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
           fi
-      - name: Publish security rules
-        if: steps.creds.outputs.skip != 'true'
-        run: npx --yes firebase-tools@15.32.1 deploy --only firestore:rules --project ohmygoal-c8a4a --non-interactive
-      - name: Deploy payment functions
+      - name: Deploy functions (first: the new rules need the access passes only they issue)
         if: steps.creds.outputs.skip != 'true'
         run: |
           npm ci --prefix functions --no-audit --no-fund
           npx --yes firebase-tools@15.32.1 deploy --only functions --project ohmygoal-c8a4a --non-interactive --force
+      - name: Publish security rules
+        if: steps.creds.outputs.skip != 'true'
+        run: npx --yes firebase-tools@15.32.1 deploy --only firestore:rules --project ohmygoal-c8a4a --non-interactive
       - name: Deploy website (Firebase Hosting)
         if: steps.creds.outputs.skip != 'true'
         run: npx --yes firebase-tools@15.32.1 deploy --only hosting --project ohmygoal-c8a4a --non-interactive

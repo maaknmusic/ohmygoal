@@ -6,10 +6,11 @@ rules_version = '2';
 // friendships (+ friend messages) and Premium entitlements (written only by Cloud Functions).
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /artifacts/{appId}/public/data {
+    // Pinned to the real app id (config.js APP_ID / functions .env APP_ID): no other path under artifacts/ is writable.
+    match /artifacts/anon-connect/public/data {
 
       function now() { return request.time.toMillis(); }
-      function recentTs(ts) { return ts is int && ts <= now() + 60000 && ts >= now() - 600000; }
+      function recentTs(ts) { return ts is int && ts <= now() + 300000 && ts >= now() - 600000; }
       function changes() { return request.resource.data.diff(resource.data).affectedKeys(); }
       function google() {
         return request.auth != null && request.auth.token.firebase.sign_in_provider == 'google.com';
@@ -18,14 +19,14 @@ service cloud.firestore {
       // ---------------- Premium ----------------
       // Passes are granted ONLY by the payment Cloud Functions (the Admin SDK bypasses rules).
       function isPremium(uid) {
-        let path = /databases/$(database)/documents/artifacts/$(appId)/public/data/entitlements/$(uid);
+        let path = /databases/$(database)/documents/artifacts/anon-connect/public/data/entitlements/$(uid);
         return exists(path) && get(path).data.premiumUntil > now();
       }
 
       // ---------------- Access passes ----------------
       // Written only by the checkAccess Cloud Function after checking IP / device / account bans.
       function hasAccess(uid, mode) {
-        let path = /databases/$(database)/documents/artifacts/$(appId)/public/data/access/$(uid);
+        let path = /databases/$(database)/documents/artifacts/anon-connect/public/data/access/$(uid);
         return exists(path) && get(path).data.until > now()
           && (mode != 'video' || get(path).data.get('videoBanUntil', 0) < now());
       }
@@ -35,8 +36,10 @@ service cloud.firestore {
         allow list, write: if false;
       }
 
+      // Only the owner can read their own pass. A chat partner's badge is checked by the partnerPremium
+      // Cloud Function, which answers yes/no and only for someone you share a room with.
       match /entitlements/{uid} {
-        allow get: if request.auth != null; // lets a partner verify a Premium badge
+        allow get: if request.auth != null && request.auth.uid == uid;
         allow list, write: if false;
       }
 
@@ -54,7 +57,9 @@ service cloud.firestore {
                                  'countryFilter', 'premium', 'ts', 'roomId'])
           && d.mode in ['video', 'voice', 'text']
           && d.get('interests', []) is list && d.get('interests', []).size() <= 5
+          && d.get('interests', []).join(',').size() <= 140
           && d.get('blocked', []) is list && d.get('blocked', []).size() <= 100
+          && d.get('blocked', []).join(',').size() <= 4000
           && d.get('gender', 'x') in ['male', 'female', 'x']
           && d.get('country', '') is string && d.get('country', '').size() <= 2
           && d.get('genderFilter', 'any') in ['any', 'male', 'female']
@@ -71,7 +76,7 @@ service cloud.firestore {
       // A claimer must be queued themselves, in the same mode, not blocked either way,
       // and must satisfy the target's filters.
       function claimAllowed(uid) {
-        let mine = get(/databases/$(database)/documents/artifacts/$(appId)/public/data/queue/$(request.auth.uid)).data;
+        let mine = get(/databases/$(database)/documents/artifacts/anon-connect/public/data/queue/$(request.auth.uid)).data;
         let theirs = resource.data;
         return mine.mode == theirs.mode
           && !(request.auth.uid in theirs.get('blocked', []))
@@ -86,7 +91,9 @@ service cloud.firestore {
           && validQueue(request.resource.data)
           && hasAccess(uid, request.resource.data.mode)
           && (!usesPremium(request.resource.data) || isPremium(uid));
-        allow delete: if request.auth != null && request.auth.uid == uid;
+        // The owner removes their entry; anyone may clear one nobody has refreshed for 3 minutes (left-over from a closed tab).
+        allow delete: if request.auth != null && (request.auth.uid == uid
+          || (resource.data.get('ts', 0) is int && resource.data.get('ts', 0) < now() - 180000));
         allow update: if request.auth != null && (
           // owner heartbeat
           (request.auth.uid == uid && changes().hasOnly(['ts']) && recentTs(request.resource.data.ts))
@@ -97,11 +104,12 @@ service cloud.firestore {
           // someone else claims an unclaimed entry, creating a real room for the two of them
           || (request.auth.uid != uid
               && resource.data.get('roomId', null) == null
+              && resource.data.ts is int && resource.data.ts >= now() - 60000
               && changes().hasOnly(['roomId', 'partnerId'])
               && request.resource.data.partnerId == request.auth.uid
               && request.resource.data.roomId is string
               && claimAllowed(uid)
-              && getAfter(/databases/$(database)/documents/artifacts/$(appId)/public/data/rooms/$(request.resource.data.roomId)).data.users.hasAll([uid, request.auth.uid]))
+              && getAfter(/databases/$(database)/documents/artifacts/anon-connect/public/data/rooms/$(request.resource.data.roomId)).data.users.hasAll([uid, request.auth.uid]))
         );
       }
 
@@ -111,17 +119,18 @@ service cloud.firestore {
       // an arbitrary victim or a back-dated timestamp, which keeps likes and reports tied to real matches.
       function matchRoom(roomId, d) {
         let other = d.users[0] == request.auth.uid ? d.users[1] : d.users[0];
-        let qp = /databases/$(database)/documents/artifacts/$(appId)/public/data/queue/$(other);
+        let qp = /databases/$(database)/documents/artifacts/anon-connect/public/data/queue/$(other);
         return !('friendship' in d.keys())
           && d.created == request.time
           && exists(qp)
           && get(qp).data.get('roomId', null) == null
+          && get(qp).data.get('ts', 0) is int && get(qp).data.get('ts', 0) >= now() - 60000
           && get(qp).data.mode == d.mode
           && getAfter(qp).data.get('roomId', null) == roomId
           && getAfter(qp).data.get('partnerId', null) == request.auth.uid;
       }
       function friendRoom(d) {
-        let fp = /databases/$(database)/documents/artifacts/$(appId)/public/data/friendships/$(d.friendship);
+        let fp = /databases/$(database)/documents/artifacts/anon-connect/public/data/friendships/$(d.friendship);
         return d.get('friendship', null) is string
           && d.created is number
           && d.mode == 'video'
@@ -146,7 +155,7 @@ service cloud.firestore {
         // Signaling messages: only the two room members can read/write, and only as themselves.
         match /signals/{signalId} {
           function isMember() {
-            return request.auth.uid in get(/databases/$(database)/documents/artifacts/$(appId)/public/data/rooms/$(roomId)).data.users;
+            return request.auth.uid in get(/databases/$(database)/documents/artifacts/anon-connect/public/data/rooms/$(roomId)).data.users;
           }
           allow read: if request.auth != null && isMember();
           // Only the four WebRTC message kinds, with bounded fields, so a room can't be used as free storage.
@@ -176,6 +185,7 @@ service cloud.firestore {
         allow read: if request.auth != null;
         allow create, update: if request.auth != null && request.auth.uid == uid
           && request.resource.data.keys().hasOnly(['ts', 'status'])
+          && request.resource.data.get('status', 'online') in ['online', 'away']
           && recentTs(request.resource.data.ts);
         allow delete: if request.auth != null && request.auth.uid == uid;
       }
@@ -186,7 +196,7 @@ service cloud.firestore {
       function validName(d, u) { return d.names.get(u, '') is string && d.names.get(u, '').size() <= 30; }
       function validCall(c) {
         return c == null || (c is map && c.keys().hasOnly(['from', 'roomId', 'ts'])
-          && c.from is string && c.roomId is string && c.ts is int);
+          && c.from is string && c.from.size() <= 128 && c.roomId is string && c.roomId.size() <= 40 && c.ts is int);
       }
       function validFriendship(d, pairId) {
         return d.keys().hasOnly(['users', 'status', 'requestedBy', 'names', 'createdAt', 'acceptedAt',
@@ -199,7 +209,9 @@ service cloud.firestore {
           && validName(d, d.users[0]) && validName(d, d.users[1])
           && validCall(d.get('call', null))
           && d.get('lastMessage', '') is string && d.get('lastMessage', '').size() <= 80
-          && d.get('lastMessageAt', 0) is int;
+          && d.get('lastMessageAt', 0) is int
+          && d.get('createdAt', 0) is int && d.get('acceptedAt', 0) is int
+          && d.users[0].size() <= 128 && d.users[1].size() <= 128;
       }
 
       match /friendships/{pairId} {
@@ -230,7 +242,7 @@ service cloud.firestore {
 
         match /messages/{msgId} {
           function friendship() {
-            return get(/databases/$(database)/documents/artifacts/$(appId)/public/data/friendships/$(pairId)).data;
+            return get(/databases/$(database)/documents/artifacts/anon-connect/public/data/friendships/$(pairId)).data;
           }
           allow read: if request.auth != null && request.auth.uid in friendship().users
             && friendship().status == 'accepted';
@@ -240,6 +252,7 @@ service cloud.firestore {
             && request.resource.data.from == request.auth.uid
             && request.resource.data.text is string && request.resource.data.text.size() <= 1000
             && recentTs(request.resource.data.ts);
+          allow delete: if request.auth != null && request.auth.uid in friendship().users;
         }
       }
 
@@ -252,9 +265,10 @@ service cloud.firestore {
           && reportId == request.auth.uid + '_' + request.resource.data.roomId + '_' + request.resource.data.reason
           && request.resource.data.keys().hasOnly(['reporter', 'reported', 'roomId', 'reason', 'ts'])
           && request.resource.data.reporter == request.auth.uid
+          && request.resource.data.ts == request.time
           && request.resource.data.reason in ['sexual', 'minor', 'harassment', 'spam', 'other', 'auto-nudity']
           && request.resource.data.roomId is string
-          && get(/databases/$(database)/documents/artifacts/$(appId)/public/data/rooms/$(request.resource.data.roomId)).data.users.hasAll([request.auth.uid, request.resource.data.reported]);
+          && get(/databases/$(database)/documents/artifacts/anon-connect/public/data/rooms/$(request.resource.data.roomId)).data.users.hasAll([request.auth.uid, request.resource.data.reported]);
       }
     }
   }

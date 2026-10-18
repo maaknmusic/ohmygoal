@@ -93,6 +93,8 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
     async function tryClaim({ mode, interests, blocked, profile }) {
         const snap = await getDocs(query(queueCol, where('mode', '==', mode), limit(50)));
         const now = Date.now();
+        // Entries nobody has refreshed for ~3 minutes are left-overs from closed tabs: clear a few each time (the rules allow it).
+        snap.docs.filter(d => d.id !== me() && now - (d.data().ts || 0) > 190000).slice(0, 5).forEach(d => deleteDoc(d.ref).catch(() => {}));
         const shared = d => (d.interests || []).filter(i => interests.includes(i)).length;
         const candidates = snap.docs
             .filter(d => {

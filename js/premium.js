@@ -65,11 +65,12 @@ export class Premium {
     /** Wait (briefly) for the first entitlement answer, e.g. right after signing in. */
     waitReady(ms = 4000) { return Promise.race([this.ready, new Promise(r => setTimeout(r, ms))]); }
 
-    /** Is another user's Premium badge real? */
-    async verify(uid) {
+    /** Is your chat partner's Premium badge real? The server answers yes/no, and only for someone in your room. */
+    async verify(uid, roomId) {
+        if (!roomId) return false;
         try {
-            const snap = await this.fs.getDoc(this.entitlementRef(uid));
-            return (snap.data()?.premiumUntil || 0) > Date.now();
+            const fn = await this.callable('partnerPremium');
+            return (await fn({ roomId })).data?.premium === true;
         } catch { return false; }
     }
 

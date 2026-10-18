@@ -991,7 +991,7 @@ function onPeerData(sess, msg) {
             if (S.mode === 'voice') { applyAvatar(el.voiceAvatarThem, sess.partner); el.voiceNameThem.textContent = nick; }
             if (msg.timed && !sess.round && !sess.friend) startRound(sess);
             // A Premium badge is only shown after checking the partner's pass in the database.
-            if (msg.premium && premium) premium.verify(sess.partnerId).then(ok => {
+            if (msg.premium && premium) premium.verify(sess.partnerId, sess.roomId).then(ok => {
                 if (ok && sess === S.session) el.partnerBadge.classList.remove('hidden');
             });
             renderMatchCard(sess.partner, interests.filter(i => S.interests.includes(i)));

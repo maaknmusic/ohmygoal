@@ -148,7 +148,18 @@ export class Friends {
     }
 
     async remove(pairId) {
-        const { doc, deleteDoc } = this.fs;
+        const { doc, deleteDoc, collection, getDocs, writeBatch } = this.fs;
+        // The saved messages go first (the rules need the friendship to exist to allow it); they would otherwise stay forever.
+        try {
+            for (;;) {
+                const snap = await getDocs(collection(this.col, pairId, 'messages'));
+                if (snap.empty) break;
+                const batch = writeBatch(this.db);
+                snap.docs.slice(0, 400).forEach(d => batch.delete(d.ref));
+                await batch.commit();
+                if (snap.size <= 400) break;
+            }
+        } catch (e) { console.warn('could not clear friend messages', e); }
         await deleteDoc(doc(this.col, pairId));
     }
 
