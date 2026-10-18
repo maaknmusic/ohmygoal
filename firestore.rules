@@ -22,6 +22,19 @@ service cloud.firestore {
         return exists(path) && get(path).data.premiumUntil > now();
       }
 
+      // ---------------- Access passes ----------------
+      // Written only by the checkAccess Cloud Function after checking IP / device / account bans.
+      function hasAccess(uid, mode) {
+        let path = /databases/$(database)/documents/artifacts/$(appId)/public/data/access/$(uid);
+        return exists(path) && get(path).data.until > now()
+          && (mode != 'video' || get(path).data.get('videoBanUntil', 0) < now());
+      }
+
+      match /access/{uid} {
+        allow get: if request.auth != null && request.auth.uid == uid;
+        allow list, write: if false;
+      }
+
       match /entitlements/{uid} {
         allow get: if request.auth != null; // lets a partner verify a Premium badge
         allow list, write: if false;
@@ -63,6 +76,7 @@ service cloud.firestore {
         allow read: if request.auth != null;
         allow create: if request.auth != null && request.auth.uid == uid
           && validQueue(request.resource.data)
+          && hasAccess(uid, request.resource.data.mode)
           && (!usesPremium(request.resource.data) || isPremium(uid));
         allow delete: if request.auth != null && request.auth.uid == uid;
         allow update: if request.auth != null && (
@@ -70,6 +84,7 @@ service cloud.firestore {
           (request.auth.uid == uid && changes().hasOnly(['ts']) && recentTs(request.resource.data.ts))
           // owner re-queues over a stale entry
           || (request.auth.uid == uid && validQueue(request.resource.data)
+              && hasAccess(uid, request.resource.data.mode)
               && (!usesPremium(request.resource.data) || isPremium(uid)))
           // someone else claims an unclaimed entry, creating a real room for the two of them
           || (request.auth.uid != uid
@@ -89,7 +104,8 @@ service cloud.firestore {
           && request.resource.data.mode in ['video', 'text']
           && request.resource.data.users is list
           && request.resource.data.users.size() == 2
-          && request.auth.uid in request.resource.data.users;
+          && request.auth.uid in request.resource.data.users
+          && hasAccess(request.auth.uid, request.resource.data.mode);
         allow read: if request.auth != null && request.auth.uid in resource.data.users;
 
         // Signaling messages: only the two room members can read/write, and only as themselves.

@@ -382,6 +382,16 @@ body.is-premium .pro-tag { display: none; }
 .result.bad { background: rgba(239, 68, 68, 0.12); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); }
 .result.warn { background: rgba(245, 158, 11, 0.12); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.3); }
 .verify-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+#banned { flex: 1; display: grid; place-items: center; padding: 24px 16px; }
+#banned .verify-card h2 { margin-bottom: 14px; }
+#banned p { margin: 0 0 10px; font-size: 14px; }
+#banned .muted { color: var(--muted); }
+#banned .small { font-size: 12px; }
+.ban-until b { font-variant-numeric: tabular-nums; }
+.appeal { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.appeal h3 { margin: 0 0 12px; font-size: 16px; }
+.appeal textarea { resize: vertical; min-height: 76px; font: inherit; }
+.appeal.no-appeal h3, .appeal.no-appeal .field, .appeal.no-appeal #appealSend { display: none; }
 .verify-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--success); margin-top: 10px; }
 
 @media (max-width: 900px) {
@@ -398,4 +408,13 @@ body.is-premium .pro-tag { display: none; }
     .topbar { padding: 10px 12px; }
     #modeChip { display: none; }
     .kbd { display: none; }
+}
+@media (max-width: 480px) {
+    .topbar { gap: 8px; }
+    .brand { font-size: 15px; gap: 8px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #premiumBtn { padding: 6px 9px; }
+    .brand-dot { flex-shrink: 0; }
+    .topbar-actions { gap: 6px; flex-shrink: 0; }
+    .topbar .icon-btn { width: 34px; height: 34px; }
+    #premiumBtnText { display: none; }
 }

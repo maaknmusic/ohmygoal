@@ -4,6 +4,7 @@ import { Effects, BACKGROUNDS, MASKS, FILTERS } from './effects.js';
 import { NudityGuard } from './safety.js';
 import { Friends, pairIdOf } from './friends.js';
 import { Premium } from './premium.js';
+import { Access } from './access.js';
 
 // =====================================================================
 // Config
@@ -114,6 +115,7 @@ const store = {
 // =====================================================================
 let friends = null;
 let premium = null;
+let access = null; // server-side bans (Firebase only); null in the local demo
 const PREMIUM_CFG = { enabled: true, functionsRegion: 'asia-south1', plans: [], ...(CFG.premium || {}) };
 // Premium only exists on the live (Firebase) site with premium.enabled; otherwise everything is unlocked.
 // Note: firestore.rules also enforce the filters, so turning Premium off needs a rules change too.
@@ -423,21 +425,33 @@ function startSafety(sess) {
     }, 3000);
 }
 
-function selfViolation(sess) {
+async function selfViolation(sess) {
     sess.safety.selfBad = 0;
     S.camOff = true;
     applyTrackState();
-    const strikes = store.get('strikes', []).filter(t => Date.now() - t < DAY_MS);
-    strikes.push(Date.now());
-    store.set('strikes', strikes);
-    if (strikes.length >= SAFETY.strikesForBan) {
-        store.set('videoBanUntil', Date.now() + DAY_MS);
-        store.set('strikes', []);
+    let strikes, max, banned;
+    // On the live site the server counts strikes (per device and account) and decides the ban.
+    const res = access ? await access.report('nudity-strike').catch(e => (console.warn('strike report failed', e), null)) : null;
+    if (res) {
+        if (!res.allowed) { applyAccess(res); return; } // fully restricted: the ban screen explains
+        ({ strikes, strikesForBan: max } = res);
+        store.set('videoBanUntil', res.videoBanUntil || 0);
+        banned = res.videoBanUntil > Date.now();
+    } else {
+        const list = store.get('strikes', []).filter(t => Date.now() - t < DAY_MS);
+        list.push(Date.now());
+        strikes = list.length;
+        max = SAFETY.strikesForBan;
+        banned = strikes >= max;
+        store.set('strikes', banned ? [] : list);
+        if (banned) store.set('videoBanUntil', Date.now() + DAY_MS);
+    }
+    if (banned) {
         toast('Video chat is locked for 24 hours after repeated nudity on camera. Text chat is still available.', true);
         setMode('text');
         startSearch('Your camera was turned off.');
-    } else {
-        toast(`Your camera was turned off: nudity detected. Strike ${strikes.length} of ${SAFETY.strikesForBan}.`, true);
+    } else if (!sess.ended) {
+        toast(`Your camera was turned off: nudity detected. Strike ${strikes} of ${max}.`, true);
         sys('Your camera was turned off by the safety check. Turn it back on when you’re ready.', 'bad');
     }
 }
@@ -523,12 +537,18 @@ async function startSearch(note) {
     if (typeof note === 'string') sys(note);
     sys('Looking for someone to talk to…');
 
+    const ac = new AbortController();
+    S.searchAbort = ac;
+    // The matching queue only accepts people with a current access pass (see firestore.rules).
+    if (access) {
+        const st = await access.fresh().catch(e => (console.warn('access check failed', e), null));
+        if (ac.signal.aborted || S.searchAbort !== ac) return;
+        if (st && applyAccess(st)) return;
+    }
+
     if (S.mode === 'video' && !(await ensureMedia())) {
         // ensureMedia already switched us to text mode
     }
-
-    const ac = new AbortController();
-    S.searchAbort = ac;
     const filtered = S.genderFilter !== 'any' || S.countryFilter !== 'any';
     const slowHint = setTimeout(() => {
         if (S.searchAbort === ac && filtered) sys('Still looking… your filters may be limiting matches. Try “Everyone” or “Anywhere” for faster chats.');
@@ -538,16 +558,29 @@ async function startSearch(note) {
     const search = profile => S.transport.findMatch({
         mode: S.mode, interests: S.interests, blocked: [...S.blocked], profile,
     }, ac.signal);
-    try {
-        const profile = myProfile();
+    const searchAs = async profile => {
         try {
-            match = await search(profile);
+            return await search(profile);
         } catch (e) {
             // The database refused Premium options (pass expired, clock skew...): search as a free user.
             if (e?.code !== 'permission-denied' || !(profile.premium || profile.genderFilter !== 'any' || profile.countryFilter !== 'any')) throw e;
             console.warn('premium search refused; retrying without premium options', e);
             sys('Premium options aren’t active right now, so you’re searching everyone.');
-            match = await search({ ...profile, premium: false, genderFilter: 'any', countryFilter: 'any' });
+            return search({ ...profile, premium: false, genderFilter: 'any', countryFilter: 'any' });
+        }
+    };
+    try {
+        try {
+            match = await searchAs(myProfile());
+        } catch (e) {
+            // The access pass expired or was revoked: ask the server again, then retry once.
+            if (e?.code !== 'permission-denied' || !access || ac.signal.aborted) throw e;
+            console.warn('queue refused; renewing the access pass', e);
+            const st = await access.check();
+            if (ac.signal.aborted || S.searchAbort !== ac) return;
+            if (applyAccess(st)) { ac.abort(); return; }
+            if (S.mode === 'video' && !S.localStream && !(await ensureMedia())) { /* switched to text */ }
+            match = await searchAs(myProfile());
         }
         clearTimeout(slowHint);
     } catch (e) {
@@ -1260,7 +1293,7 @@ async function runVerification() {
     }
 }
 
-function finishAttempt(age) {
+async function finishAttempt(age) {
     stopVerifyCamera();
     vEl.msg.textContent = '';
     if (age == null) {
@@ -1273,14 +1306,28 @@ function finishAttempt(age) {
         renderAgeStatus();
         return showVerifyResult('ok', '✓ Verified. You’re good to go.', { cont: true });
     }
+    // On the live site the server records the outcome and decides any lockout, for this
+    // device, network and account (so a private window or a new account doesn't reset it).
+    const report = async type => {
+        if (!access) return null;
+        vEl.msg.textContent = 'Saving result…';
+        const res = await access.report(type).catch(e => (console.warn('age report failed', e), null));
+        vEl.msg.textContent = '';
+        if (res && !res.allowed) { closeVerify(); applyAccess(res); }
+        return res;
+    };
     if (age < AGE.minAge) {
+        const res = await report('underage');
+        if (res && !res.allowed) return;
         store.set('ageLockUntil', Date.now() + AGE.lockHours * 3600000);
         store.set('ageAttempts', 0);
         renderAgeStatus();
         return showVerifyResult('bad', `Access denied. Our check suggests you may be under ${AGE.minAge}. This service is for adults only. Try again in ${AGE.lockHours} hours.`);
     }
-    const attempts = store.get('ageAttempts', 0) + 1;
-    store.set('ageAttempts', attempts);
+    const res = await report('age-inconclusive');
+    if (res && !res.allowed) return;
+    const attempts = res ? AGE.maxAttempts - res.triesLeft : store.get('ageAttempts', 0) + 1;
+    if (!res) store.set('ageAttempts', attempts);
     if (attempts >= AGE.maxAttempts) {
         // Inconclusive isn't a fail: a short cooldown, not the long lockout used for under-age results.
         store.set('ageLockUntil', Date.now() + AGE.cooldownMinutes * 60000);
@@ -1325,6 +1372,111 @@ function startAgeRecheck(sess) {
         }
     }, 15000);
 }
+
+// =====================================================================
+// Restrictions: server-side bans by IP address, device and account
+// (functions/moderation.js). They hold in private windows and new accounts.
+// =====================================================================
+const bEl = {
+    screen: $('banned'), reason: $('banReason'), countdown: $('banCountdown'), until: $('banUntil'),
+    form: $('appealForm'), msg: $('appealMsg'), contact: $('appealContact'), result: $('appealResult'),
+    send: $('appealSend'), recheck: $('banRecheck'),
+};
+const BAN_REASONS = {
+    underage: `Our age check suggested you may be under ${AGE.minAge}. This service is for adults only.`,
+    'age-inconclusive': `We couldn’t confirm your age after ${AGE.maxAttempts} tries. Take a short break, then try again facing a light source.`,
+    admin: 'A moderator has restricted access from this device or network.',
+};
+let banTimer = null;
+let lastAutoRecheck = 0;
+
+const formatLeft = ms => {
+    const t = Math.ceil(ms / 1000), hh = Math.floor(t / 3600), mm = Math.floor((t % 3600) / 60), ss = t % 60;
+    return hh ? `${hh}h ${String(mm).padStart(2, '0')}m` : `${mm}:${String(ss).padStart(2, '0')}`;
+};
+
+/** Applies the server's answer. Returns true when the user is fully restricted (ban screen shown). */
+function applyAccess(st) {
+    if (!st) return false;
+    // On the live site the server decides: an unban there clears this device's locks too.
+    store.set('videoBanUntil', st.videoBanUntil || 0);
+    if (!st.allowed) { showBanned(st.ban); return true; }
+    if (ageLockedUntil()) { store.set('ageLockUntil', 0); renderAgeStatus(); }
+    if (!bEl.screen.classList.contains('hidden')) closeBanned();
+    if (S.mode === 'video' && videoBannedUntil()) setMode('text'); // explains why in a toast
+    return false;
+}
+
+function showBanned(ban) {
+    S.searchAbort?.abort();
+    S.searchAbort = null;
+    clearTimeout(S.autoNextTimer);
+    endSession({ notify: true });
+    stopMedia();
+    closeVerify();
+    [el.welcome, el.chat, el.leaveBtn, el.modeChip, el.drawer, el.paywall].forEach(x => x.classList.add('hidden'));
+    bEl.screen.classList.remove('hidden');
+    const reason = BAN_REASONS[ban?.reason] ? ban.reason : 'admin';
+    bEl.reason.textContent = BAN_REASONS[reason] + (ban?.note ? ` Note from the moderator: ${ban.note}` : '');
+    bEl.form.classList.toggle('no-appeal', reason === 'age-inconclusive'); // just a short cooldown
+    bEl.result.classList.add('hidden');
+    const until = ban?.until || 0;
+    bEl.until.textContent = until ? `(${new Date(until).toLocaleString()})` : '';
+    clearInterval(banTimer);
+    const tick = () => {
+        const left = until - Date.now();
+        if (left > 0) { bEl.countdown.textContent = formatLeft(left); return; }
+        bEl.countdown.textContent = 'a moment';
+        // At most once a minute, in case this device's clock is ahead of the server's.
+        if (Date.now() - lastAutoRecheck > 60000) { lastAutoRecheck = Date.now(); recheckBan(); }
+    };
+    tick();
+    banTimer = setInterval(tick, 1000);
+}
+
+function closeBanned() {
+    clearInterval(banTimer);
+    bEl.screen.classList.add('hidden');
+    el.welcome.classList.remove('hidden');
+    renderAgeStatus();
+}
+
+async function recheckBan() {
+    bEl.recheck.disabled = true;
+    try {
+        if (!applyAccess(await access.check())) toast('You can chat again. Welcome back!');
+    } catch (e) {
+        console.warn('access check failed', e);
+        toast('Couldn’t check right now. Try again in a moment.', true);
+    } finally {
+        bEl.recheck.disabled = false;
+    }
+}
+bEl.recheck.onclick = recheckBan;
+
+function appealResult(kind, text) {
+    bEl.result.className = 'result ' + kind;
+    bEl.result.textContent = text;
+}
+bEl.form.onsubmit = async e => {
+    e.preventDefault();
+    const message = bEl.msg.value.trim();
+    if (message.length < 5) return bEl.msg.focus();
+    bEl.send.disabled = true;
+    try {
+        const res = await access.requestUnban(message, bEl.contact.value.trim());
+        appealResult('ok', res.duplicate
+            ? 'You already have a review request open. We’ll look at it soon.'
+            : 'Request sent. A moderator will review it. Press “Check again” later to see if access is back.');
+        bEl.msg.value = '';
+    } catch (err) {
+        console.warn('unban request failed', err);
+        const shown = ['functions/invalid-argument', 'functions/failed-precondition', 'functions/resource-exhausted'];
+        appealResult('bad', shown.includes(err?.code) ? err.message : 'Could not send the request. Check your connection and try again.');
+    } finally {
+        bEl.send.disabled = false;
+    }
+};
 
 // =====================================================================
 // Welcome screen
@@ -1413,6 +1565,12 @@ el.startBtn.onclick = async () => {
     S.nick = el.nickInput.value.trim().slice(0, 20);
     store.set('nick', S.nick);
     if (el.tagInput.value) { addTag(el.tagInput.value); el.tagInput.value = ''; }
+    if (access) {
+        el.startBtn.disabled = true;
+        const st = await access.fresh().catch(e => (console.warn('access check failed', e), null));
+        refreshStart();
+        if (st && applyAccess(st)) return;
+    }
     const locked = ageLockedUntil();
     if (locked) { renderAgeStatus(); toast(`Locked until ${new Date(locked).toLocaleString()}.`, true); return; }
     if (!ageVerified()) return runVerification();
@@ -1462,7 +1620,9 @@ function initFriends() {
         checkIncomingCalls();
         if (friends.uid !== lastUid) {
             lastUid = friends.uid;
-            if (S.phase === 'searching') startSearch(); // re-queue under the new account
+            // A different account needs its own access pass (and may have its own ban).
+            const recheck = access ? access.check().then(applyAccess).catch(e => console.warn('access check failed', e)) : Promise.resolve();
+            recheck.then(() => { if (S.phase === 'searching') startSearch(); }); // re-queue under the new account
         }
     });
     friends.start();
@@ -1814,11 +1974,20 @@ el.fcCall.onclick = async () => {
     if (!f || !canCall()) return;
     if (!(await prepareCallScreen())) return;
     try {
-        const roomId = await friends.call(f.id, f.other);
+        let roomId;
+        try {
+            roomId = await friends.call(f.id, f.other);
+        } catch (e) {
+            // Calls need a current access pass too: renew it and try once more.
+            if (e?.code !== 'permission-denied' || !access) throw e;
+            if (applyAccess(await access.check())) return;
+            roomId = await friends.call(f.id, f.other);
+        }
         connect({ roomId, role: 'offerer', partnerId: f.other, bus: S.transport.roomBus(roomId), friend: f });
     } catch (e) {
         console.warn('call failed', e);
-        toast('Could not start the call.', true);
+        toast(e?.code === 'permission-denied' && access?.status?.videoBanUntil > Date.now()
+            ? 'Video calls are locked for now after a safety strike.' : 'Could not start the call.', true);
     }
 };
 
@@ -1919,7 +2088,11 @@ try {
     refreshOnline();
     setTimeout(refreshOnline, 4000); // again once our own presence ping has been saved
     setInterval(refreshOnline, S.transport.kind === 'local' ? 3000 : ONLINE_REFRESH_MS);
-    if (S.transport.kind === 'firebase') initFriends();
+    if (S.transport.kind === 'firebase') {
+        access = new Access(S.transport, PREMIUM_CFG.functionsRegion);
+        access.check().then(applyAccess).catch(e => console.warn('access check failed', e));
+        initFriends();
+    }
 } catch (e) {
     console.error('transport init failed', e);
     el.startBtn.textContent = 'Service unavailable';

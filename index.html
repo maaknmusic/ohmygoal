@@ -150,6 +150,32 @@
         </div>
     </main>
 
+    <!-- ===================== RESTRICTED (server-side ban) ===================== -->
+    <main id="banned" class="hidden">
+        <div class="verify-card">
+            <h2>You can’t chat right now</h2>
+            <div id="banReason" class="result bad"></div>
+            <p class="ban-until">Access returns in <b id="banCountdown">—</b> <span class="muted" id="banUntil"></span></p>
+            <p class="muted small">This applies to this device and network, including private or incognito windows.</p>
+            <form id="appealForm" class="appeal">
+                <h3>Think this is a mistake?</h3>
+                <div class="field">
+                    <label class="lbl" for="appealMsg">Tell us what happened</label>
+                    <textarea id="appealMsg" class="input" rows="3" maxlength="600" minlength="5" required placeholder="e.g. I’m 25, the camera was dark"></textarea>
+                </div>
+                <div class="field">
+                    <label class="lbl" for="appealContact">Email or phone (optional, so we can reply)</label>
+                    <input id="appealContact" class="input" maxlength="120" autocomplete="email">
+                </div>
+                <div id="appealResult" class="result hidden"></div>
+                <div class="verify-actions">
+                    <button type="button" class="btn btn-ghost" id="banRecheck">Check again</button>
+                    <button type="submit" class="btn btn-primary" id="appealSend">Request a review</button>
+                </div>
+            </form>
+        </div>
+    </main>
+
     <!-- ===================== CHAT ===================== -->
     <main id="chat" class="hidden">
         <section class="stage">

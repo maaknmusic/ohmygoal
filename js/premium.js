@@ -3,6 +3,7 @@
 // The pass lives in entitlements/{uid}, written only by the payment Cloud
 // Functions; this module just reads it and runs Razorpay Checkout.
 // =====================================================================
+import { callable } from './cloud.js';
 
 export class Premium {
     constructor(transport, friends, cfg) {
@@ -72,14 +73,8 @@ export class Premium {
         } catch { return false; }
     }
 
-    async callable(name) {
-        if (!this.functions) {
-            const mod = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js');
-            this.functions = mod.getFunctions(this.t.fb.app, this.cfg.functionsRegion || 'asia-south1');
-            if (this.t.emulators?.functions) mod.connectFunctionsEmulator(this.functions, ...this.t.emulators.functions);
-            this.httpsCallable = mod.httpsCallable;
-        }
-        return this.httpsCallable(this.functions, name);
+    callable(name) {
+        return callable(this.t, name, this.cfg.functionsRegion || 'asia-south1');
     }
 
     loadCheckout() {

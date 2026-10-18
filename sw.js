@@ -1,7 +1,8 @@
 // Service worker: makes the app installable and lets the shell open offline.
 // Network-first, so users always get the latest version when online.
-const CACHE = 'anon-connect-v1';
+const CACHE = 'anon-connect-v2';
 const SHELL = ['./', 'index.html', 'styles.css', 'config.js', 'js/app.js', 'js/transport.js', 'js/geo.js', 'js/effects.js', 'js/safety.js', 'js/friends.js', 'js/premium.js',
+    'js/cloud.js', 'js/access.js', 'js/fingerprint.js',
     'legal.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', event => {

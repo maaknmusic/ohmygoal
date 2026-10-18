@@ -10,20 +10,17 @@
 // browser closes before verifyPayment runs. Granting is idempotent per order.
 // =====================================================================
 import crypto from 'node:crypto';
-import { setGlobalOptions, logger } from 'firebase-functions/v2';
+import { logger } from 'firebase-functions/v2';
 import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret, defineString } from 'firebase-functions/params';
-import { initializeApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { db, APP_ID } from './common.js';
 
-setGlobalOptions({ region: 'asia-south1', maxInstances: 10 });
-initializeApp();
-const db = getFirestore();
+// Bans, access passes, unban requests and the admin API.
+export { checkAccess, reportViolation, requestUnban, admin } from './moderation.js';
 
 const RAZORPAY_KEY_ID = defineSecret('RAZORPAY_KEY_ID');
 const RAZORPAY_KEY_SECRET = defineSecret('RAZORPAY_KEY_SECRET');
 const RAZORPAY_WEBHOOK_SECRET = defineSecret('RAZORPAY_WEBHOOK_SECRET');
-const APP_ID = defineString('APP_ID', { default: 'anon-connect' });
 // Overridable only so tests can point at a mock; production uses Razorpay.
 const RAZORPAY_API = defineString('RAZORPAY_API', { default: 'https://api.razorpay.com' });
 

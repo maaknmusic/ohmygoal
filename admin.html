@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Admin · Anonymous Connect</title>
+    <meta name="theme-color" content="#4f46e5">
+    <link rel="icon" href="icons/icon-192.png" type="image/png">
+    <link rel="stylesheet" href="styles.css">
+    <script src="config.js"></script>
+    <style>
+        body { display: block; }
+        .admin { max-width: 1040px; margin: 0 auto; padding: 20px 16px 60px; }
+        .admin h1 { font-size: 26px; letter-spacing: -0.02em; margin: 6px 0 4px; }
+        .admin .muted { color: var(--muted); font-size: 13px; }
+        .card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 18px; margin: 14px 0; }
+        .signin { max-width: 440px; margin: 60px auto; text-align: center; }
+        .signin p { color: var(--muted); }
+        .me { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: 13px; color: var(--muted); }
+        .me b { color: var(--text); }
+        .me .spacer { flex: 1; }
+        .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 18px 0 4px; }
+        .tabs button { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border); background: transparent; font-weight: 600; font-size: 14px; }
+        .tabs button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+        .tabs .count { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 6px; border-radius: 999px; background: var(--panel-2); color: var(--text); font-size: 12px; }
+        .tabs button.active .count { background: rgba(255, 255, 255, 0.25); color: #fff; }
+        .item { border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin: 10px 0; background: var(--bg-2); }
+        .item-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: 13px; color: var(--muted); }
+        .item-head b { color: var(--text); font-size: 14px; }
+        .item-msg { margin: 10px 0; white-space: pre-wrap; word-break: break-word; }
+        .kv { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--muted); }
+        .kv code { color: var(--text); font-size: 12px; word-break: break-all; }
+        .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+        .actions .input { flex: 1; min-width: 160px; padding: 8px 12px; }
+        .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; background: var(--panel-2); color: var(--muted); }
+        .pill.open { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+        .pill.approved { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+        .pill.rejected, .pill.all { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+        .pill.video { background: rgba(99, 102, 241, 0.15); color: var(--primary); }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; align-items: end; }
+        .form-grid label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+        .form-grid .input { padding: 10px 12px; }
+        .empty { color: var(--muted); text-align: center; padding: 26px 0; }
+        .help { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+        .filter { display: flex; gap: 8px; margin: 12px 0 0; }
+        .filter .input { padding: 9px 12px; }
+    </style>
+</head>
+<body>
+    <header class="topbar">
+        <a class="brand" href="./" style="color: inherit; text-decoration: none;">
+            <div class="brand-dot"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.7 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/></svg></div>
+            Admin
+        </a>
+        <div class="topbar-actions">
+            <button id="signOutBtn" class="btn btn-ghost btn-sm hidden">Sign out</button>
+        </div>
+    </header>
+
+    <main class="admin">
+        <div id="loading" class="empty">Loading…</div>
+
+        <div id="signin" class="card signin hidden">
+            <h1>Admin sign-in</h1>
+            <p id="signinMsg">Sign in with the Google account listed in <code>ADMIN_EMAILS</code>.</p>
+            <button id="signInBtn" class="btn btn-primary">Sign in with Google</button>
+        </div>
+
+        <div id="panel" class="hidden">
+            <div class="card me">
+                <span>Signed in as <b id="meEmail"></b></span>
+                <span>Your IP as the server sees it: <b id="meIp"></b></span>
+                <span class="spacer"></span>
+                <button id="refreshBtn" class="btn btn-ghost btn-sm">Refresh</button>
+            </div>
+
+            <nav class="tabs" id="tabs">
+                <button data-tab="requests">Unban requests<span class="count" id="countRequests">0</span></button>
+                <button data-tab="bans">Active bans<span class="count" id="countBans">0</span></button>
+                <button data-tab="whitelist">IP whitelist<span class="count" id="countWhitelist">0</span></button>
+                <button data-tab="reports">Reports<span class="count" id="countReports">0</span></button>
+            </nav>
+
+            <section data-view="requests">
+                <div class="filter">
+                    <select id="requestFilter" class="input" style="max-width: 200px">
+                        <option value="open">Open</option>
+                        <option value="all">All</option>
+                    </select>
+                </div>
+                <div id="requestList"></div>
+            </section>
+
+            <section data-view="bans" class="hidden">
+                <div class="card">
+                    <b>Add a ban</b>
+                    <p class="help">Enter an IP address, or a user ID from a report (that user’s last IP address and device are banned too).</p>
+                    <form id="banForm" class="form-grid" style="margin-top: 10px">
+                        <div><label for="banTarget">IP address or user ID</label><input id="banTarget" class="input" required autocomplete="off"></div>
+                        <div><label for="banHours">Length</label>
+                            <select id="banHours" class="input">
+                                <option value="1">1 hour</option>
+                                <option value="24" selected>24 hours</option>
+                                <option value="168">7 days</option>
+                                <option value="720">30 days</option>
+                                <option value="8760">1 year</option>
+                            </select></div>
+                        <div><label for="banScope">Blocks</label>
+                            <select id="banScope" class="input">
+                                <option value="all">All chat</option>
+                                <option value="video">Video only</option>
+                            </select></div>
+                        <div><label for="banNote">Note (shown to the user)</label><input id="banNote" class="input" maxlength="300" autocomplete="off"></div>
+                        <div><button class="btn btn-danger" type="submit" style="width: 100%">Ban</button></div>
+                    </form>
+                </div>
+                <div class="filter"><input id="banSearch" class="input" placeholder="Search IP, user ID or reason" autocomplete="off"></div>
+                <div id="banList"></div>
+            </section>
+
+            <section data-view="whitelist" class="hidden">
+                <div class="card">
+                    <b>Whitelist an IP address</b>
+                    <p class="help">For shared networks (offices, colleges, mobile carriers) where innocent people are being blocked. On a whitelisted IP only account bans apply, not IP or device bans, so a banned person there could get back in with a private window. Adding an IP lifts its current IP bans.</p>
+                    <form id="whitelistForm" class="form-grid" style="margin-top: 10px">
+                        <div><label for="wlIp">IP address</label><input id="wlIp" class="input" required autocomplete="off" placeholder="203.0.113.7 or 2001:db8::1"></div>
+                        <div><label for="wlNote">Note</label><input id="wlNote" class="input" maxlength="200" autocomplete="off"></div>
+                        <div><button class="btn btn-primary" type="submit" style="width: 100%">Add to whitelist</button></div>
+                    </form>
+                </div>
+                <div id="whitelistList"></div>
+            </section>
+
+            <section data-view="reports" class="hidden">
+                <p class="help">The latest 100 reports from users and the automatic nudity check.</p>
+                <div id="reportList"></div>
+            </section>
+        </div>
+    </main>
+
+    <div id="toasts"></div>
+    <script type="module" src="js/admin.js"></script>
+</body>
+</html>

@@ -6,14 +6,14 @@
 #   git clone https://github.com/maaknmusic/ohmygoal && cd ohmygoal && bash deploy.sh
 #
 # Options:
-#   --rules-only      only publish firestore.rules (works on the free Spark plan)
+#   --rules-only      only publish firestore.rules (the functions must already be deployed: the rules rely on them)
 #   --reset-secrets   ask for the Razorpay keys again (e.g. when switching from test to live keys)
 set -euo pipefail
 cd "$(dirname "$0")"
 
 PROJECT=ohmygoal-c8a4a
 FB="npx --yes firebase-tools@15.32.1"
-SECRETS=(RAZORPAY_KEY_ID RAZORPAY_KEY_SECRET RAZORPAY_WEBHOOK_SECRET)
+SECRETS=(RAZORPAY_KEY_ID RAZORPAY_KEY_SECRET RAZORPAY_WEBHOOK_SECRET ADMIN_EMAILS)
 RULES_ONLY=false
 RESET=false
 for arg in "$@"; do
@@ -38,13 +38,14 @@ fi
 echo "==> Installing function dependencies"
 npm ci --prefix functions --no-audit --no-fund
 
-echo "==> Razorpay keys (stored in Google Secret Manager, never in GitHub)"
+echo "==> Secrets (stored in Google Secret Manager, never in GitHub)"
 for name in "${SECRETS[@]}"; do
     if $RESET || ! $FB functions:secrets:get "$name" --project "$PROJECT" >/dev/null 2>&1; then
         case "$name" in
             RAZORPAY_KEY_ID) hint="Key Id from Razorpay → Settings → API Keys (starts with rzp_test_ or rzp_live_)" ;;
             RAZORPAY_KEY_SECRET) hint="Key Secret shown next to the Key Id" ;;
             RAZORPAY_WEBHOOK_SECRET) hint="any long random text; use the SAME text when you add the webhook in Razorpay" ;;
+            ADMIN_EMAILS) hint="Google email(s) allowed into admin.html, comma-separated" ;;
         esac
         echo "Enter $name ($hint):"
         $FB functions:secrets:set "$name" --project "$PROJECT"
@@ -53,12 +54,16 @@ for name in "${SECRETS[@]}"; do
     fi
 done
 
-echo "==> Deploying security rules and payment functions"
-$FB deploy --only firestore:rules,functions --project "$PROJECT" --non-interactive --force
+# Functions first: the new rules require access passes that only the new functions can issue.
+echo "==> Deploying functions (payments, bans, admin)"
+$FB deploy --only functions --project "$PROJECT" --non-interactive --force
+echo "==> Publishing security rules"
+$FB deploy --only firestore:rules --project "$PROJECT" --non-interactive
 
 cat <<EOF
 
 ✔ Done.
+Admin page: https://raw.githack.com/maaknmusic/ohmygoal/main/admin.html
 Webhook URL for Razorpay (Settings → Webhooks → Add, event "order.paid"):
   https://asia-south1-$PROJECT.cloudfunctions.net/razorpayWebhook
 EOF
