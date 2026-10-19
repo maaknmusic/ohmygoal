@@ -200,6 +200,9 @@ export const partnerPremium = onCall(async request => {
     if (!Array.isArray(users) || users.length !== 2 || !users.includes(request.auth.uid)) {
         throw new HttpsError('permission-denied', 'Not your chat.');
     }
+    // Only for a recent chat: an old room can't be used to keep checking whether a past partner has bought Premium.
+    const created = typeof room.data().created?.toMillis === 'function' ? room.data().created.toMillis() : room.data().created;
+    if (!Number.isFinite(created) || Date.now() - created > 2 * 3600000) return { premium: false };
     const other = users.find(u => u !== request.auth.uid);
     if (typeof other !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(other)) return { premium: false };
     const e = await entitlementRef(other).get();

@@ -203,7 +203,12 @@ async function refreshAccess(id) {
 
 // ---------------- public callables ----------------
 
-export const checkAccess = onCall(async request => refreshAccess(identity(request)));
+export const checkAccess = onCall(async request => {
+    const status = await refreshAccess(identity(request));
+    // A little housekeeping on a small share of visits, so cleanup never depends on the admin page being opened.
+    if (Math.random() < 0.03) await sweepOldRecords().catch(e => logger.warn('sweep failed', { message: e.message }));
+    return status;
+});
 
 export const reportViolation = onCall(async request => {
     const id = identity(request);
@@ -310,6 +315,20 @@ async function sweepOldRecords() {
     for (const [col, field, age] of RETENTION) {
         if (!age) continue;
         const snap = await privateCol(col).where(field, '<', now - age).limit(200).get();
+        if (snap.empty) continue;
+        const batch = db.batch();
+        snap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+    }
+    // Matching rooms and their connection-setup messages (which can hold network addresses), dead queue entries and presence: after a day.
+    const cutoff = now - DAY;
+    const rooms = [
+        ...(await publicCol('rooms').where('created', '<', Timestamp.fromMillis(cutoff)).limit(40).get()).docs,
+        ...(await publicCol('rooms').where('created', '<', cutoff).limit(40).get()).docs, // friend calls store a number
+    ];
+    for (const d of rooms) await db.recursiveDelete(d.ref).catch(() => {});
+    for (const col of ['queue', 'presence']) {
+        const snap = await publicCol(col).where('ts', '<', cutoff).limit(200).get();
         if (snap.empty) continue;
         const batch = db.batch();
         snap.docs.forEach(d => batch.delete(d.ref));

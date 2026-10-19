@@ -252,7 +252,11 @@ el.hideIpBtn.onclick = () => {
     S.hideIp = !S.hideIp;
     store.set('hideIp', S.hideIp);
     renderHideIp();
-    toast(S.hideIp ? 'Your IP address is hidden from strangers.' : 'Direct connections on: strangers can see your IP address.', !S.hideIp);
+    // The connection of a chat that is already running was made with the old setting and stays as it is.
+    const live = S.session && !S.session.ended;
+    toast(S.hideIp
+        ? (live ? 'Your IP address will be hidden from your next chat. The current one keeps its connection.' : 'Your IP address is hidden from strangers.')
+        : 'Direct connections on: strangers can see your IP address.', !S.hideIp);
 };
 renderHideIp();
 
@@ -408,6 +412,10 @@ function effectiveFx() {
 }
 const fxActive = () => { const fx = effectiveFx(); return fx.background !== 'none' || fx.mask !== 'none' || fx.filter !== 'none'; };
 const videoSender = () => S.session?.pc.getSenders().find(s => s.track?.kind === 'video');
+/** A mask or background is there to hide you: it must never silently fall back to the raw camera. */
+const hidingFx = () => { const fx = effectiveFx(); return fx.background !== 'none' || fx.mask !== 'none'; };
+const hidingReady = () => !hidingFx() || Boolean(S.effects?.active && S.effects.track);
+const effectsSettled = (ms = 12000) => Promise.race([fxChain.catch(() => {}), new Promise(r => setTimeout(r, ms))]);
 /** The video track that is previewed and sent: processed when effects are on, raw camera otherwise. */
 const outVideoTrack = () => S.effects?.track || S.localStream?.getVideoTracks()[0] || null;
 /** Unprocessed camera (for safety checks that must not be fooled by masks). */
@@ -433,10 +441,9 @@ async function syncEffects() {
         await fx.set(wanted);
     } catch (e) {
         console.warn('effects failed to load', e);
-        toast('Backgrounds and masks aren’t available on this device.', true);
-        S.fx = { ...S.fx, background: 'none', mask: 'none' };
-        store.set('fx', S.fx);
-        await fx.set(effectiveFx()).catch(() => {});
+        // Fail closed: the choice is kept, so a new chat sends no video (instead of your unmasked face) until you pick "None".
+        toast('Your mask or background couldn’t load on this device, so your video won’t be sent. Choose “None” in Effects to send it as it is.', true);
+        await fx.set({ background: 'none', mask: 'none', filter: wanted.filter }).catch(() => {});
         renderFxPanel();
     }
     el.fxStatus.textContent = '';
@@ -786,7 +793,14 @@ async function connect({ roomId, role, bus, partnerId, friend = null }) {
     };
 
     if (S.mode !== 'text' && S.localStream) {
-        const send = new MediaStream([...S.localStream.getAudioTracks(), S.mode === 'video' ? outVideoTrack() : null].filter(Boolean));
+        // A saved mask / background gets time to load (and a late Premium answer time to arrive) before any video leaves the device.
+        if (S.mode === 'video' && (S.fx.mask !== 'none' || S.fx.background !== 'none')) {
+            if (premium) await premium.waitReady(3000);
+            await effectsSettled();
+        }
+        const withhold = S.mode === 'video' && !hidingReady();
+        if (withhold) toast('Your mask or background isn’t ready, so your video isn’t being sent in this chat.', true);
+        const send = new MediaStream([...S.localStream.getAudioTracks(), S.mode === 'video' && !withhold ? outVideoTrack() : null].filter(Boolean));
         send.getTracks().forEach(t => pc.addTrack(t, send));
     }
     setPhase('connecting');
@@ -1367,13 +1381,17 @@ async function refreshCell() {
     myCell = await getApproxCell({ cellDeg: CELL_DEG });
     return myCell;
 }
+let locRequest = 0;
 el.locCheck.onchange = async () => {
+    const mine = ++locRequest;
     if (!el.locCheck.checked) { S.loc = false; myCell = null; store.set('loc', false); return; }
     try {
         await refreshCell();
+        // Unticked (or ticked again) while the position fix was pending: this answer is out of date, so nothing is turned on.
+        if (mine !== locRequest || !el.locCheck.checked) { if (!el.locCheck.checked) myCell = null; return; }
         S.loc = true;
         store.set('loc', true);
-        toast('Distance on. Only an approximate area is shared, and only with people who share theirs.');
+        toast('Distance on. Only an approximate area (about 5 km) is shared, and only with a chat partner who also turned it on.');
     } catch (e) {
         el.locCheck.checked = false;
         S.loc = false;

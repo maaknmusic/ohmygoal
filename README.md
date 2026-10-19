@@ -60,7 +60,7 @@ With no Firebase config, the app matches tabs with each other through `Broadcast
 3. Deploy `firestore.rules`.
 4. Add a **TURN server** to `iceServers` in `config.js`. Without one, roughly 10–20% of users (strict NATs, mobile carriers) can't connect.
 5. Optional: set `geminiApiKey` in `config.js` to turn on translation. Put the key behind a proxy before going public.
-6. Recommended: add a Firestore TTL policy on `queue.ts`, and on `rooms` / `signals`, to clean up abandoned docs.
+6. Cleanup is automatic: rooms, connection-setup messages, dead queue entries and presence older than a day, and old appeal / visit records (see Privacy design) are removed by a small sweep that runs on a share of visits and whenever the admin overview opens. No TTL policy is needed.
 
 ## Accounts & Premium
 
