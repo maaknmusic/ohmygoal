@@ -411,7 +411,7 @@ function effectiveFx() {
     return fx;
 }
 const fxActive = () => { const fx = effectiveFx(); return fx.background !== 'none' || fx.mask !== 'none' || fx.filter !== 'none'; };
-const videoSender = () => S.session?.pc.getSenders().find(s => s.track?.kind === 'video');
+const videoSender = () => S.session?.pc.getTransceivers().find(t => t.receiver.track?.kind === 'video')?.sender;
 /** A mask or background is there to hide you: it must never silently fall back to the raw camera. */
 const hidingFx = () => { const fx = effectiveFx(); return fx.background !== 'none' || fx.mask !== 'none'; };
 const hidingReady = () => !hidingFx() || Boolean(S.effects?.active && S.effects.track);
@@ -445,6 +445,10 @@ async function syncEffects() {
         toast('Your mask or background couldn’t load on this device, so your video won’t be sent. Choose “None” in Effects to send it as it is.', true);
         await fx.set({ background: 'none', mask: 'none', filter: wanted.filter }).catch(() => {});
         renderFxPanel();
+        el.fxStatus.textContent = '';
+        // Stop sending in a chat that is already running (your own preview shows the plain camera); choosing "None" resumes it.
+        await videoSender()?.replaceTrack(null).catch(() => {});
+        return;
     }
     el.fxStatus.textContent = '';
     if (!S.localStream) return;
@@ -729,6 +733,12 @@ async function startSearch(note) {
         if (ac.signal.aborted || S.searchAbort !== ac) return; // they left or pressed Stop while the permission prompt was open
         if (!ok && S.mode !== 'text') setMode('text');
     }
+    // A saved mask / background gets time to load (and a late Premium answer time to arrive) before anyone can be matched with your camera.
+    if (S.mode === 'video' && (S.fx.mask !== 'none' || S.fx.background !== 'none')) {
+        if (premium) await premium.waitReady(3000);
+        await effectsSettled();
+        if (ac.signal.aborted || S.searchAbort !== ac) return;
+    }
     const filtered = S.genderFilter !== 'any' || S.countryFilter !== 'any';
     const slowHint = setTimeout(() => {
         if (S.searchAbort === ac && filtered) sys('Still looking… your filters may be limiting matches. Try “Everyone” or “Anywhere” for faster chats.');
@@ -793,11 +803,7 @@ async function connect({ roomId, role, bus, partnerId, friend = null }) {
     };
 
     if (S.mode !== 'text' && S.localStream) {
-        // A saved mask / background gets time to load (and a late Premium answer time to arrive) before any video leaves the device.
-        if (S.mode === 'video' && (S.fx.mask !== 'none' || S.fx.background !== 'none')) {
-            if (premium) await premium.waitReady(3000);
-            await effectsSettled();
-        }
+        // startSearch already gave a saved mask / background time to load; if it still isn't ready, no video is sent.
         const withhold = S.mode === 'video' && !hidingReady();
         if (withhold) toast('Your mask or background isn’t ready, so your video isn’t being sent in this chat.', true);
         const send = new MediaStream([...S.localStream.getAudioTracks(), S.mode === 'video' && !withhold ? outVideoTrack() : null].filter(Boolean));
@@ -995,7 +1001,7 @@ function onPeerData(sess, msg) {
             const nick = sanitizeHandle(msg.nick) || 'Stranger';
             const avatar = sanitizeAvatar(msg.avatar);
             const interests = Array.isArray(msg.interests) ? msg.interests.map(String).slice(0, MAX_INTERESTS) : [];
-            const country = /^[A-Z]{2}$/.test(msg.country || '') ? msg.country : '';
+            const country = typeof msg.country === 'string' && /^[A-Z]{2}$/.test(msg.country) ? msg.country : '';
             const gender = ['male', 'female'].includes(msg.gender) ? msg.gender : '';
             sess.partner = { nick, interests, country, gender, avatar, loc: msg.loc === true };
             el.partnerName.textContent = nick;

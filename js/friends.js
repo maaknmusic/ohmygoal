@@ -6,6 +6,7 @@
 // - Friend chats are stored (unlike random chats) so they can be read later.
 // - Friend video calls ring through a "call" field on the friendship doc.
 // =====================================================================
+import { sanitizeHandle } from './identity.js';
 
 const CALL_RING_MS = 45000;
 const ONLINE_MS = 75000;
@@ -24,7 +25,7 @@ function parseFriendship(id, x, uid) {
         id, users: x.users, other,
         status: x.status === 'accepted' ? 'accepted' : 'pending',
         requestedBy: typeof x.requestedBy === 'string' ? x.requestedBy : '',
-        name: (typeof rawName === 'string' && rawName.trim().slice(0, 30)) || 'Friend',
+        name: sanitizeHandle(rawName) || 'Friend',
         call,
         lastMessage: typeof x.lastMessage === 'string' ? x.lastMessage.slice(0, 80) : '',
         lastMessageAt: Number.isFinite(x.lastMessageAt) ? x.lastMessageAt : 0,

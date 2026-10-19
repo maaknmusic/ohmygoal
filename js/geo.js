@@ -9,7 +9,7 @@ export const COUNTRIES = [
 ];
 
 export function flagOf(code) {
-    if (!/^[A-Z]{2}$/.test(code || '')) return '🌐';
+    if (typeof code !== 'string' || !/^[A-Z]{2}$/.test(code)) return '🌐';
     return String.fromCodePoint(...[...code].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
 }
 

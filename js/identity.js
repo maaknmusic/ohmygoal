@@ -39,7 +39,10 @@ const SEAM = /nig|rape|tit|cum|sex|ass|mc|bc|fag|anal|anus|dick|boob|porn|slut|p
 
 // Names that pose as the service or its staff would borrow trust from the stranger reading them ("Admin", "OhMyGoal Support").
 const OFFICIAL = new Set(['admin', 'administrator', 'moderator', 'support', 'official', 'staff', 'helpdesk', 'verified', 'police', 'cybercell']);
-const OFFICIAL_BRAND = /ohmygoal|customercare|cybercell|trustandsafety/;
+const OFFICIAL_BRAND = /ohmygoal|anonymousconnect|anonconnect|customercare|cybercell|trustandsafety|safetyteam|securityteam/;
+// Letters of other scripts that look like Latin ones (Cyrillic, Greek, Cherokee): folded before the staff-name test.
+const LOOKALIKE = { а: 'a', е: 'e', о: 'o', р: 'p', с: 'c', у: 'y', х: 'x', і: 'i', ј: 'j', ѕ: 's', һ: 'h', ԁ: 'd', ӏ: 'l', ɡ: 'g', к: 'k', м: 'm', н: 'h', т: 't', в: 'b', ο: 'o', ν: 'v', ρ: 'p', α: 'a', ι: 'i', κ: 'k', τ: 't', υ: 'u', χ: 'x', ε: 'e', η: 'n', μ: 'm', ς: 's', Ꭺ: 'a', Ᏼ: 'b', Ꮯ: 'c', Ꭰ: 'd', Ꭼ: 'e', Ꮐ: 'g', Ꮋ: 'h', Ꭻ: 'j', Ꮶ: 'k', Ꮮ: 'l', Ꮇ: 'm', Ꮪ: 's', Ꭲ: 't', Ꮤ: 'w', Ꮓ: 'z', Ꮲ: 'p' };
+const foldLookalikes = t => t.replace(/[\u0370-\u03ff\u0400-\u04ff\u13a0-\u13ff]/gu, ch => LOOKALIKE[ch.toLowerCase()] || LOOKALIKE[ch] || ch);
 const LEET_DIGITS = { 0: 'o', 1: 'i', 3: 'e', 4: 'a', 5: 's', 7: 't' };
 
 // Friendly animal and nature emoji, all single code points (no variation selectors).
@@ -101,6 +104,7 @@ export function sanitizeAvatar(x) {
 /** True for a name that poses as the service or its staff: whole words only (Admin, Admin2, RahulAdmin, Adm1n; not Badminton). */
 function impersonates(name) {
     const readDigits = t => t.replace(/[013457]/g, d => LEET_DIGITS[d]);
+    name = foldLookalikes(name);
     const words = name.split(/[ ._-]+|(?<=\p{Ll})(?=\p{Lu})/u).map(w => w.toLowerCase());
     if (words.some(w => OFFICIAL.has(readDigits(w)) || OFFICIAL.has(w.replace(/\d+/g, '')))) return true;
     return OFFICIAL_BRAND.test(readDigits(name.toLowerCase()).replace(/[^a-z]/g, ''));

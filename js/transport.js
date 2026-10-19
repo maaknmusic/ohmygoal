@@ -193,13 +193,13 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
         });
     }
 
+    const sentReports = new Set();
     async function report({ partnerId, roomId, reason }) {
-        // One report per reporter, room and reason (the rules enforce the id); sending it again changes nothing.
-        try {
-            await setDoc(doc(reportsCol, `${me()}_${roomId}_${reason}`), { reporter: me(), reported: partnerId, roomId, reason, ts: serverTimestamp() });
-        } catch (e) {
-            if (e?.code !== 'permission-denied') throw e;
-        }
+        // One report per reporter, room and reason (the rules enforce the id), so sending the same one again is a no-op.
+        const key = `${me()}_${roomId}_${reason}`;
+        if (sentReports.has(key)) return;
+        await setDoc(doc(reportsCol, key), { reporter: me(), reported: partnerId, roomId, reason, ts: serverTimestamp() });
+        sentReports.add(key);
     }
 
     // Presence: every open page refreshes a tiny doc; "online" = refreshed within the window.
