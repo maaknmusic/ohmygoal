@@ -26,7 +26,7 @@ const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial
 const ICE = { iceServers: CFG.iceServers || [{ urls: 'stun:stun.l.google.com:19302' }] };
 const HAS_TURN = (CFG.iceServers || []).some(srv => [].concat(srv.urls).some(u => /^turns?:/i.test(u)));
 // With 'relay' our connection candidates are only relay addresses, so the other person never learns our IP address.
-const iceConfig = () => ({ ...ICE, iceTransportPolicy: S.hideIp ? 'relay' : 'all' });
+const iceConfig = () => ({ ...ICE, iceTransportPolicy: hideIpOn() ? 'relay' : 'all' });
 const canTranslate = Boolean(CFG.geminiApiKey) || typeof __app_id !== 'undefined';
 
 const MAX_INTERESTS = 5;
@@ -182,8 +182,13 @@ const S = {
     skipTimer: null,
 };
 
-// Hide my IP: on by default on the live site (needs the TURN relay); off in the local demo, which has no relay.
-S.hideIp = HAS_TURN && store.get('hideIp', Boolean(firebaseConfig) && CFG.privacy?.hideIp !== false);
+// "Hide my IP address" is a Premium feature: it sends the whole chat through the TURN relay, which costs relay bandwidth.
+// Free users connect directly (the relay is still used automatically on networks that block that). Premium people get it
+// on by default on the live site and can switch it off in the menu; the local demo has no relay, so it starts off there.
+S.hideIpPref = store.get('hideIp', null); // true / false once the person has chosen
+const hideIpDefault = Boolean(firebaseConfig) && CFG.privacy?.hideIpForPremium !== false;
+function hideIpOn() { return Boolean(HAS_TURN && isPremium() && (S.hideIpPref ?? hideIpDefault)); }
+Object.defineProperty(S, 'hideIp', { get: hideIpOn, enumerable: true });
 
 // Anonymous identity: a friendly generated handle + emoji avatar, rerolled with the dice button.
 if (!S.nick) { S.nick = generateHandle(); store.set('nick', S.nick); }
@@ -242,21 +247,23 @@ function renderAccents() {
 }
 
 function renderHideIp() {
-    el.hideIpLabel.textContent = HAS_TURN ? (S.hideIp ? 'On' : 'Off') : 'Unavailable';
+    const locked = HAS_TURN && !isPremium();
+    el.hideIpLabel.textContent = !HAS_TURN ? 'Unavailable' : locked ? '👑 Premium' : (hideIpOn() ? 'On' : 'Off');
     el.hideIpBtn.disabled = !HAS_TURN;
-    el.hideIpBtn.title = HAS_TURN
-        ? 'When on, your connection goes through a relay so strangers never see your IP address. When off, they can.'
-        : 'Needs a TURN relay server in config.js';
+    el.hideIpBtn.title = !HAS_TURN ? 'Needs a TURN relay server in config.js'
+        : locked ? 'Premium: keep your IP address hidden from the people you chat with'
+        : 'When on, your connection goes through a relay so strangers never see your IP address. When off, they can.';
 }
 el.hideIpBtn.onclick = () => {
-    S.hideIp = !S.hideIp;
-    store.set('hideIp', S.hideIp);
+    if (!isPremium()) { closeSheet(el.menuSheet); return openPaywall('ip'); }
+    S.hideIpPref = !hideIpOn();
+    store.set('hideIp', S.hideIpPref);
     renderHideIp();
     // The connection of a chat that is already running was made with the old setting and stays as it is.
     const live = S.session && !S.session.ended;
     toast(S.hideIp
         ? (live ? 'Your IP address will be hidden from your next chat. The current one keeps its connection.' : 'Your IP address is hidden from strangers.')
-        : 'Direct connections on: strangers can see your IP address.', !S.hideIp);
+        : 'Direct connections on: strangers can see your IP address.', !hideIpOn());
 };
 renderHideIp();
 
@@ -823,7 +830,7 @@ async function connect({ roomId, role, bus, partnerId, friend = null }) {
     pc.onconnectionstatechange = () => {
         if (sess.ended) return;
         if (pc.connectionState === 'failed') {
-            partnerLeft('Connection failed', S.hideIp
+            partnerLeft('Connection failed', hideIpOn()
                 ? 'The privacy relay could not connect. You can turn off “Hide my IP address” in the menu to allow direct connections (this shows your IP address to the other person).'
                 : 'The network blocked a direct connection. A TURN server fixes this.');
         } else if (pc.connectionState === 'disconnected') {
@@ -2282,6 +2289,7 @@ const PAYWALL_REASONS = {
     effects: 'This effect is part of Premium.',
     menu: 'Get more out of every chat.',
     theme: 'Colour themes are part of Premium.',
+    ip: 'Hiding your IP address from the people you chat with is part of Premium.',
 };
 let selectedPlan = null;
 let purchasing = false;
@@ -2303,6 +2311,7 @@ function renderPremium() {
     if (S.localStream && S.mode === 'video') applyEffects({}); // re-apply: Premium effects switch on/off with the plan
     renderFxPanel();
     renderAccents();
+    renderHideIp();
     renderPaywall();
 }
 

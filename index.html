@@ -472,7 +472,7 @@
                 <ul class="lp-proofs">
                     <li class="lp-proof reveal" style="--d:0"><span class="lp-proof-ico"><svg class="lp-i"><use href="#lp-i-shield"/></svg></span><div><h3>Age check on your device</h3><p>A quick face check estimates your age in the browser and asks for a small head turn to prove you're really there. Nothing is uploaded or stored.</p></div></li>
                     <li class="lp-proof reveal" style="--d:1"><span class="lp-proof-ico"><svg class="lp-i"><use href="#lp-i-eyeoff"/></svg></span><div><h3>Blurred until checked</h3><p>Your partner's video stays blurred until an on-device check clears it, and it hides again if something explicit shows up.</p></div></li>
-                    <li class="lp-proof reveal" style="--d:2"><span class="lp-proof-ico"><svg class="lp-i"><use href="#lp-i-lock"/></svg></span><div><h3>Never recorded</h3><p>Video goes straight between you and your partner. We don't record or store it. By default your video goes through an encrypted relay that hides your IP address from your partner, and it still isn't saved.</p></div></li>
+                    <li class="lp-proof reveal" style="--d:2"><span class="lp-proof-ico"><svg class="lp-i"><use href="#lp-i-lock"/></svg></span><div><h3>Never recorded</h3><p>Video goes straight between you and your partner. We don't record or store it. A few networks need an encrypted relay to connect, and it still isn't saved.</p></div></li>
                     <li class="lp-proof reveal" style="--d:3"><span class="lp-proof-ico"><svg class="lp-i"><use href="#lp-i-flag"/></svg></span><div><h3>Report and block, always</h3><p>Both are one tap away in every chat. Reports are read by human moderators.</p></div></li>
                     <li class="lp-proof reveal" style="--d:4"><span class="lp-proof-ico"><svg class="lp-i"><use href="#lp-i-alert"/></svg></span><div><h3>Scam shield</h3><p>If someone shares a phone number, UPI ID or social handle, you get a warning before you reply. In India, report fraud on 1930 or at <a href="https://cybercrime.gov.in" target="_blank" rel="noopener noreferrer">cybercrime.gov.in</a>.</p></div></li>
                     <li class="lp-proof reveal" style="--d:5"><span class="lp-proof-ico"><svg class="lp-i"><use href="#lp-i-ban"/></svg></span><div><h3>Fair bans, free appeals</h3><p>Bans cover the device, network and account. You always see why, and you can appeal for free. Many restrictions end on their own.</p></div></li>
@@ -551,6 +551,7 @@
                         <li>Choose a country, or stay open to anywhere</li>
                         <li>Priority matching</li>
                         <li>All backgrounds, face masks and filters</li>
+                        <li>Hide your IP address from the people you chat with</li>
                         <li>Diwali, Holi, Chai and Neon Mumbai themes</li>
                         <li>A 👑 next to your handle</li>
                     </ul>
@@ -909,7 +910,7 @@
             <div class="sheet-body">
                 <div class="menu-list">
                     <button id="themeBtn" class="menu-item" type="button"><i class="icon" data-icon="moon"></i><span>Light / dark</span><small id="themeLabel">Dark</small></button>
-                    <button id="hideIpBtn" class="menu-item" type="button"><i class="icon" data-icon="shield"></i><span>Hide my IP address</span><small id="hideIpLabel">On</small></button>
+                    <button id="hideIpBtn" class="menu-item" type="button"><i class="icon" data-icon="shield"></i><span>Hide my IP address</span><small id="hideIpLabel">Off</small></button>
                     <button id="soundBtn" class="menu-item" type="button"><i class="icon" data-icon="volume"></i><span>Sounds</span><small id="soundLabel">On</small></button>
                     <button id="installBtn" class="menu-item hidden" type="button"><i class="icon" data-icon="download"></i><span>Install the app</span></button>
                     <div class="menu-item static" id="vibesRow"><i class="icon" data-icon="heart"></i><span>Good vibes you’ve received</span><small id="myVibes">–</small></div>
@@ -950,8 +951,8 @@
                     <li><b>Never share</b> your phone number, UPI ID, OTPs, address or social handles. Scams start by moving you to another app.</li>
                     <li><b>Nobody needs money</b> from you here. Don’t send any, and don’t click links from strangers.</li>
                     <li><b>Report and block</b> in one tap (flag and ban icons). We review reports, and repeat offenders are banned by device and network.</li>
-                    <li><b>Your IP address stays hidden</b> from strangers while “Hide my IP address” is on (Menu). It is on by default.</li>
-                    <li><b>Your video is never recorded.</b> It is encrypted and goes only to your partner (through a relay that cannot read it). Partner video stays blurred until our on-device check passes.</li>
+                    <li><b>Your IP address</b> can be seen by the person you chat with, as in any peer-to-peer call. Premium members can hide it (Menu → Hide my IP address).</li>
+                    <li><b>Your video is never recorded.</b> It is encrypted and goes only to your partner (directly, or through a relay that cannot read it). Partner video stays blurred until our on-device check passes.</li>
                     <li><b>Asked for photos or threatened?</b> Stop replying, block, and report. In India call <b>1930</b> (cybercrime helpline) or visit <a href="https://cybercrime.gov.in" target="_blank" rel="noopener">cybercrime.gov.in</a>.</li>
                 </ul>
                 <p class="hint">We never sell unbans or verification. Appeals are free.</p>
@@ -978,6 +979,7 @@
                         <tr><td>All safety tools</td><td class="yes">✓</td><td class="yes">✓</td></tr>
                         <tr><td>Gender &amp; country filters</td><td class="no">–</td><td class="yes">✓</td></tr>
                         <tr><td>Priority matching</td><td class="no">–</td><td class="yes">✓</td></tr>
+                        <tr><td>Hide my IP address</td><td class="no">–</td><td class="yes">✓</td></tr>
                         <tr><td>Every effect &amp; colour theme</td><td class="no">–</td><td class="yes">✓</td></tr>
                         <tr><td>👑 Premium badge</td><td class="no">–</td><td class="yes">✓</td></tr>
                     </tbody>

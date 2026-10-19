@@ -72,12 +72,18 @@ step('2b. user cannot forge entitlement', forgeA !== 'ALLOWED', forgeA);
 const queueFilterA = await sdk(A, ({ db, f, base, auth, tryIt }) => tryIt(() => f.setDoc(f.doc(db, ...base, 'queue', auth.currentUser.uid), { mode: 'text', genderFilter: 'female', countryFilter: 'any', ts: Date.now(), roomId: null })));
 step('2c. non-premium queue entry with gender filter refused by rules', queueFilterA !== 'ALLOWED', queueFilterA);
 
+// 2d. "Hide my IP address" is a Premium feature: a free user sees it locked and the click opens the paywall
+const ipFree = await A.evaluate(() => { const label = document.getElementById('hideIpLabel').textContent; document.getElementById('hideIpBtn').click(); return { label, reason: document.getElementById('paywallReason').textContent }; });
+step('2d. free user: Hide my IP shows "Premium" and opens the paywall instead of toggling', /Premium/.test(ipFree.label) && /IP address/.test(ipFree.reason), JSON.stringify(ipFree));
+
 // 3. Buy (month)
 await A.click('#plans .plan[data-plan=month]');
 await A.click('#paywallCta');
 await A.waitForFunction(() => document.body.classList.contains('is-premium'), null, { timeout: 20000 }).catch(() => {});
 const until = await A.evaluate(() => document.getElementById('premiumBtn').title);
 step('3a. purchase -> premium active', await A.evaluate(() => document.body.classList.contains('is-premium')), until + ' | toast: ' + (await A.textContent('#toasts')).slice(-80));
+const ipPrem = await A.evaluate(() => { const b = document.getElementById('hideIpBtn'); const before = document.getElementById('hideIpLabel').textContent; b.click(); const after = document.getElementById('hideIpLabel').textContent; b.click(); /* back to Off: the emulator has no TURN relay */ return { before, after }; });
+step('3a2. Premium user can toggle Hide my IP (the test starts it Off)', ipPrem.before === 'Off' && ipPrem.after === 'On', JSON.stringify(ipPrem));
 step('3b. checkout got server price', true, JSON.stringify(await A.evaluate(() => window.__checkoutOpts)));
 const daysLeft = await sdk(A, async ({ db, f, base, auth }) => ((await f.getDoc(f.doc(db, ...base, 'entitlements', auth.currentUser.uid))).data().premiumUntil - Date.now()) / 864e5);
 step('3c. 30 days granted', Math.round(daysLeft) === 30, daysLeft.toFixed(2));

@@ -11,7 +11,7 @@ Read `README.md` first (files, deploy, privacy design). Tests: `tests/README.md`
 ## Still open
 1. `config.js` → `business` (email, phone, address): empty. Razorpay's live-mode review and `legal.html` need them.
 2. Razorpay: still in test mode until KYC / go-live is done; then `bash deploy.sh --reset-secrets` with the live keys.
-3. Metered TURN credentials are static and public in `config.js` (relay-only IP hiding uses them). Better: a Cloud Function that issues short-lived credentials (needs the Metered API key as a secret). Check Metered quota after real use; users can switch the relay off in the menu.
+3. Metered TURN credentials are static and public in `config.js` (the relay is used by Premium "Hide my IP address" and as the fallback for networks that block direct connections). Better: a Cloud Function that issues short-lived credentials (needs the Metered API key as a secret). Check Metered quota after real use; users can switch the relay off in the menu.
 4. Accepted / deferred review findings:
    - presence is readable by any signed-in user (a past partner's online status can be polled);
    - `loc:true` in the hello message is self-declared, so a modified client can receive an opted-in partner's ~5 km square;

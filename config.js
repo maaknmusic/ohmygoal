@@ -32,9 +32,11 @@ window.APP_CONFIG = {
     ],
     // Privacy.
     privacy: {
-        // true: all chat traffic goes through the TURN relay above, so strangers never see anyone's IP address.
-        // It uses your relay's bandwidth (video most of all). false: direct connections, which show IPs to each other.
-        hideIp: true,
+        // "Hide my IP address" is a Premium feature. It sends the whole chat through the TURN relay above, so strangers
+        // never see the IP, and it uses your relay's bandwidth (video most of all). Free users connect directly (the relay
+        // is still used automatically when a network blocks that). true: Premium people start with it on (they can turn it
+        // off in the menu). false: they start with it off.
+        hideIpForPremium: true,
     },
     // Optional "how far away is this person". Off by default for every user. A position is rounded to a grid
     // square of cellDeg degrees (0.05 is about 5.5 km) on the device, and only that square is shared, directly
