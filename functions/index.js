@@ -19,6 +19,8 @@ import { db, APP_ID } from './common.js';
 export { checkAccess, reportViolation, requestUnban, admin } from './moderation.js';
 // "Good vibe" likes after a chat.
 export { likeUser } from './likes.js';
+// Short-lived relay (Cloudflare TURN) credentials.
+export { turnCredentials } from './turn.js';
 
 const RAZORPAY_KEY_ID = defineSecret('RAZORPAY_KEY_ID');
 const RAZORPAY_KEY_SECRET = defineSecret('RAZORPAY_KEY_SECRET');

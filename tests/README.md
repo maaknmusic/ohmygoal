@@ -24,7 +24,7 @@ Two pages of one browser context match each other in demo mode.
    `RAZORPAY_API=http://127.0.0.1:7777` and a fake `.secret.local`) next to a `firebase.json` that enables the auth (9099),
    firestore (8080) and functions (5001) emulators. Start with `NO_PROXY=127.0.0.1,localhost firebase emulators:start
    --only auth,firestore,functions --project demo-ohmygoal`. Restart it after every rules change (hot reload is unreliable).
-2. `node tests/e2e/mockrzp.mjs &` (fake Razorpay on :7777).
+2. `node tests/e2e/mockrzp.mjs &` (fake Razorpay and Cloudflare TURN on :7777).
 3. Install the web SDK (`npm i firebase@11.6.1`) and pass its folder via the path the scripts read (`FB`, `<scratch>/fb`).
 4. `fixes.mjs` (rules attacks, real matching, signalling, reports), `friends.mjs`, `bans.mjs` (58 checks),
    `premium.mjs` (22), `privacy.mjs` (attacker reads/writes), `likes.mjs` (52).

@@ -160,7 +160,8 @@ await B.evaluate(() => document.getElementById('prefsSheet').classList.add('hidd
 await A.click('#startBtn'); await B.click('#startBtn');
 const live = p => p.waitForFunction(() => !document.getElementById('msgInput').disabled, null, { timeout: 20000 }).then(() => true, () => false);
 step('7b. filtered premium match works under rules', (await live(A)) && (await live(B)));
-await B.waitForTimeout(1500);
+// the badge is checked by a Cloud Function: the first call after the emulator starts can take a few seconds
+await B.waitForSelector('#partnerBadge:not(.hidden)', { timeout: 10000 }).catch(() => {});
 step('7c. B sees A\'s verified 👑 badge', await B.isVisible('#partnerBadge'));
 await A.screenshot({ path: SP + '/pr-chat.png' });
 console.log('LOGS:', logs.slice(0, 8));

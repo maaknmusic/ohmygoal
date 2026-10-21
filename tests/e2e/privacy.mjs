@@ -158,6 +158,11 @@ step('7b. presence exposes only {ts,status}', R.presenceFieldsVisible === 'statu
 step('8a. admin actions refuse non-admins', R['admin overview as non-admin'] === 'functions/permission-denied' && R['admin ban as non-admin'] === 'functions/permission-denied');
 step('8b. garbage / forged function calls are refused cleanly (never an internal error)', ['reportViolation garbage type', 'requestUnban while not banned', 'createOrder anonymous', 'verifyPayment forged'].every(k => R[k] && R[k] !== 'functions/internal'), JSON.stringify([R['reportViolation garbage type'], R['requestUnban while not banned'], R['createOrder anonymous'], R['verifyPayment forged']]));
 console.log('queue blocked-list note: the "blocked" array in queue entries IS readable by other signed-in users (needed for matching). Fields visible:', R.queueFieldsVisible);
+const nopass = await run(async ({ V, X }) => ({
+  before: (await V.call('turnCredentials', {})).err,
+  afterPass: ((await X.call('checkAccess', { fp: 'c'.repeat(32) })).ok?.allowed === true) && Array.isArray((await X.call('turnCredentials', {})).ok?.iceServers),
+}));
+step('9. turnCredentials refuses a person with no access pass (permission-denied) and answers once they have one', nopass.before === 'functions/permission-denied' && nopass.afterPass === true, JSON.stringify(nopass));
 console.log(failures ? `${failures} FAILED` : 'ALL PASSED');
 await browser.close();
 process.exit(failures ? 1 : 0);

@@ -196,13 +196,25 @@ const f16 = await sdk(C, async ({ db, f, base, auth, tryIt }) => {
   out.claimSemiStale = await claim('zz-semi-stale');
   out.claimFresh = await claim('zz-fresh-victim');
   out.deleteStale = await tryIt(() => f.deleteDoc(qd('zz-stale-victim')));
+  // (a searching client in the test may already have cleared that dead entry itself: then it is gone, which is the point)
+  out.staleGone = (await fetch('http://127.0.0.1:8080/v1/projects/demo-ohmygoal/databases/(default)/documents/artifacts/anon-connect/public/data/queue/zz-stale-victim', { headers: { Authorization: 'Bearer owner' } })).status === 404;
   await f.deleteDoc(qd(me)).catch(() => {});
   await f.deleteDoc(qd('zz-fresh-victim')).catch(() => {});
   await fetch('http://127.0.0.1:8080/v1/projects/demo-ohmygoal/databases/(default)/documents/artifacts/anon-connect/public/data/queue/zz-semi-stale', { method: 'DELETE', headers: { Authorization: 'Bearer owner' } });
   return out;
 });
 step('F16. a live queue entry cannot be deleted by others, a 3-minute-dead one can; a target not refreshed for a minute cannot be claimed into a room, a live one can',
-  f16.deleteFresh === 'permission-denied' && f16.deleteSemi === 'permission-denied' && f16.deleteStale === 'ALLOWED' && f16.claimSemiStale === 'permission-denied' && f16.claimFresh === 'ALLOWED', JSON.stringify(f16));
+  f16.deleteFresh === 'permission-denied' && f16.deleteSemi === 'permission-denied' && (f16.deleteStale === 'ALLOWED' || f16.staleGone) && f16.staleGone && f16.claimSemiStale === 'permission-denied' && f16.claimFresh === 'ALLOWED', JSON.stringify(f16));
+
+// F18. Relay credentials: short-lived, only the browser-safe fields, no port-53 URLs, one shared credential, never without a login
+const f18 = await sdk(B, async ({ call }) => ({ b: await call('turnCredentials', {}) }));
+const f18c = await sdk(C, async ({ call }) => ({ c: await call('turnCredentials', {}) }));
+const rel = f18.b.ok?.iceServers?.[0];
+const f18anon = await fetch('http://127.0.0.1:5001/demo-ohmygoal/asia-south1/turnCredentials', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"data":{}}' }).then(r => r.json()).catch(() => null);
+step('F18. turnCredentials: signed-in person with a pass gets a short-lived TURN credential (no :53 URLs, TTL 3-4 h), shared between people; no login = refused',
+  Boolean(rel) && rel.urls.some(u => /^turn:/.test(u)) && rel.urls.some(u => /^turns:/.test(u)) && !rel.urls.some(u => /:53(\?|$)/.test(u)) && Object.keys(rel).sort().join() === 'credential,urls,username'
+  && f18.b.ok.ttl > 3 * 3600 - 120 && f18.b.ok.ttl <= 4 * 3600 && f18c.c.ok?.iceServers?.[0]?.username === rel.username && f18anon?.error?.status === 'UNAUTHENTICATED',
+  JSON.stringify({ rel: rel && { u: rel.username, n: rel.urls.length }, ttl: f18.b.ok?.ttl, same: f18c.c.ok?.iceServers?.[0]?.username === rel.username, anon: f18anon?.error?.status }));
 
 // F17. Reports need server time (so junk timestamps can't pin the admin list); removing a friend can clear the saved chat
 const f17 = await sdk(B, async ({ db, f, base, auth, tryIt, arg }) => {

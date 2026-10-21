@@ -13,7 +13,7 @@ cd "$(dirname "$0")"
 
 PROJECT=ohmygoal-c8a4a
 FB="npx --yes firebase-tools@15.32.1"
-SECRETS=(RAZORPAY_KEY_ID RAZORPAY_KEY_SECRET RAZORPAY_WEBHOOK_SECRET ADMIN_EMAILS)
+SECRETS=(RAZORPAY_KEY_ID RAZORPAY_KEY_SECRET RAZORPAY_WEBHOOK_SECRET ADMIN_EMAILS CF_TURN_KEY_ID CF_TURN_API_TOKEN)
 RULES_ONLY=false
 RESET=false
 for arg in "$@"; do
@@ -46,6 +46,8 @@ for name in "${SECRETS[@]}"; do
             RAZORPAY_KEY_SECRET) hint="Key Secret shown next to the Key Id" ;;
             RAZORPAY_WEBHOOK_SECRET) hint="any long random text; use the SAME text when you add the webhook in Razorpay" ;;
             ADMIN_EMAILS) hint="Google email(s) allowed into admin.html, comma-separated" ;;
+            CF_TURN_KEY_ID) hint="Cloudflare dashboard → Realtime → TURN Server → your key's Key ID. Type the word unset to skip: chats then connect directly with no relay" ;;
+            CF_TURN_API_TOKEN) hint="the API Token shown with that TURN key (type unset to skip)" ;;
         esac
         echo "Enter $name ($hint):"
         $FB functions:secrets:set "$name" --project "$PROJECT"

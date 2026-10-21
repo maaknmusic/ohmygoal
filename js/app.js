@@ -23,10 +23,16 @@ const injectedFirebase = typeof __firebase_config !== 'undefined' ? JSON.parse(_
 const firebaseConfig = CFG.firebase || injectedFirebase;
 const appId = typeof __app_id !== 'undefined' ? __app_id : (CFG.appId || 'anon-connect');
 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-const ICE = { iceServers: CFG.iceServers || [{ urls: 'stun:stun.l.google.com:19302' }] };
-const HAS_TURN = (CFG.iceServers || []).some(srv => [].concat(srv.urls).some(u => /^turns?:/i.test(u)));
+// ICE servers: STUN (and, in the local demo, any TURN) come from config.js. On the live site the relay (Cloudflare TURN)
+// credentials are fetched from the turnCredentials function: short-lived, and only for people with an access pass.
+const STATIC_ICE = CFG.iceServers || [{ urls: 'stun:stun.l.google.com:19302' }];
+const isTurnUrl = u => /^turns?:/i.test(u);
+const hasTurnIn = list => list.some(srv => [].concat(srv.urls).some(isTurnUrl));
+let iceServers = STATIC_ICE;
+let iceExpiresAt = Infinity; // the static list never expires
+const hasTurn = () => hasTurnIn(iceServers);
 // With 'relay' our connection candidates are only relay addresses, so the other person never learns our IP address.
-const iceConfig = () => ({ ...ICE, iceTransportPolicy: hideIpOn() ? 'relay' : 'all' });
+const iceConfig = () => ({ iceServers, iceTransportPolicy: hideIpOn() ? 'relay' : 'all' });
 const canTranslate = Boolean(CFG.geminiApiKey) || typeof __app_id !== 'undefined';
 
 const MAX_INTERESTS = 5;
@@ -187,7 +193,31 @@ const S = {
 // on by default on the live site and can switch it off in the menu; the local demo has no relay, so it starts off there.
 S.hideIpPref = store.get('hideIp', null); // true / false once the person has chosen
 const hideIpDefault = Boolean(firebaseConfig) && CFG.privacy?.hideIpForPremium !== false;
-function hideIpOn() { return Boolean(HAS_TURN && isPremium() && (S.hideIpPref ?? hideIpDefault)); }
+const hideIpWanted = () => Boolean(isPremium() && (S.hideIpPref ?? hideIpDefault));
+function hideIpOn() { return hideIpWanted() && hasTurn(); }
+let icePending = null;
+/** Fetch (or renew) the relay credentials. Never throws; without them chats simply connect directly. */
+function refreshIce(force = false) {
+    if (S.transport?.kind !== 'firebase') return Promise.resolve();
+    if (!force && hasTurn() && Date.now() < iceExpiresAt - 30 * 60000) return Promise.resolve();
+    icePending ||= (async () => {
+        try {
+            const fn = await callable(S.transport, 'turnCredentials', PREMIUM_CFG.functionsRegion);
+            const r = (await fn()).data;
+            if (Array.isArray(r?.iceServers) && hasTurnIn(r.iceServers)) {
+                iceServers = [...STATIC_ICE.filter(srv => ![].concat(srv.urls).some(isTurnUrl)), ...r.iceServers];
+                iceExpiresAt = Date.now() + (Number(r.ttl) > 0 ? Number(r.ttl) : 3600) * 1000;
+            }
+        } catch (e) {
+            console.warn('relay credentials unavailable', e);
+        } finally {
+            if (Date.now() >= iceExpiresAt) { iceServers = STATIC_ICE; iceExpiresAt = Infinity; } // expired and not renewed: don't offer dead credentials
+            icePending = null;
+            renderHideIp();
+        }
+    })();
+    return icePending;
+}
 Object.defineProperty(S, 'hideIp', { get: hideIpOn, enumerable: true });
 
 // Anonymous identity: a friendly generated handle + emoji avatar, rerolled with the dice button.
@@ -247,10 +277,10 @@ function renderAccents() {
 }
 
 function renderHideIp() {
-    const locked = HAS_TURN && !isPremium();
-    el.hideIpLabel.textContent = !HAS_TURN ? 'Unavailable' : locked ? '👑 Premium' : (hideIpOn() ? 'On' : 'Off');
-    el.hideIpBtn.disabled = !HAS_TURN;
-    el.hideIpBtn.title = !HAS_TURN ? 'Needs a TURN relay server in config.js'
+    const locked = hasTurn() && !isPremium();
+    el.hideIpLabel.textContent = !hasTurn() ? 'Unavailable' : locked ? '👑 Premium' : (hideIpOn() ? 'On' : 'Off');
+    el.hideIpBtn.disabled = !hasTurn();
+    el.hideIpBtn.title = !hasTurn() ? 'The relay isn’t available right now'
         : locked ? 'Premium: keep your IP address hidden from the people you chat with'
         : 'When on, your connection goes through a relay so strangers never see your IP address. When off, they can.';
 }
@@ -733,6 +763,14 @@ async function startSearch(note) {
         const st = await access.fresh().catch(e => (console.warn('access check failed', e), null));
         if (ac.signal.aborted || S.searchAbort !== ac) return;
         if (st && applyAccess(st)) return;
+        await Promise.race([refreshIce(), new Promise(r => setTimeout(r, 4000))]);
+        if (ac.signal.aborted || S.searchAbort !== ac) return;
+    }
+    // "Hide my IP address" is on but the relay can't be reached: don't quietly connect directly and show the IP.
+    if (hideIpWanted() && !hasTurn()) {
+        toast('“Hide my IP address” is on, but the relay isn’t reachable right now, so no chat was started.', true);
+        setPhase('ended', { title: 'Relay unavailable', sub: 'Try again in a moment, or turn off “Hide my IP address” in the menu to connect directly.' });
+        return;
     }
 
     if (S.mode !== 'text') {
@@ -2789,7 +2827,8 @@ try {
     setInterval(refreshOnline, S.transport.kind === 'local' ? 3000 : ONLINE_REFRESH_MS);
     if (S.transport.kind === 'firebase') {
         access = new Access(S.transport, PREMIUM_CFG.functionsRegion);
-        access.check().then(applyAccess).catch(e => console.warn('access check failed', e));
+        access.check().then(applyAccess).then(() => refreshIce()).catch(e => console.warn('access check failed', e));
+        setInterval(() => refreshIce(), 10 * 60000); // renew the short-lived relay credentials before they run out
         initFriends();
     }
 } catch (e) {

@@ -2,7 +2,7 @@
  * App configuration. Edit this file to deploy.
  * - firebase: Firebase web config. When null, the app runs in LOCAL DEMO mode
  *   (matching only works between tabs of the same browser).
- * - iceServers: STUN/TURN servers. TURN lets users behind strict NATs / mobile data connect.
+ * - iceServers: STUN servers (the TURN relay credentials come from the turnCredentials function). TURN lets users behind strict NATs / mobile data connect.
  * - geminiApiKey: optional, enables the "Translate" button on incoming messages.
  * - ageCheck: on-device face age estimation settings.
  */
@@ -16,23 +16,14 @@ window.APP_CONFIG = {
         appId: '1:719459235525:web:5886e6a4a5d5ee2ab122ac',
     },
     appId: 'anon-connect',
+    // STUN only here. The relay (Cloudflare TURN) credentials are short-lived and come from the turnCredentials Cloud
+    // Function (key stored in Secret Manager via deploy.sh), so nothing relay-related is public in this file.
     iceServers: [
-        { urls: ['stun:stun.l.google.com:19302', 'stun:stun.relay.metered.ca:80'] },
-        // Metered TURN relay: used only when a direct connection is blocked (mobile data, strict NATs).
-        {
-            urls: [
-                'turn:global.relay.metered.ca:80',
-                'turn:global.relay.metered.ca:80?transport=tcp',
-                'turn:global.relay.metered.ca:443',
-                'turns:global.relay.metered.ca:443?transport=tcp',
-            ],
-            username: '2a803601019d1d0bb1078a86',
-            credential: 'Hcp9CNhuUNyqjV2f',
-        },
+        { urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
     ],
     // Privacy.
     privacy: {
-        // "Hide my IP address" is a Premium feature. It sends the whole chat through the TURN relay above, so strangers
+        // "Hide my IP address" is a Premium feature. It sends the whole chat through the TURN relay (Cloudflare, credentials from the turnCredentials function), so strangers
         // never see the IP, and it uses your relay's bandwidth (video most of all). Free users connect directly (the relay
         // is still used automatically when a network blocks that). true: Premium people start with it on (they can turn it
         // off in the menu). false: they start with it off.

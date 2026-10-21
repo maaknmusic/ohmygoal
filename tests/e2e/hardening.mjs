@@ -4,7 +4,9 @@ import { createRequire } from 'module';
 import fs from 'fs';
 const { chromium } = createRequire(process.env.NODE_PATH + '/')('playwright');
 const SP = process.argv[2];
-const cfg = fs.readFileSync('/home/user/ohmygoal/config.js', 'utf8').replace(/firebase: \{[\s\S]*?\n    \},/, 'firebase: null,');
+const cfg = fs.readFileSync('/home/user/ohmygoal/config.js', 'utf8').replace(/firebase: \{[\s\S]*?\n    \},/, 'firebase: null,')
+  // config.js has no relay any more (credentials come from a function), so give the local demo a fake one to test the toggle.
+  .replace('iceServers: [', "iceServers: [ { urls: ['turn:turn.example.invalid:3478'], username: 'u', credential: 'c' },");
 const appSrc = fs.readFileSync('/home/user/ohmygoal/js/app.js', 'utf8') + '\nwindow.__t = { S, sendData };\n';
 const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
 const errors = [];

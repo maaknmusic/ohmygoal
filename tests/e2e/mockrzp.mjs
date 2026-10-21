@@ -3,7 +3,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 const SECRET = 'test_key_secret';
 const orders = new Map(), payments = new Map();
-let n = 0;
+let n = 0, cfIssued = 0;
 const send = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' }); res.end(JSON.stringify(obj)); };
 http.createServer((req, res) => {
   let body = ''; req.on('data', c => body += c); req.on('end', () => {
@@ -11,6 +11,14 @@ http.createServer((req, res) => {
     const json = body ? JSON.parse(body) : {};
     const auth = req.headers.authorization || '';
     const url = req.url;
+    // Mock Cloudflare Realtime TURN: credentials for a key (token 'testtoken'); a new username each time it is asked.
+    let cf;
+    if (req.method === 'POST' && (cf = url.match(/^\/v1\/turn\/keys\/([^/]+)\/credentials\/generate-ice-servers$/))) {
+      if (auth !== 'Bearer testtoken' || cf[1] !== 'testkey') return send(res, 401, { error: 'bad key' });
+      cfIssued++;
+      return send(res, 201, { iceServers: [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.cloudflare.com:53', 'turn:turn.cloudflare.com:3478?transport=udp', 'turn:turn.cloudflare.com:53?transport=udp', 'turns:turn.cloudflare.com:443?transport=tcp'], username: 'cfuser' + cfIssued, credential: 'cfpass' + cfIssued, ttl: json.ttl }] });
+    }
+    if (req.method === 'GET' && url === '/test/cf-count') return send(res, 200, { issued: cfIssued });
     if (url.startsWith('/v1/')) {
       const expected = 'Basic ' + Buffer.from('rzp_test_mock:' + SECRET).toString('base64');
       if (auth !== expected) return send(res, 401, { error: { description: 'bad auth' } });
