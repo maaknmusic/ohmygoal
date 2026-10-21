@@ -62,26 +62,27 @@ $FB deploy --only functions --project "$PROJECT" --non-interactive --force
 echo "==> Publishing security rules"
 $FB deploy --only firestore:rules --project "$PROJECT" --non-interactive
 
-# The website itself, on your own address (https://$PROJECT.web.app) with security headers. The admin page should
-# only ever be opened from here: raw.githack.com is shared with every other GitHub project.
-echo "==> Publishing the website (Firebase Hosting)"
+# The website itself, on your own address (https://$SITE.web.app, the site named in firebase.json) with security headers.
+# The admin page should only ever be opened from here: raw.githack.com is shared with every other GitHub project.
+SITE=$(node -p "require('./firebase.json').hosting.site || '$PROJECT'")
+echo "==> Publishing the website (Firebase Hosting site: $SITE)"
+if ! $FB hosting:sites:get "$SITE" --project "$PROJECT" >/dev/null 2>&1; then
+    echo "   Creating the hosting site $SITE (its address will be https://$SITE.web.app)"
+    $FB hosting:sites:create "$SITE" --project "$PROJECT" || echo "!! Could not create the site \"$SITE\" (the name may already be taken by someone else). Change \"site\" in firebase.json to another name and run this script again."
+fi
 if ! $FB deploy --only hosting --project "$PROJECT" --non-interactive; then
-    echo "!! Hosting deploy failed. If it says the site does not exist, run:  $FB hosting:sites:create $PROJECT --project $PROJECT"
-    echo "   then run this script again. Everything else above was published."
+    echo "!! Hosting deploy failed. This is usually a network hiccup: run this script again (files already uploaded are skipped)."
 fi
 
-# Razorpay's live-mode review looks for a contact email, phone and address on the site.
-if grep -qE "^[[:space:]]*(email|phone|address):[[:space:]]*''" config.js; then
-    echo
-    echo "!! config.js → business is missing an email, phone or address. Razorpay (and the law) want them on legal.html."
-    echo "   Fill them in, push, and run this script again before going live."
-fi
+# Google sign-in only works on addresses listed in Firebase Authentication → Settings → Authorized domains.
+echo
+echo "!! One-time: add $SITE.web.app (and $SITE.firebaseapp.com) under Firebase console → Authentication → Settings → Authorized domains, or Google sign-in will fail on the new address."
 
 cat <<EOF
 
 ✔ Done.
-Website:    https://$PROJECT.web.app
-Admin page: https://$PROJECT.web.app/admin.html   (open it only from here)
+Website:    https://$SITE.web.app
+Admin page: https://$SITE.web.app/admin.html   (open it only from here)
 Webhook URL for Razorpay (Settings → Webhooks → Add, event "order.paid"):
   https://asia-south1-$PROJECT.cloudfunctions.net/razorpayWebhook
 EOF

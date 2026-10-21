@@ -1,5 +1,6 @@
 {
     "hosting": {
+        "site": "ohmygoal",
         "public": ".",
         "ignore": [
             "firebase.json",
