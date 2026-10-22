@@ -149,10 +149,10 @@ const connect = async (a, b) => { await a.click('#startBtn'); await b.click('#st
   step('4a. video match', await connect(a, b));
   step('4b. Next is the big button on the video stage', await a.locator('#nextSlotStage #nextBtn').count() === 1);
   await a.click('#reactBtn');
-  step('4c. reaction bar opens', await a.isVisible('#reactBar') && await a.locator('#reactBar button').count() === 6);
+  step('4c. reaction bar opens', await a.isVisible('#reactBar') && await a.locator('#reactBar button').count() === 12);
   await a.click('#reactBar button:nth-child(2)');
-  await b.waitForSelector('.float-emoji', { timeout: 8000 }).catch(() => {});
-  step('4d. reaction floats up on both screens', await a.locator('.float-emoji').count() >= 1 && await b.locator('.float-emoji').count() >= 1);
+  await b.waitForSelector('.float-react', { timeout: 8000 }).catch(() => {});
+  step('4d. reaction floats up on both screens', await a.locator('.float-react').count() >= 1 && await b.locator('.float-react').count() >= 1);
   await a.dblclick('#videoWrap');
   step('4e. double-tap sends a heart', true);
   await a.click('#gamesBtn');

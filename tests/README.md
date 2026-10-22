@@ -15,6 +15,7 @@ Need `npm i playwright` (Chromium), a static server (`python3 -m http.server 876
 node tests/e2e/v2.mjs <scratch-dir>   # UI flows on desktop and phone
 node tests/e2e/hardening.mjs          # hostile peer (floods, oversize frames, extra channels)
 node tests/e2e/distance.mjs           # approximate distance
+node tests/e2e/reactions.mjs          # drawn reactions: tap, hold burst, Premium pack, hostile peer, phone
 node tests/e2e/failclosed.mjs         # masks never fall back to the raw camera; distance toggle race
 node tests/e2e/translate-live-demo.mjs <scratch-dir>   # Live translate (fake on-device Translator): sheet, receive/send, failures, queue, hostile frames, phones
 node tests/e2e/translate-demo.mjs <scratch-dir>        # My language selector, localStorage, hello.lang, "Speaks ..." on the match card

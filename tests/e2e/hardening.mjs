@@ -138,10 +138,10 @@ const raw = (p, frames) => p.evaluate(fr => { const dc = window.__t.S.session.dc
   await a.waitForTimeout(2700);
   await a.dblclick('#fxBtn');
   await b.waitForTimeout(600);
-  step('4b. double-clicking a control does not send a heart to the stranger', await b.locator('.float-emoji').count() === 0 && await a.locator('.float-emoji').count() === 0);
+  step('4b. double-clicking a control does not send a heart to the stranger', await b.locator('.float-react').count() === 0 && await a.locator('.float-react').count() === 0);
   await a.dblclick('#remoteVideo', { force: true });
-  await b.waitForSelector('.float-emoji', { timeout: 4000 }).catch(() => {});
-  step('4c. double-clicking the video itself still sends a heart', await b.locator('.float-emoji').count() >= 1);
+  await b.waitForSelector('.float-react', { timeout: 4000 }).catch(() => {});
+  step('4c. double-clicking the video itself still sends a heart', await b.locator('.float-react').count() >= 1);
   await ctx.close();
 }
 

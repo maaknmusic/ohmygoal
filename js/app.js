@@ -13,6 +13,7 @@ import { scanMessage, maskContact } from './shield.js';
 import { meterStream } from './audio-meter.js';
 import { callable } from './cloud.js';
 import { initLanding } from './landing.js';
+import { REACTIONS, reactionById, parseReaction, takeBudget, spriteURL, MAX_BURST, HOLD_MAX, SEND_CAP, RECEIVE_CAP } from './reactions.js';
 import { LANGS, sanitizeLang, langNative, langLabel, guessLang } from './languages.js';
 import { createEngine, createDeviceProvider, parseChatMessage } from './translate.js';
 import { createLiveTranslate } from './livetranslate.js';
@@ -75,6 +76,7 @@ const ICONS = {
     heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
     x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
     chevronLeft: '<path d="m15 18-6-6 6-6"/>',
+    lock: '<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
     languages: '<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>',
 };
 function setIcon(el, name) {
@@ -337,10 +339,14 @@ function beep(notes) {
         }
     } catch { /* audio unavailable */ }
 }
+let reactGen = 0;   // bumped when a chat ends: bursts still being staged for the old chat must not appear in the next
+let reactHold = null;
+let lastPop = 0;
 const SOUND = {
     match: () => beep([[523, 0.12], [784, 0.18]]),
     message: () => beep([[880, 0.09]]),
     leave: () => beep([[440, 0.12], [330, 0.18]]),
+    react: () => beep([[740, 0.05], [1108, 0.07]]),
 };
 
 // =====================================================================
@@ -691,7 +697,7 @@ function setPhase(phase, info = {}) {
     el.endLikeBtn.classList.toggle('hidden', !(phase === 'ended' && info.report && S.last && !S.last.liked && S.transport?.kind === 'firebase'));
     el.gamesBtn.disabled = !live;
     el.gamesBtnText.disabled = !live;
-    if (!live) { el.reactBar.classList.add('hidden'); el.reactBtn.classList.remove('on'); hideIcebreakers(); }
+    if (!live) { el.reactBar.classList.add('hidden'); el.reactBtn.classList.remove('on'); stopReactions(); hideIcebreakers(); }
     el.msgInput.disabled = !live;
     lt?.refresh(); // Live translate button and bar follow the phase
     el.sendBtn.disabled = !live;
@@ -1541,53 +1547,149 @@ function startVoiceStage(sess) {
 }
 
 // =====================================================================
-// Reactions: emoji that float up over the video for both of you
+// Reactions: original drawn sprites (see reactions.js) that float up over the video for both of you.
+// Tap one for a single sprite; press and hold for a burst (up to HOLD_MAX). Premium unlocks the extra pack.
 // =====================================================================
-const REACTIONS = ['❤️', '😂', '🔥', '👏', '🙏', '😮'];
-el.reactBar.append(...REACTIONS.map(e => {
-    const b = h('button', '', e);
-    b.type = 'button';
-    b.setAttribute('aria-label', `Send ${e}`);
-    b.onclick = () => sendReaction(e);
-    return b;
-}));
 el.gamesBtn.onclick = el.gamesBtnText.onclick = () => S.session?.games?.toggle();
 // A rotated tablet or resized window moves the game card between the video and the panel.
 matchMedia('(min-width: 900px)').addEventListener('change', () => S.session?.games?.refresh());
+
+function buildReactBar() {
+    el.reactBar.replaceChildren(...REACTIONS.map(r => {
+        const b = h('button', 'react-item' + (r.premium ? ' pro' : ''));
+        b.type = 'button';
+        b.dataset.react = r.id;
+        b.title = r.premium ? `${r.label} (Premium)` : r.label;
+        b.setAttribute('aria-label', `Send ${r.label}${r.premium ? ', Premium' : ''}`);
+        const img = new Image();
+        img.src = spriteURL(r.id);
+        img.alt = '';
+        img.draggable = false;
+        b.append(img);
+        if (r.premium) {
+            const lock = h('i', 'icon react-lock');
+            setIcon(lock, 'lock');
+            b.append(lock);
+        }
+        b.addEventListener('pointerdown', ev => { if (ev.button === 0 || ev.pointerType === 'touch') startReaction(r, b, ev); });
+        for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(type, endReaction);
+        b.addEventListener('contextmenu', ev => ev.preventDefault()); // a long press on a phone must not open a menu
+        b.addEventListener('click', ev => { if (ev.detail === 0) sendReaction(r.id); }); // keyboard and screen readers
+        return b;
+    }));
+    updateReactMore();
+}
+function updateReactMore() {
+    const bar = el.reactBar;
+    bar.classList.toggle('more', bar.scrollWidth - bar.clientWidth - bar.scrollLeft > 4);
+}
+el.reactBar.addEventListener('scroll', updateReactMore, { passive: true });
 el.reactBtn.onclick = () => {
+    if (!el.reactBar.firstChild) buildReactBar();
     el.reactBar.classList.toggle('hidden');
     el.reactBtn.classList.toggle('on', !el.reactBar.classList.contains('hidden'));
+    updateReactMore();
 };
-function floatEmoji(e) {
+
+/** Premium sprites are cosmetic: this is the same client-side gate as the Premium effects. */
+function canReact(r) {
+    if (S.phase !== 'connected' || !r) return false;
+    if (r.premium && !isPremium()) { openPaywall('reactions'); return false; }
+    return true;
+}
+
+/** One sprite floating up over the video. Returns false in a text chat, where there is no video to float over. */
+function floatReaction(id) {
     if (S.mode === 'text') return false;
-    const node = h('span', 'float-emoji', e);
-    node.style.left = `${12 + Math.random() * 70}%`;
-    node.style.setProperty('--dx', `${Math.round(Math.random() * 80 - 40)}px`);
-    el.reactLayer.appendChild(node);
+    const layer = el.reactLayer;
+    while (layer.childElementCount >= 40) layer.firstElementChild.remove();
+    const node = new Image();
+    node.className = 'float-react';
+    node.src = spriteURL(id);
+    node.alt = '';
+    node.draggable = false;
+    const size = Math.round(44 + Math.random() * 34);
+    node.style.width = node.style.height = `${size}px`;
+    node.style.left = `${8 + Math.random() * 74}%`;
+    node.style.setProperty('--dx', `${Math.round(Math.random() * 100 - 50)}px`);
+    node.style.setProperty('--rot', `${Math.round(Math.random() * 50 - 25)}deg`);
+    node.style.setProperty('--dur', `${(2.1 + Math.random() * 0.9).toFixed(2)}s`);
+    layer.appendChild(node);
     node.addEventListener('animationend', () => node.remove());
     return true;
 }
-function sendReaction(e) {
-    if (S.phase !== 'connected' || !REACTIONS.includes(e)) return;
+function popSound() {
     const now = Date.now();
-    S.reactTimes = (S.reactTimes || []).filter(t => now - t < 4000);
-    if (S.reactTimes.length >= 8) return;
-    S.reactTimes.push(now);
-    sendData({ t: 'react', e });
-    floatEmoji(e);
+    if (now - lastPop < 220) return;
+    lastPop = now;
+    SOUND.react();
+}
+
+function startReaction(r, button, ev) {
+    endReaction();
+    if (!canReact(r)) return;
+    try { button.setPointerCapture(ev.pointerId); } catch { /* not all browsers allow it */ }
+    const hold = reactHold = { id: r.id, sent: 0, total: 0, startTimer: 0, tickTimer: 0, flushTimer: 0 };
+    const tick = () => {
+        if (hold.total >= HOLD_MAX || S.phase !== 'connected') return clearInterval(hold.tickTimer);
+        if (!takeBudget(S.reactTimes ||= [], Date.now(), 1, SEND_CAP)) return clearInterval(hold.tickTimer);
+        hold.total++;
+        floatReaction(hold.id);
+        popSound();
+    };
+    tick(); // a plain tap shows one straight away
+    hold.startTimer = setTimeout(() => { hold.tickTimer = setInterval(tick, 130); }, 320);
+    hold.flushTimer = setInterval(flushReaction, 450);
+}
+function flushReaction() {
+    const hold = reactHold;
+    if (!hold || hold.total <= hold.sent || S.phase !== 'connected') return;
+    const n = Math.min(MAX_BURST, hold.total - hold.sent);
+    hold.sent += n;
+    sendData({ t: 'react', e: hold.id, ...(n > 1 ? { n } : {}) });
+}
+function endReaction() {
+    const hold = reactHold;
+    if (!hold) return;
+    flushReaction();
+    clearTimeout(hold.startTimer);
+    clearInterval(hold.tickTimer);
+    clearInterval(hold.flushTimer);
+    reactHold = null;
+}
+/** A single sprite from the keyboard, a double click or a screen reader. */
+function sendReaction(id) {
+    const r = reactionById(id);
+    if (!canReact(r) || !takeBudget(S.reactTimes ||= [], Date.now(), 1, SEND_CAP)) return;
+    sendData({ t: 'react', e: id });
+    floatReaction(id);
+    popSound();
+}
+/** Chat over: stop any hold in progress and clear what is still floating. */
+function stopReactions() {
+    endReaction();
+    reactGen++;
+    el.reactLayer.replaceChildren();
 }
 function receiveReaction(sess, msg) {
-    if (!REACTIONS.includes(msg.e)) return;
-    const now = Date.now();
-    sess.reactTimes = (sess.reactTimes || []).filter(t => now - t < 4000);
-    if (sess.reactTimes.length >= 10) return; // the other side is spamming
-    sess.reactTimes.push(now);
-    if (!floatEmoji(msg.e)) sys(`${sess.partner?.nick || 'Stranger'} sent ${msg.e}`);
-    SOUND.message();
+    const r = parseReaction(msg);
+    if (!r) return;
+    const n = takeBudget(sess.reactTimes ||= [], Date.now(), r.n, RECEIVE_CAP); // the other side may be spamming
+    if (!n) return;
+    const meta = reactionById(r.id);
+    if (S.mode === 'text') {
+        sys(`${sess.partner?.nick || 'Stranger'} sent ${n > 1 ? `${n} × ` : 'a '}${meta.label}`);
+    } else {
+        const gen = reactGen;
+        for (let i = 0; i < n; i++) {
+            setTimeout(() => { if (gen === reactGen && S.session === sess) floatReaction(r.id); }, i * 90);
+        }
+    }
+    popSound();
 }
 el.videoWrap.addEventListener('dblclick', e => {
     if (e.target.closest('button, input, textarea, .game-stage, .fx-panel, .react-bar, .stage-dock')) return;
-    sendReaction('❤️');
+    sendReaction('heart');
 });
 
 el.shareBtn.onclick = async () => {
@@ -2419,6 +2521,7 @@ const PAYWALL_REASONS = {
     theme: 'Colour themes are part of Premium.',
     ip: 'Hiding your IP address from the people you chat with is part of Premium.',
     translate: 'Live translate is part of Premium: chat with anyone in their own language.',
+    reactions: 'The Premium reaction pack (stars, party poppers, balloons, rainbows and more) is part of Premium.',
 };
 let selectedPlan = null;
 let purchasing = false;

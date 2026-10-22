@@ -5,7 +5,9 @@
 //   - small a11y/mirroring helpers (aria-pressed on the mode picker, online count copies)
 // Nothing here uses innerHTML. Call initLanding() once after the page markup is in the DOM.
 
-const REACTIONS = ['❤️', '😂', '🔥', '👏', '🙏', '😮'];
+import { REACTIONS, spriteURL } from './reactions.js';
+
+const FREE_SPRITES = REACTIONS.filter(r => !r.premium).map(r => r.id);
 // A tic-tac-toe game that ends with a win on the 2-4-6 diagonal. 'x' is "you".
 const GAME_MOVES = [[0, 'x'], [1, 'o'], [4, 'x'], [8, 'o'], [6, 'x'], [3, 'o'], [2, 'x']];
 const WIN_LINE = [2, 4, 6];
@@ -20,6 +22,7 @@ export function initLanding() {
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
 
     const safe = fn => { try { fn(); } catch (err) { console.warn('[landing]', err); } };
+    safe(() => root.querySelectorAll('img[data-sprite]').forEach(img => { img.src = spriteURL(img.dataset.sprite); }));
     safe(() => setupReveal(root, reduce));
     safe(() => setupAnchors(root, reduce));
     safe(() => setupSticky(root));
@@ -169,9 +172,10 @@ function setupMock(root, reduce) {
         if (!reacts) return;
         $(reacts, '.lp-react--still')?.remove();
         if (reacts.children.length >= 4) return;
-        const r = document.createElement('span');
+        const r = document.createElement('img');
         r.className = 'lp-react';
-        r.textContent = REACTIONS[Math.floor(Math.random() * REACTIONS.length)];
+        r.alt = '';
+        r.src = spriteURL(FREE_SPRITES[Math.floor(Math.random() * FREE_SPRITES.length)]);
         r.style.setProperty('--dx', Math.round(rand(-34, 34)) + 'px');
         r.style.left = Math.round(rand(-26, 26)) + 'px';
         r.addEventListener('animationend', () => r.remove(), { once: true });

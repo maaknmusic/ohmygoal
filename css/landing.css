@@ -302,7 +302,7 @@
 #welcome .lp-ctl-next { display: inline-flex; align-items: center; gap: calc(var(--u) * 6); height: calc(var(--u) * 38); padding: 0 calc(var(--u) * 16); border-radius: 999px; font-weight: 700; font-size: 1.1em; background: var(--lp-grad); box-shadow: 0 8px 20px -6px color-mix(in srgb, var(--primary) 80%, transparent); }
 #welcome .lp-ctl-next .lp-i { width: calc(var(--u) * 16); height: calc(var(--u) * 16); }
 #welcome .lp-reacts { position: absolute; right: calc(var(--u) * 100); bottom: calc(var(--u) * 84); width: 0; height: 0; pointer-events: none; }
-#welcome .lp-react { position: absolute; left: 0; bottom: 0; font-size: calc(var(--u) * 30); line-height: 1; opacity: 0; animation: lp-float 3.4s var(--ease) forwards; will-change: transform, opacity; }
+#welcome .lp-react { position: absolute; left: 0; bottom: 0; width: calc(var(--u) * 34); height: calc(var(--u) * 34); opacity: 0; animation: lp-float 3.4s var(--ease) forwards; will-change: transform, opacity; }
 #welcome .lp-react--still { opacity: 1; animation: none; left: calc(var(--u) * -6); bottom: calc(var(--u) * 150); }
 @keyframes lp-float {
     0% { opacity: 0; transform: translate3d(0, 0, 0) scale(0.5); }
@@ -372,7 +372,7 @@
 #welcome .lp-link-line { position: relative; width: 64px; height: 3px; border-radius: 3px; background: linear-gradient(90deg, var(--primary), var(--success)); }
 #welcome .lp-link-line::after { content: ""; position: absolute; top: -4px; left: 0; width: 11px; height: 11px; border-radius: 50%; background: var(--text); animation: lp-travel 2.6s var(--ease) infinite; }
 @keyframes lp-travel { 0% { transform: translateX(0); opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { transform: translateX(53px); opacity: 0; } }
-#welcome .lp-mini-react { padding: 8px 14px; border-radius: 999px; font-size: 20px; letter-spacing: 4px; background: var(--lp-card-2); border: 1px solid var(--border); }
+#welcome .lp-mini-react { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; background: var(--lp-card-2); border: 1px solid var(--border); }
 #welcome .lp-mini-next { display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: 999px; font-weight: 700; font-size: 14px; color: var(--on-primary); background: var(--primary-2); }
 #welcome .lp-mini-next .lp-i { width: 16px; height: 16px; }
 
@@ -429,6 +429,7 @@
 /* reactions */
 #welcome .lp-react-vis { display: grid; gap: 10px; }
 #welcome .lp-rail { display: flex; gap: 4px; padding: 6px; width: fit-content; max-width: 100%; border-radius: 999px; background: var(--lp-card-2); border: 1px solid var(--border); font-size: 22px; line-height: 1; }
+#welcome .lp-rail img { width: 28px; height: 28px; }
 #welcome .lp-rail span { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; transition: transform 0.2s var(--ease); }
 #welcome .lp-tile:hover .lp-rail span:nth-child(odd) { transform: translateY(-5px); }
 #welcome .lp-ice { width: fit-content; max-width: 100%; padding: 9px 14px; border-radius: 16px; border-bottom-left-radius: 5px; font-size: 14px; font-weight: 600; background: var(--primary-soft); border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent); }
