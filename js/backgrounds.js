@@ -6,7 +6,8 @@
 // this file; the scenes are generic (no real landmarks, brands or recognisable characters).
 //
 // Each scene is built once into a cached canvas at the output size (rebuilt when the size changes);
-// animated scenes also have a cheap per-frame overlay (twinkling, drifting, running rain ...).
+// animated scenes also have a cheap per-frame overlay (twinkling, drifting, running rain ...); overlay(ctx, seconds, lite) does
+// less work when lite is true (slow devices).
 // =====================================================================
 
 const TAU = Math.PI * 2;
@@ -265,7 +266,7 @@ function buildMumbai(w, h) {
     for (let x = r() * u * 0.01; x < w; x += u * (0.008 + r() * 0.01)) { lights.push([x, y0 + h * 0.004, [255, 214, 140]]); glow(g, x, y0 + h * 0.004, u * 0.012, [255, 210, 140], 0.55); }
     // Reflections of the lights in the water
     g.save();
-    for (const [lx, ly, col] of lights) {
+    for (const [lx, , col] of lights) {
         const n = 3 + ((r() * 4) | 0), depth = h * (0.08 + r() * 0.12);
         for (let k = 0; k < n; k++) {
             const t = (k + r() * 0.8) / n;
@@ -385,17 +386,17 @@ function buildAurora(w, h) {
     const S = 22, top = lakeY - CH * 0.98;
     return {
         base,
-        overlay(c, t) {
+        overlay(c, t, lite) {
             c.save();
             c.globalCompositeOperation = 'lighter';
-            const sw = CW / 1.4 * 1.0 / S;
+            const Sn = lite ? S >> 1 : S, sw = CW / 1.4 / Sn;   // lite (slow devices): half the strips, no lake reflection
             for (const L of layers) {
                 const xoff = (CW - w) * (0.5 + 0.5 * Math.sin(t * 0.06 * L.sp + L.ph));
                 const breathe = L.a * (0.72 + 0.28 * Math.sin(t * 0.35 * L.sp + L.ph * 2));
-                for (let pass = 0; pass < 2; pass++) {
+                for (let pass = 0; pass < (lite ? 1 : 2); pass++) {
                     c.globalAlpha = pass ? breathe * 0.28 : breathe;
-                    for (let i = 0; i < S; i++) {
-                        const wob = Math.sin(i * 0.5 + t * 0.55 * L.sp + L.ph) * h * 0.014, sc = 1 + 0.05 * Math.sin(i * 0.33 - t * 0.4 + L.ph);
+                    for (let i = 0; i < Sn; i++) {
+                        const wob = Math.sin(i * (lite ? 1 : 0.5) + t * 0.55 * L.sp + L.ph) * h * 0.014, sc = 1 + 0.05 * Math.sin(i * (lite ? 0.66 : 0.33) - t * 0.4 + L.ph);
                         const y = top + L.dy * h + wob;
                         if (!pass) c.drawImage(L.cv, xoff + i * sw, 0, sw, CH, i * sw, y + CH * (1 - sc), sw + 1, CH * sc);
                         else c.drawImage(L.cv, xoff + i * sw, 0, sw, CH, i * sw, lakeY + (lakeY - (y + CH)) , sw + 1, CH * sc * 0.55);
@@ -435,10 +436,11 @@ function buildBokeh(w, h) {
     grain(g, w, h, 0.045);
     return {
         base,
-        overlay(c, t) {
+        overlay(c, t, lite) {
             c.save(); c.globalCompositeOperation = 'lighter';
             const mw = w + 200, mh = h + 200;
-            for (const d of discs) {
+            for (let i = 0, n = lite ? 30 : discs.length; i < n; i++) {
+                const d = discs[i];
                 const x = (((d.x + d.vx * t * 10) % mw) + mw) % mw - 100, y = (((d.y + d.vy * t * 10) % mh) + mh) % mh - 100;
                 c.globalAlpha = d.a * (0.78 + 0.22 * Math.sin(t * d.sp + d.ph));
                 c.drawImage(d.s, x - d.rad, y - d.rad, d.rad * 2, d.rad * 2);
@@ -659,8 +661,9 @@ function buildMonsoon(w, h) {
     for (let i = 0; i < 12; i++) runners.push({ x: (i + r()) / 12 * w, rad: u * lerp(0.006, 0.012, r()), per: 10 + r() * 14, ph: r() * 30, wob: r() * TAU, trail: u * (0.15 + r() * 0.25) });
     return {
         base: fogged,
-        overlay(c, t) {
-            for (const d of runners) {
+        overlay(c, t, lite) {
+            for (let i = 0, n = lite ? 6 : runners.length; i < n; i++) {
+                const d = runners[i];
                 const f = ((t + d.ph) / d.per) % 1, yy = -h * 0.08 + (f + 0.04 * Math.sin(f * TAU * 3)) * h * 1.18, x = d.x + Math.sin(f * 9 + d.wob) * u * 0.004;
                 if (yy < -d.rad * 2) continue;
                 const y0 = Math.max(0, yy - d.trail), tw = d.rad * 0.9;
@@ -838,20 +841,20 @@ function buildForest(w, h) {
     const motes = Array.from({ length: 34 }, () => ({ x: r() * w, y: r() * h * 0.8, rad: 0.6 + r() * 1.4, ph: r() * TAU, sp: 0.15 + r() * 0.35, a: 0.3 + r() * 0.6 }));
     return {
         base,
-        overlay(c, t) {
+        overlay(c, t, lite) {
             c.save();
             c.globalCompositeOperation = 'lighter';
             c.globalAlpha = 0.65 + 0.35 * Math.sin(t * 0.4);
             c.drawImage(rays, 0, 0);
             c.globalCompositeOperation = 'source-over';
-            mist.forEach((m, i) => {
+            mist.slice(0, lite ? 1 : 2).forEach((m, i) => {
                 const ww = w * 1.5, off = ((t * (6 + i * 4) + i * 300) % ww + ww) % ww;
                 c.globalAlpha = 0.65 - i * 0.15;
                 const y = h * (0.5 + i * 0.22), hh = h * 0.26;
                 c.drawImage(m, -off, y, ww, hh); c.drawImage(m, ww - off, y, ww, hh);
             });
             c.globalCompositeOperation = 'lighter'; c.fillStyle = 'rgb(255,250,220)';
-            for (const m of motes) { c.globalAlpha = m.a * (0.4 + 0.6 * Math.sin(t * m.sp * 3 + m.ph)) * 0.7; c.beginPath(); c.arc(m.x + Math.sin(t * m.sp + m.ph) * u * 0.02, (m.y - t * u * 0.004 * (1 + m.sp) % (h * 0.8) + h * 0.8) % (h * 0.8), m.rad, 0, TAU); c.fill(); }
+            for (const m of lite ? [] : motes) { c.globalAlpha = m.a * (0.4 + 0.6 * Math.sin(t * m.sp * 3 + m.ph)) * 0.7; c.beginPath(); c.arc(m.x + Math.sin(t * m.sp + m.ph) * u * 0.02, (m.y - t * u * 0.004 * (1 + m.sp) % (h * 0.8) + h * 0.8) % (h * 0.8), m.rad, 0, TAU); c.fill(); }
             c.restore();
         },
     };
@@ -1050,10 +1053,11 @@ function photoThumb(ctx, w, h) {
     const key = 'photo#' + photoVersion;
     for (const k of [...thumbCache.keys()]) if (k.startsWith('photo#') && k !== key) thumbCache.delete(k);
     cachedThumb(key, 80, (g, cw, ch) => {
+        if (!photo) return;
         const k = Math.max(cw / photo.width, ch / photo.height);
         g.drawImage(photo, (cw - photo.width * k) / 2, (ch - photo.height * k) / 2, photo.width * k, photo.height * k);
         g.fillStyle = 'rgba(15,20,35,0.7)'; g.beginPath(); g.arc(cw * 0.8, ch * 0.8, cw * 0.15, 0, TAU); g.fill();
-        g.strokeStyle = '#fff'; g.lineWidth = cw * 0.04; g.lineCap = 'round';   // a small pencil-less "change" mark: two arcs with arrow tips
+        g.strokeStyle = '#fff'; g.lineWidth = cw * 0.04; g.lineCap = 'round';   // a small "change" badge: two arcs chasing each other
         g.beginPath(); g.arc(cw * 0.8, ch * 0.8, cw * 0.06, Math.PI * 0.2, Math.PI * 1.3); g.stroke();
         g.beginPath(); g.arc(cw * 0.8, ch * 0.8, cw * 0.06, Math.PI * 1.2, Math.PI * 2.3); g.stroke();
     }, '#444b66')(ctx, w, h);
@@ -1076,4 +1080,3 @@ export const BACKGROUNDS = [
     // and this tile is not the active one: then it is simply selected). Clicking the active tile again lets the person change the photo.
     { id: 'photo', label: 'Your photo', thumb: photoThumb, pick: active => (photo && !active ? Promise.resolve(true) : pickCustomPhoto()) },
 ];
-export const buildScene = (id, w, h) => SCENES[id](w, h);

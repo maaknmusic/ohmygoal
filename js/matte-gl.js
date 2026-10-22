@@ -57,7 +57,7 @@ void main() {
     float fw = fwidth(c);
     float a = smoothstep(uT - uSoft - fw * 0.5, uT + uSoft + fw * 0.5, c);
     if (uMode == 0) { o = vec4(0.0, 0.0, 0.0, a); return; }
-    float amt = a * (1.0 - smoothstep(uT, uT + 0.3, c)) * uWrap;
+    float amt = a * (1.0 - smoothstep(uT, uT + 0.4, c)) * uWrap;
     o = vec4(texture(uBg, vUv).rgb * amt, amt);
 }`;
 

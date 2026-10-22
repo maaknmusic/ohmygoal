@@ -3,10 +3,11 @@
 // Pure canvas / typed-array code, no libraries and no images: everything here is
 // original code written for this project.
 //
-//  Matte      turns the segmenter's raw person-confidence mask into a stable, soft alpha matte:
-//             motion-adaptive temporal smoothing (no flicker, no ghosting), a smoothstep soft
-//             threshold that also contracts the edge a little (kills the halo of background that
-//             the model lets through), output as an alpha canvas that the caller upsamples smoothly.
+//  Matte      turns the segmenter's raw person-confidence mask into a stable matte:
+//             motion-adaptive temporal smoothing (no flicker, no ghosting) of the confidence. The
+//             edge itself is then drawn at full resolution: on the GPU by matte-gl.js (joint bilateral
+//             enlargement + anti-aliased threshold, the normal path), or, when WebGL2 is not available,
+//             by paint() below (2x bilinear enlargement, soft erosion and a smoothstep threshold).
 //  BackdropBlur  a real gaussian-looking background blur that never bleeds the person's colours
 //             into the background (normalised convolution at low resolution, like a lens would).
 //             It is plain JavaScript on a tiny image, so it looks the same in every browser
@@ -64,6 +65,7 @@ export class Matte {
         const n = w * h;
         if (this.w !== w || this.h !== h || !this.soft) {
             this.w = w; this.h = h;
+            this.eroded = null; this.ring = null; this.row = null;
             this.soft = new Float32Array(n);
             this.conf8 = new Uint8Array(n);
             this.soft.set(conf.length === n ? conf : conf.subarray(0, n));
@@ -94,8 +96,8 @@ export class Matte {
         if (this.canvas.width !== W2 || this.canvas.height !== H2) {
             this.canvas.width = W2; this.canvas.height = H2;
             this.image = this.ctx.createImageData(W2, H2);
-            this.row = new Float32Array(w);
         }
+        this.row ||= new Float32Array(w);
         const px = this.image.data, row = this.row, last = w - 1;
         // Erode a little first: the model's mask runs about one model pixel past the real outline, which shows as a halo of the old room.
         const er = this.eroded ||= new Float32Array(w * h), k = this.erode;

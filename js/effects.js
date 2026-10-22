@@ -171,6 +171,7 @@ export class Effects {
         this.track?.stop();
         this.track = null;
         this.video.srcObject = null;
+        this.backdrop = null; this.blurTiny = null; this.matte.reset(); // free the cached scene; the next start begins from a fresh matte
     }
 
     frame() {
@@ -288,7 +289,7 @@ export class Effects {
             let bd = this.backdrop;
             if (!bd || bd.id !== bgId || bd.w !== W || bd.h !== H || bd.version !== backdropVersion(bgId)) bd = this.backdrop = makeBackdrop(bgId, W, H);
             ctx.drawImage(bd.base, 0, 0);
-            bd.overlay?.(ctx, ts / 1000);
+            bd.overlay?.(ctx, ts / 1000, tier < 2);
             scene = bd;
         }
         const t2 = performance.now();
@@ -359,7 +360,7 @@ export class Effects {
         gl.resize(W, H);
         gl.upload(m.conf8, m.w, m.h, v, wrap ? scene.small : null);
         drawFrame(this.person, p);
-        const prm = { t: 0.6, soft: 0.06, radius: tier === 0 ? 0 : 3.5 * W / 960, wrap: 0.55, ...this.glParams };
+        const prm = { t: 0.6, soft: 0.06, radius: tier === 0 ? 0 : 3.5 * W / 960, wrap: 0.65, ...this.glParams };
         p.globalCompositeOperation = 'destination-in';
         p.drawImage(gl.draw(0, prm), 0, 0);
         if (wrap) { p.globalCompositeOperation = 'source-atop'; p.drawImage(gl.draw(1, prm), 0, 0); }
@@ -371,7 +372,8 @@ export class Effects {
      *  wantCanvas, true when only the matte bytes were made, null when there is no matte yet. */
     updateMatte(v, ts, wantCanvas = true) {
         const m = this.matte;
-        const last = () => (m.frames ? (wantCanvas ? m.canvas : true) : null); // keep using the last matte, never the raw camera
+        // keep using the last matte when the segmenter fails, never the raw camera
+        const last = () => { if (!m.frames) return null; if (!wantCanvas) return true; if (!m.image) m.paint(); return m.canvas; };
         if (ts - this.lastMatteTs > 700) m.reset(); // coming back after a pause: start from the new frame instead of blending with an old one
         this.lastMatteTs = ts;
         this.segctx.drawImage(v, 0, 0, SEG_SIZE, SEG_SIZE);

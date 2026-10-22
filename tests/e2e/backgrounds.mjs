@@ -111,6 +111,12 @@ async function openPage(realMode) {
     out.unique = new Set(out.ids).size === out.ids.length;
     out.reexport = (await import('/js/effects.js')).BACKGROUNDS === B.BACKGROUNDS;
     out.thumbs = {};
+    // First request: a plain tile at once, the real picture is drawn when the browser is idle (and later requests are instant).
+    const tiles = {};
+    for (const b of B.BACKGROUNDS) { if (b.id === 'none') continue; const c = document.createElement('canvas'); c.width = c.height = 80; b.thumb(c.getContext('2d'), 80, 80); tiles[b.id] = c; }
+    out.placeholderFirst = Object.values(tiles).every(c => T.patchStd(c, 0, 0, 80, 80) < 1);
+    await B.thumbsReady();
+    out.filledIn = Object.values(tiles).filter(c => T.patchStd(c, 0, 0, 80, 80) > 8).length;   // the waiting tiles were filled in by themselves
     for (const b of B.BACKGROUNDS) {
       if (b.id === 'none') continue;
       const c = document.createElement('canvas'); c.width = c.height = 80;
@@ -132,6 +138,12 @@ async function openPage(realMode) {
             const da = a.getContext('2d').getImageData(0, 0, w, h).data, db = b2.getContext('2d').getImageData(0, 0, w, h).data;
             let diff = 0; for (let i = 0; i < da.length; i += 16) diff += Math.abs(da[i] - db[i]);
             if (diff > 200) res.animated = true;
+            // the lighter version used on slow devices also draws and also moves
+            const l1 = document.createElement('canvas'); l1.width = w; l1.height = h; l1.getContext('2d').drawImage(bd.base, 0, 0); bd.overlay(l1.getContext('2d'), 1.0, true);
+            const l2 = document.createElement('canvas'); l2.width = w; l2.height = h; l2.getContext('2d').drawImage(bd.base, 0, 0); bd.overlay(l2.getContext('2d'), 9.0, true);
+            const dl1 = l1.getContext('2d').getImageData(0, 0, w, h).data, dl2 = l2.getContext('2d').getImageData(0, 0, w, h).data;
+            let dl = 0; for (let i = 0; i < dl1.length; i += 16) dl += Math.abs(dl1[i] - dl2[i]);
+            res.liteAnimated = (res.liteAnimated !== false) && dl > 100;
           }
         } catch (e) { res.ok = false; res.err = e.message; }
       }
@@ -149,12 +161,12 @@ async function openPage(realMode) {
   step('1b. "photo" is only valid once a photo is loaded (session only)', r.mig.photo === 'none');
   step('1c. list: none, blur, blur-strong + 8 scenes + photo, unique ids, labels, re-exported from effects.js',
     r.ids.join() === 'none,blur,blur-strong,mumbai,aurora,bokeh,cozy,monsoon,space,studio,forest,photo' && r.unique && r.labels && r.reexport, r.ids.join());
-  step('1d. every option except None draws its own non-blank thumbnail', Object.values(r.thumbs).every(v => typeof v === 'number' && v > 8) && Object.keys(r.thumbs).length === 11, JSON.stringify(r.thumbs));
+  step('1d. every option except None draws its own non-blank thumbnail (plain tile first, picture when idle, instant afterwards)', Object.values(r.thumbs).every(v => typeof v === 'number' && v > 8) && Object.keys(r.thumbs).length === 11 && r.placeholderFirst && r.filledIn === 11, `${JSON.stringify(r.thumbs)} filledIn ${r.filledIn}`);
   for (const [id, s] of Object.entries(r.scenes)) {
     step(`1e. scene ${id}: builds at 960x540, 960x720 and 540x960 (not blank), build ${s.buildMs.join('/')} ms`, s.ok && s.sizes.length === 3 && s.sizes.every(Boolean), s.err || '');
   }
-  step('1f. animated scenes move (mumbai, aurora, bokeh, cozy, monsoon, space, forest) and studio is still',
-    ['mumbai', 'aurora', 'bokeh', 'cozy', 'monsoon', 'space', 'forest'].every(id => r.scenes[id].animated) && !r.scenes.studio.animated);
+  step('1f. animated scenes move (mumbai, aurora, bokeh, cozy, monsoon, space, forest), also in their light version for slow devices; studio is still',
+    ['mumbai', 'aurora', 'bokeh', 'cozy', 'monsoon', 'space', 'forest'].every(id => r.scenes[id].animated && r.scenes[id].liteAnimated) && !r.scenes.studio.animated);
   step('1g. a retired id (sunset) draws the same scene as its replacement (mumbai); unknown ids still give a scene; the requested id is kept', r.aliasKeepsId);
   await ctx.close();
 }
@@ -316,7 +328,7 @@ await pipelineChecks('synthetic', false);
     return r;
   });
   step('4d. a non-image, a corrupt file, an oversized file (>40 MB) and no file are all refused, and the earlier photo is kept', bad.text === false && bad.corrupt === false && bad.huge === false && bad.none === false && bad.stillHas === true, JSON.stringify(bad));
-  const tile = await page.evaluate(() => { const c = document.createElement('canvas'); c.width = c.height = 80; T.B.BACKGROUNDS.find(x => x.id === 'photo').thumb(c.getContext('2d'), 80, 80); return { l: T.px(c, 6, 20), r: T.px(c, 74, 20) }; });
+  const tile = await page.evaluate(async () => { const c = document.createElement('canvas'); c.width = c.height = 80; T.B.BACKGROUNDS.find(x => x.id === 'photo').thumb(c.getContext('2d'), 80, 80); await T.B.thumbsReady(); return { l: T.px(c, 6, 20), r: T.px(c, 74, 20) }; });
   step('4e. once chosen, the tile shows the person\'s own photo', tile.l[0] > 200 && tile.r[2] > 200, JSON.stringify(tile));
   const used = await page.evaluate(async () => {
     const { fx, video } = T; fx.segmenter = T.stubSegmenter(); fx.adaptive = false; fx.quality = 2; fx.settings.background = 'photo';
