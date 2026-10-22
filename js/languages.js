@@ -1,6 +1,6 @@
 // =====================================================================
 // Languages offered for "My language" and Live translate. Pure data + helpers (no DOM), shared by the profile,
-// the translation engine and the chat UI. The same 46 codes are accepted by the translateText Cloud Function
+// the translation engine and the chat UI. The same 45 codes are accepted by the translateText Cloud Function
 // (functions/languages.js); a unit test keeps the two lists identical.
 //   code   what travels over the data channel, in the profile document and to translateText
 //   en     English name (used in labels like "Hindi → English")
@@ -79,6 +79,9 @@ export function langLabel(code) {
 /** Languages written right to left (for dir attributes). */
 export const isRtl = code => ['ar', 'fa', 'he', 'ur'].includes(code);
 
+// Languages normally written in a script other than Latin.
+const NON_LATIN = new Set(['hi', 'bn', 'ta', 'te', 'mr', 'gu', 'kn', 'ml', 'pa', 'ur', 'or', 'as', 'ne', 'ru', 'uk', 'ar', 'fa', 'he', 'th', 'zh', 'zh-TW', 'ja', 'ko', 'el']);
+
 // BCP-47 tags (and a few legacy ones) -> our codes.
 const TAG_ALIASES = { no: 'nb', nn: 'nb', nb: 'nb', tl: 'fil', fil: 'fil', iw: 'he', in: 'id', jw: 'id' };
 
@@ -92,12 +95,16 @@ export function fromTag(tag) {
     if (!t || t === 'und' || t === 'auto') return '';
     const [base, ...rest] = t.split('-');
     if (base === 'zh') {
+        if (rest.includes('latn')) return ''; // pinyin
         const traditional = rest.includes('hant') || rest.some(p => ['tw', 'hk', 'mo'].includes(p));
         if (rest.includes('hans') && !rest.includes('hant')) return 'zh';
         return traditional ? 'zh-TW' : 'zh';
     }
     const code = TAG_ALIASES[base] || base;
-    return isLang(code) ? code : '';
+    if (!isLang(code)) return '';
+    // Romanised text ('hi-Latn': Hindi in English letters) isn't the language as written in its own script: unknown.
+    if (rest.includes('latn') && NON_LATIN.has(code)) return '';
+    return code;
 }
 
 /** The browser's language as one of ours, 'en' when we have no match. Accepts a tag or a list of tags (navigator.languages). */

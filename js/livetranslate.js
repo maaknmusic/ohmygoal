@@ -5,7 +5,7 @@
 // resets on Next. Text is only handed to the engine while the matching switch is on (or on an explicit "Retry").
 // Everything that came from the partner is shown with textContent only.
 // =====================================================================
-import { LANGS, langName, langNative, langLabel, sanitizeLang, guessLang, isRtl } from './languages.js';
+import { LANGS, langName, langLabel, sanitizeLang, guessLang } from './languages.js';
 import { ERROR_TEXT, MAX_TEXT, MAX_ORIG, worthTranslating } from './translate.js';
 import { openSheet, closeSheet } from './ui.js';
 
@@ -27,39 +27,15 @@ const RETRYABLE = new Set(['timeout', 'unavailable', 'busy', 'quota-minute']);
  * fmt: { profanity(text), contact(text) }    how text from the partner is masked for display
  * scroll()                                   keep the newest message in view
  */
-export function createLiveTranslate({ S, store, engine, isPremium, openPaywall, toast, sendData, addMessage, fmt, scroll = () => {}, whenReady = () => Promise.resolve(), onLangChange = () => {} }) {
+export function createLiveTranslate({ S, store, engine, isPremium, openPaywall, toast, sendData, addMessage, fmt, scroll = () => {}, whenReady = () => Promise.resolve() }) {
     // ----------------------------------------------------------------- my language
-    const browserLang = () => guessLang(typeof navigator !== 'undefined' ? navigator.language : '');
-    /** The language I read and write: the one I chose, else the browser's (never sent to anyone until I choose). */
+    // The picker itself ("My language" in the preferences sheet) lives in app.js; this is the language everything here uses.
+    const browserLang = () => guessLang(typeof navigator !== 'undefined' ? (navigator.languages?.length ? navigator.languages : navigator.language) : '');
+    /** The language I read and write: the one I chose, else the browser's (the guess is never sent to anyone). */
     const myLang = () => S.lang || browserLang();
-
-    const langSelect = $('langSelect'), langSuggest = $('langSuggest');
     const byName = [...LANGS].sort((a, b) => a.en.localeCompare(b.en));
-    function fillLangSelect(select, { blank = '' } = {}) {
-        const opts = byName.map(l => { const o = new Option(langLabel(l.code), l.code); o.lang = l.code; return o; });
-        select.replaceChildren(...(blank ? [new Option(blank, '')] : []), ...opts);
-    }
-    function renderLangPicker() {
-        if (!langSelect) return;
-        const guess = browserLang();
-        langSelect.options[0].textContent = `Not set (suggested: ${langLabel(guess)})`;
-        langSelect.value = S.lang;
-        langSuggest?.classList.toggle('hidden', Boolean(S.lang));
-        if (langSuggest) langSuggest.textContent = `Use ${langNative(guess)} · ${langName(guess)}`;
-    }
-    /** Choose (or, with '', clear) my language. Saved in this browser; ProfileSync adds it to a Google account. */
-    function setMyLang(code) {
-        S.lang = sanitizeLang(code);
-        store.set('lang', S.lang);
-        renderLangPicker();
-        refresh();
-        onLangChange(S.lang);
-    }
-    if (langSelect) {
-        fillLangSelect(langSelect, { blank: ' ' });
-        renderLangPicker();
-        langSelect.addEventListener('change', () => setMyLang(langSelect.value));
-        langSuggest?.addEventListener('click', () => setMyLang(browserLang()));
+    function fillLangSelect(select) {
+        select.replaceChildren(...byName.map(l => { const o = new Option(langLabel(l.code), l.code); o.lang = l.code === 'zh-TW' ? 'zh-Hant' : l.code; return o; }));
     }
 
     // ----------------------------------------------------------------- per-chat state
@@ -420,8 +396,7 @@ export function createLiveTranslate({ S, store, engine, isPremium, openPaywall, 
     }
 
     return {
-        myLang, setMyLang, renderLangPicker,
-        partnerLang,
+        myLang, partnerLang,
         onChatStart, onChatEnd,
         onPartnerHello() { refresh(); },
         onIncoming, sending, sendTranslated,

@@ -13,7 +13,9 @@ import { scanMessage, maskContact } from './shield.js';
 import { meterStream } from './audio-meter.js';
 import { callable } from './cloud.js';
 import { initLanding } from './landing.js';
-import { LANGS, sanitizeLang, langNative, langLabel, guessLang } from './languages.js';
+import { LANGS, sanitizeLang, langName, langNative, langLabel, guessLang } from './languages.js';
+import { createEngine, createDeviceProvider, parseChatMessage } from './translate.js';
+import { createLiveTranslate } from './livetranslate.js';
 import { ProfileSync, firestoreIo, googleIdentity } from './profile.js';
 import { getApproxCell, parseLocMessage, locMessage, distanceBetweenCells, describeDistance } from './location.js';
 
@@ -35,7 +37,6 @@ let iceExpiresAt = Infinity; // the static list never expires
 const hasTurn = () => hasTurnIn(iceServers);
 // With 'relay' our connection candidates are only relay addresses, so the other person never learns our IP address.
 const iceConfig = () => ({ iceServers, iceTransportPolicy: hideIpOn() ? 'relay' : 'all' });
-const canTranslate = Boolean(CFG.geminiApiKey) || typeof __app_id !== 'undefined';
 
 const MAX_INTERESTS = 5;
 const CONNECT_TIMEOUT_MS = 20000;
@@ -74,6 +75,7 @@ const ICONS = {
     heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
     x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
     chevronLeft: '<path d="m15 18-6-6 6-6"/>',
+    languages: '<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>',
 };
 function setIcon(el, name) {
     el.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
@@ -690,6 +692,7 @@ function setPhase(phase, info = {}) {
     el.gamesBtnText.disabled = !live;
     if (!live) { el.reactBar.classList.add('hidden'); el.reactBtn.classList.remove('on'); hideIcebreakers(); }
     el.msgInput.disabled = !live;
+    lt?.refresh(); // Live translate button and bar follow the phase
     el.sendBtn.disabled = !live;
     el.emojiBtn.disabled = !live;
     el.reportBtn.disabled = !(live || phase === 'connecting' || (phase === 'ended' && info.report));
@@ -974,6 +977,7 @@ function attachChannel(sess, dc) {
         clearTimeout(sess.connectTimer);
         sess.startedAt = Date.now();
         setPhase('connected');
+        lt.onChatStart(); // Live translate starts off (or as remembered) in every chat
         clearMessages();
         sys(sess.friend ? `You're on a call with ${sess.friend.name}.` : "You're now chatting with a stranger. Say hi! 👋", 'good');
         el.partnerName.textContent = sess.friend?.name || 'Stranger';
@@ -1091,6 +1095,7 @@ function onPeerData(sess, msg) {
                 if (ok && sess === S.session) el.partnerBadge.classList.remove('hidden');
             });
             renderMatchCard(sess.partner, interests.filter(i => S.interests.includes(i)));
+            lt.onPartnerHello(sess);
             if (!sess.friend) showIcebreakers();
             maybeSendCell(sess);
             if (!sess.friend) likeCount(sess.partnerId).then(n => {
@@ -1100,11 +1105,15 @@ function onPeerData(sess, msg) {
             if (locOffer() && !sess.partner.loc) document.querySelector('.match-card')?.appendChild(h('div', 'hint', 'They haven’t turned on distance.'));
             break;
         }
-        case 'msg':
+        case 'msg': {
+            const m = parseChatMessage(msg); // text, and the sender's original + its language only when both are valid
+            if (!m) break;
             hideTyping();
-            addMessage('them', String(msg.text || '').slice(0, 500));
+            const ctl = addMessage('them', m.text, { orig: m.orig });
+            lt.onIncoming(sess, ctl, m);
             SOUND.message();
             break;
+        }
         case 'typing':
             msg.on ? showTyping() : hideTyping();
             break;
@@ -1176,6 +1185,7 @@ function endSession({ notify }) {
     const sess = S.session;
     if (!sess) return;
     sess.ended = true;
+    lt.onChatEnd();
     if (notify) sess.bus.send('bye');
     clearTimeout(sess.connectTimer);
     clearInterval(sess.statsTimer);
@@ -2402,6 +2412,7 @@ const PAYWALL_REASONS = {
     menu: 'Get more out of every chat.',
     theme: 'Colour themes are part of Premium.',
     ip: 'Hiding your IP address from the people you chat with is part of Premium.',
+    translate: 'Live translate is part of Premium: chat with anyone in their own language.',
 };
 let selectedPlan = null;
 let purchasing = false;
