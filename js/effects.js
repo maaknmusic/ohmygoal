@@ -20,6 +20,7 @@ export { MASKS, migrateMask };
 export function migrateFx(fx) {
     const out = { ...fx };
     out.mask = migrateMask(out.mask);
+    out.background = migrateBackground(out.background);
     return out;
 }
 

@@ -520,7 +520,12 @@ function renderFxPanel() {
             }
             b.title = locked ? `${opt.label || opt.id} (Premium)` : (opt.label || opt.id);
             b.dataset.id = opt.id;
-            b.onclick = () => (locked ? openPaywall('effects') : applyEffects({ [kind]: opt.id }));
+            b.onclick = async () => {
+                if (locked) return openPaywall('effects');
+                // "Your photo" asks for a picture first (the picker has to open straight from the click).
+                if (opt.pick && !(await opt.pick(effectiveFx()[kind] === opt.id))) return;
+                applyEffects({ [kind]: opt.id });
+            };
             return b;
         }));
     });

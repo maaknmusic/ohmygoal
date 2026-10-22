@@ -30,6 +30,9 @@ Random one-on-one **video or text** chat with strangers. A static site (plain HT
 | `config.js` | **All settings**: Firebase, TURN, age check, effects, safety |
 | `js/app.js` | App logic and UI |
 | `js/transport.js` | Matching, signalling, presence (Firebase or local demo) |
+| `js/effects.js` | Video effects pipeline (MediaPipe): backgrounds, masks, filters |
+| `js/masks.js`, `js/mask-art.js`, `js/mask-kit.js` | Original vector face masks (drawn in code), face tracking and fitting |
+| `js/backgrounds.js`, `js/matte.js`, `js/matte-gl.js` | Original background scenes, person cut-out smoothing, blur |
 | `js/effects.js`, `js/safety.js`, `js/friends.js`, `js/geo.js`, `js/premium.js` | Features |
 | `js/games/` | Two-player game engine (`engine.js`), the five games and their UI (`ui.js`) |
 | `js/identity.js`, `js/icebreakers.js`, `js/shield.js`, `js/audio-meter.js`, `js/ui.js`, `js/landing.js` | Handles/avatars, conversation starters, scam shield, voice rings, bottom sheets, landing page behaviour |
