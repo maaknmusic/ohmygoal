@@ -14,7 +14,7 @@
 // valid Premium pass (public entitlements/{uid}.premiumUntil, written only by the payment functions in index.js).
 //
 // PRIVACY. The message text exists only in the request, in the request to the translation provider and in a small in-memory cache
-// (see CACHE_*, per function instance, gone after CACHE_TTL_MS or when the instance stops). It is never written to Firestore and never
+// (messages up to CACHE_MAX_TEXT characters only; per function instance, gone after CACHE_TTL_MS or when the instance stops). It is never written to Firestore and never
 // logged: the logs below contain no message text, no uid and no IP address. Random-chat messages are not stored by us.
 //
 // PROVIDER. Gemini 2.5 Flash-Lite on Vertex AI, called over REST with Application Default Credentials (google-auth-library):
@@ -22,6 +22,8 @@
 // Overridable with environment params (functions/.env, or .env.local in the emulator): TRANSLATE_MODEL, TRANSLATE_LOCATION and TRANSLATE_API
 // (a base URL; when its host is not an https *.googleapis.com host no credentials are sent at all, which is how tests point it at a mock).
 // The project id comes from GCLOUD_PROJECT.
+// (Flash-Lite does not "think" by default. A model that does, such as 2.5 Flash or Pro, spends the 600 output tokens on thinking and its
+// answers get cut off: raise SETTINGS.MAX_OUTPUT_TOKENS or switch thinking off in buildProviderRequest if you change TRANSLATE_MODEL.)
 //
 // ONE-TIME SETUP (the owner):
 //   1. Enable the Vertex AI API:   gcloud services enable aiplatform.googleapis.com --project ohmygoal-c8a4a
@@ -67,6 +69,7 @@ export const SETTINGS = Object.freeze({
     PER_DAY: 500,               // translations per person per rolling 24 h -> 'Daily translation limit reached.'
     CACHE_ENTRIES: 300,         // in-memory answers kept per function instance
     CACHE_TTL_MS: 30 * MINUTE,  // ...and for how long
+    CACHE_MAX_TEXT: 120,        // only short messages are cached (the ones that repeat: "hi", "how are you"); longer ones are not kept at all
     MAX_OUTPUT_TOKENS: 600,     // generationConfig.maxOutputTokens
     ATTEMPT_MS: 5000,           // one request to the provider
     TOTAL_MS: 8000,             // all attempts together (the browser gives up after 10 s)
@@ -75,8 +78,10 @@ export const SETTINGS = Object.freeze({
 
 // Overridable only for tests and region moves; the defaults are the production setup.
 const DEFAULT_API = 'https://aiplatform.googleapis.com';
-const TRANSLATE_MODEL = defineString('TRANSLATE_MODEL', { default: 'gemini-2.5-flash-lite' });
-const TRANSLATE_LOCATION = defineString('TRANSLATE_LOCATION', { default: 'global' });
+const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
+const DEFAULT_LOCATION = 'global';
+const TRANSLATE_MODEL = defineString('TRANSLATE_MODEL', { default: DEFAULT_MODEL });
+const TRANSLATE_LOCATION = defineString('TRANSLATE_LOCATION', { default: DEFAULT_LOCATION });
 const TRANSLATE_API = defineString('TRANSLATE_API', { default: DEFAULT_API });
 
 const MSG = Object.freeze({
@@ -197,9 +202,12 @@ export function echoesPrompt(output) {
     return false;
 }
 
+// Where a link ends in running text: whitespace, and the full-width / Arabic / Devanagari punctuation CJK, Arabic and Hindi text puts right after it.
+const URL_STOPS = [0xFF0C, 0x3002, 0xFF01, 0xFF1F, 0xFF1B, 0xFF1A, 0x3001, 0xFF09, 0x300D, 0x300F, 0x3011, 0x060C, 0x061B, 0x061F, 0x06D4, 0x0964, 0x0965]
+    .map(c => String.fromCodePoint(c)).join('');
 const LINKISH = new RegExp([
-    String.raw`(?:https?:\/\/|www\.)\S+`,
-    String.raw`[^\s@]+@[^\s@]+\.[^\s@]+`,
+    String.raw`(?:https?:\/\/|www\.)[^\s${URL_STOPS}]+`,
+    String.raw`[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}`,
     String.raw`(?<![\w@])@\w{2,}`,
     String.raw`\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|net|org|info|io|me|co|in|app|xyz|top|link|ly|gg|to|tv|cc|ru|cn|site|online|club|shop|store|live|click|biz|us|uk|de)\b`,
 ].join('|'), 'gi');
@@ -208,7 +216,9 @@ const LINKISH = new RegExp([
 export function introducesLinks(input, output) {
     const seen = input.toLowerCase();
     for (const m of output.matchAll(LINKISH)) {
-        if (!seen.includes(m[0].toLowerCase().replace(/[.,;:!?)\]}"']+$/, ''))) return true;
+        // Text without spaces (CJK, Thai) can run straight on from a link: only the leading ASCII part is the link itself.
+        const link = m[0].toLowerCase().replace(/[^\x21-\x7E]+$/, '').replace(/[.,;:!?)\]}"']+$/, '');
+        if (!seen.includes(link)) return true;
     }
     return false;
 }
@@ -265,7 +275,8 @@ function projectId() {
     return process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || fromConfig;
 }
 
-const readConfig = () => ({ api: TRANSLATE_API.value(), location: TRANSLATE_LOCATION.value(), model: TRANSLATE_MODEL.value(), project: projectId() });
+// .value() is empty when nothing set the variable (the defaults above are applied by the deploy tool / emulator), so fall back to them here too.
+const readConfig = () => ({ api: TRANSLATE_API.value() || DEFAULT_API, location: TRANSLATE_LOCATION.value() || DEFAULT_LOCATION, model: TRANSLATE_MODEL.value() || DEFAULT_MODEL, project: projectId() });
 
 async function attempt(url, headers, body, ms, fetchImpl) {
     let res;
@@ -401,7 +412,7 @@ export const translateText = onCall({ timeoutSeconds: 20 }, async request => {
             logger.warn('Translation provider failed', { reason: e instanceof ProviderError ? e.reason : 'error' });
             throw new HttpsError('unavailable', MSG.unavailable);
         }
-        cache.set(key, result);
+        if (text.length <= SETTINGS.CACHE_MAX_TEXT) cache.set(key, result);
         return answer(text, target, result);
     } catch (e) {
         if (e instanceof HttpsError) throw e;

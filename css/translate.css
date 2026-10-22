@@ -8,3 +8,47 @@
     background: var(--panel-2); border: 1px solid var(--border-strong); color: var(--text);
 }
 .lang-suggest:hover { border-color: var(--primary); color: var(--primary-text); }
+
+/* ---------- Live translate (Premium): entry point, slim bar, lines under messages, settings sheet ---------- */
+.translate-btn.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+/* Phones: the header is already full, so Live translate lives in the "This chat" sheet and the slim bar below. */
+@media (max-width: 899px) { #translateBtn { display: none !important; } }
+
+.tr-bar {
+    display: flex; align-items: center; gap: 4px; margin: 0 12px 8px; padding: 2px 4px 2px 12px; min-height: 44px;
+    border-radius: var(--r-md); background: var(--primary-soft); border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+    font-size: 13px; line-height: 1.3; color: var(--text);
+}
+.tr-bar-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.tr-bar-btn {
+    position: relative; flex-shrink: 0; min-height: 44px; min-width: 44px; padding: 0 12px; border: 0; border-radius: var(--r-sm);
+    background: none; color: var(--primary-text); font-size: 13px; font-weight: 700;
+}
+.tr-bar-btn:hover { background: var(--primary-soft); }
+.tr-bar-go { min-height: 36px; margin: 4px 0; border-radius: 999px; background: var(--primary); color: #fff; }
+.tr-bar-go:hover { background: var(--primary); filter: brightness(1.08); }
+.tr-bar-go::after { content: ''; position: absolute; inset: -4px; } /* 44px tap area */
+.tr-bar-x { font-size: 20px; font-weight: 600; color: var(--muted); }
+
+/* What Live translate adds under a message: the language label, "Show original", the original or the sent version */
+.translated { display: flex; flex-direction: column; gap: 2px; max-width: 100%; overflow-wrap: anywhere; }
+.translated .tr-head { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; font-size: 11.5px; font-weight: 600; color: var(--faint); }
+.translated .tr-body { font-size: 13px; color: var(--text); white-space: pre-wrap; }
+.translated.pending .tr-head { font-style: italic; }
+.translated.failed .tr-head { color: var(--danger); }
+.msg.me .translated { align-items: flex-end; text-align: right; border-left: 0; border-right: 3px solid var(--primary); }
+.tr-link {
+    position: relative; padding: 0; border: 0; background: none; color: var(--primary-text); font: inherit; font-weight: 700;
+    text-decoration: underline; text-underline-offset: 2px;
+}
+.tr-link::after { content: ''; position: absolute; inset: -14px -8px; } /* a bigger tap area than the small text */
+
+.tr-sheet .tr-intro { margin: 0 0 var(--space-3); }
+.tr-group { padding: var(--space-3) 0; border-top: 1px solid var(--border); }
+.tr-group .toggle { min-height: 44px; margin-bottom: 6px; }
+.tr-group .lbl { margin: 6px 0 4px; }
+.tr-group select.input { min-height: 44px; }
+.tr-group.disabled { opacity: 0.65; }
+.toggle input:disabled + .switch { opacity: 0.5; }
+.toggle input:disabled ~ span { cursor: not-allowed; }
+.tr-remember { min-height: 44px; margin: var(--space-3) 0 4px; }

@@ -13,7 +13,7 @@ import { scanMessage, maskContact } from './shield.js';
 import { meterStream } from './audio-meter.js';
 import { callable } from './cloud.js';
 import { initLanding } from './landing.js';
-import { LANGS, sanitizeLang, langName, langNative, langLabel, guessLang } from './languages.js';
+import { LANGS, sanitizeLang, langNative, langLabel, guessLang } from './languages.js';
 import { createEngine, createDeviceProvider, parseChatMessage } from './translate.js';
 import { createLiveTranslate } from './livetranslate.js';
 import { ProfileSync, firestoreIo, googleIdentity } from './profile.js';
@@ -157,6 +157,7 @@ const store = {
 // =====================================================================
 let friends = null;
 let premium = null;
+let lt = null; // Live translate (set up in the Messaging section)
 let access = null; // server-side bans (Firebase only); null in the local demo
 const PREMIUM_CFG = { enabled: true, functionsRegion: 'asia-south1', plans: [], ...(CFG.premium || {}) };
 // Premium only exists on the live (Firebase) site with premium.enabled; otherwise everything is unlocked.
@@ -1320,14 +1321,14 @@ const RISK_COPY = {
     'explicit-ask': 'They asked for photos or private video. You never have to, and you can report this.',
     default: 'They shared contact details or a link. Moving to another app is how many scams start.',
 };
-function riskCard(scan, bubble, original, senderId) {
+function riskCard(scan, ctl, senderId) {
     const kind = scan.kinds.includes('explicit-ask') ? 'explicit-ask' : scan.kinds.includes('money') ? 'money' : 'default';
     const card = h('div', 'alert-card');
     card.append(h('b', '', 'Heads up. '), document.createTextNode(RISK_COPY[kind]));
     const row = h('div', 'row');
     const show = h('button', 'btn btn-ghost btn-sm', 'Show anyway');
     show.type = 'button';
-    show.onclick = () => { bubble.textContent = maskProfanity(original); bubble.classList.remove('masked'); show.remove(); };
+    show.onclick = () => { ctl.revealed = true; ctl.render(); ctl.onReveal.forEach(f => f()); show.remove(); };
     const block = h('button', 'btn btn-ghost btn-sm', 'Block & next');
     block.type = 'button';
     block.onclick = () => {
@@ -1339,24 +1340,38 @@ function riskCard(scan, bubble, original, senderId) {
     return card;
 }
 
-function addMessage(who, text) {
+/**
+ * Shows one chat bubble and returns its controller, which Live translate reads and updates (js/livetranslate.js).
+ * orig: the sender's own wording, when they had it translated for us. The scam shield checks both texts; a masked
+ * message stays masked (in whichever version is shown) until "Show anyway".
+ */
+function addMessage(who, text, { orig = '' } = {}) {
     hideIcebreakers();
     const wrap = h('div', 'msg ' + who);
-    const scan = who === 'them' ? scanMessage(text) : { risky: false, kinds: [] };
-    const shown = who === 'them' ? maskProfanity(scan.risky ? maskContact(text) : text) : text;
-    if (EMOJI_ONLY.test(shown)) wrap.classList.add('emoji-only');
-    const bubble = h('div', 'bubble' + (scan.risky ? ' masked' : ''), shown);
-    wrap.appendChild(bubble);
-    if (scan.risky) wrap.appendChild(riskCard(scan, bubble, text, S.session?.partnerId));
+    const them = who === 'them';
+    const clean = { risky: false, kinds: [] };
+    const scan = them ? scanMessage(text) : clean;
+    const scanOrig = them && orig ? scanMessage(orig) : clean;
+    const risk = { risky: scan.risky || scanOrig.risky, kinds: [...new Set([...scan.kinds, ...scanOrig.kinds])] };
+    const bubble = h('div', 'bubble');
+    bubble.dir = 'auto';
     const meta = h('div', 'meta', new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    if (who === 'them' && canTranslate && !wrap.classList.contains('emoji-only')) {
-        const btn = h('button', '', 'Translate');
-        btn.onclick = () => translateInto(wrap, btn, text);
-        meta.appendChild(btn);
-    }
+    const ctl = { who, wrap, bubble, meta, text, risky: risk.risky, revealed: false, view: 'orig', translated: null, lines: null, onReveal: [] };
+    ctl.render = () => {
+        const raw = ctl.view === 'translated' && ctl.translated != null ? ctl.translated : ctl.text;
+        const masked = ctl.risky && !ctl.revealed;
+        const shown = them ? maskProfanity(masked ? maskContact(raw) : raw) : raw;
+        bubble.textContent = shown;
+        bubble.classList.toggle('masked', masked);
+        wrap.classList.toggle('emoji-only', EMOJI_ONLY.test(shown));
+    };
+    ctl.render();
+    wrap.appendChild(bubble);
+    if (risk.risky) wrap.appendChild(riskCard(risk, ctl, S.session?.partnerId));
     wrap.appendChild(meta);
     el.messages.insertBefore(wrap, typingNode?.isConnected ? typingNode : null);
     scrollMessages();
+    return ctl;
 }
 
 function sendMessage() {
@@ -1376,10 +1391,10 @@ function sendMessage() {
     el.piiWarn.classList.add('hidden');
 
     S.msgTimes.push(now);
-    sendData({ t: 'msg', text });
-    addMessage('me', text);
     el.msgInput.value = '';
     setTypingSent(false);
+    if (lt.sending()) lt.sendTranslated(text); // Live translate: translated first, sent with the original, order kept
+    else { sendData({ t: 'msg', text }); addMessage('me', text); }
 }
 
 function setTypingSent(on) {
@@ -1424,34 +1439,24 @@ EMOJIS.forEach(em => {
 el.emojiBtn.onclick = e => { e.stopPropagation(); el.emojiPop.classList.toggle('hidden'); };
 document.addEventListener('click', e => { if (!el.emojiPop.contains(e.target)) el.emojiPop.classList.add('hidden'); });
 
-// Translation (optional, Gemini)
-async function translateInto(wrap, btn, text) {
-    btn.disabled = true;
-    btn.textContent = 'Translating…';
-    const code = (navigator.language || 'en').split('-')[0];
-    const lang = new Intl.DisplayNames(['en'], { type: 'language' }).of(code) || 'English';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${CFG.geminiModel || 'gemini-2.5-flash'}:generateContent?key=${CFG.geminiApiKey || ''}`;
-    const payload = {
-        contents: [{ parts: [{ text }] }],
-        systemInstruction: { parts: [{ text: `Translate the user's message into ${lang}. Reply with only the translation. If it is already in ${lang}, reply with it unchanged.` }] },
-    };
-    try {
-        let res;
-        for (let i = 0; i < 3; i++) {
-            res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            if (res.ok) break;
-            await new Promise(r => setTimeout(r, 2 ** i * 1000));
-        }
-        const json = await res.json();
-        const out = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        if (!out) throw new Error('empty translation');
-        wrap.insertBefore(h('div', 'translated', `${lang}: ${maskProfanity(out)}`), wrap.lastChild);
-        btn.remove();
-    } catch (e) {
-        console.warn('translate failed', e);
-        btn.textContent = 'Translation unavailable';
-    }
-}
+// =====================================================================
+// Live translate (Premium). The engine (js/translate.js) tries the browser's on-device translator first and otherwise our
+// translateText Cloud Function; js/livetranslate.js is the switch, the sheet and the lines under messages. Text is only
+// handed over while the person has a switch on.
+// =====================================================================
+const translateEngine = createEngine({
+    device: createDeviceProvider(globalThis),
+    // Our server exists on the live (Firebase) site only; the local demo has the browser's translator or nothing.
+    cloud: firebaseConfig ? async req => {
+        const fn = await callable(S.transport, 'translateText', PREMIUM_CFG.functionsRegion);
+        return (await fn(req)).data;
+    } : null,
+});
+lt = createLiveTranslate({
+    S, store, engine: translateEngine, isPremium, openPaywall, toast, sendData, addMessage, scroll: scrollMessages,
+    whenReady: () => (premium ? premium.waitReady(2500) : Promise.resolve()),
+    fmt: { profanity: maskProfanity, contact: maskContact },
+});
 
 // =====================================================================
 // Approximate distance. Off by default, and only ever shared with a partner who also turned it on.
@@ -2251,7 +2256,7 @@ function renderLang() {
     langSuggest.textContent = `Use ${langLabel(guess)}`;
     langSuggest.classList.toggle('hidden', Boolean(S.lang));
 }
-function setLang(code) { S.lang = sanitizeLang(code); store.set('lang', S.lang); renderLang(); }
+function setLang(code) { S.lang = sanitizeLang(code); store.set('lang', S.lang); renderLang(); lt?.refresh(); }
 langSelect.onchange = () => setLang(langSelect.value);
 langSuggest.onclick = () => setLang(browserLang());
 renderLang();
@@ -2360,6 +2365,7 @@ function applyProfile(p) {
     if (p.interests) { S.interests = p.interests.slice(0, MAX_INTERESTS); store.set('interests', S.interests); renderTags(); }
     if (p.gender) { S.gender = p.gender; el.genderSelect.value = S.gender; store.set('gender', S.gender); }
     renderLang();
+    lt?.refresh();
 }
 
 function initFriends() {
@@ -2435,6 +2441,7 @@ function renderPremium() {
     renderFxPanel();
     renderAccents();
     renderHideIp();
+    lt?.enforce(); // Premium ended or signed out: Live translate goes off
     renderPaywall();
 }
 

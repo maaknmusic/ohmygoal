@@ -305,14 +305,12 @@ export function createEngine({
         if (running || disposed || !queue.length || !isVisible()) return;
         const item = queue.shift();
         running = item;
+        // Free the slot before anyone is told, so `pending` and the de-duplication are exact the moment a promise settles.
+        const settle = done => { inflight.delete(item.key); running = null; done(); pump(); };
         attempt(item).then(
-            res => { remember(item.key, res); item.resolve(res); },
-            err => item.reject(classifyError(err)),
-        ).finally(() => {
-            inflight.delete(item.key);
-            running = null;
-            pump();
-        });
+            res => settle(() => { remember(item.key, res); item.resolve(res); }),
+            err => settle(() => item.reject(classifyError(err))),
+        );
     }
     const stopWatching = onVisible(() => { if (isVisible()) pump(); });
 

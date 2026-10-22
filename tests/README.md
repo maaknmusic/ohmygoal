@@ -16,6 +16,8 @@ node tests/e2e/v2.mjs <scratch-dir>   # UI flows on desktop and phone
 node tests/e2e/hardening.mjs          # hostile peer (floods, oversize frames, extra channels)
 node tests/e2e/distance.mjs           # approximate distance
 node tests/e2e/failclosed.mjs         # masks never fall back to the raw camera; distance toggle race
+node tests/e2e/translate-live-demo.mjs <scratch-dir>   # Live translate (fake on-device Translator): sheet, receive/send, failures, queue, hostile frames, phones
+node tests/e2e/translate-demo.mjs <scratch-dir>        # My language selector, localStorage, hello.lang, "Speaks ..." on the match card
 node tests/e2e/masks.mjs              # every mask on a real face (needs the MediaPipe files, see the header of the script)
 node tests/e2e/backgrounds.mjs        # matte stability, blur, every scene, custom photo (same requirements)
 ```

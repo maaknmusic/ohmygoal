@@ -1,6 +1,6 @@
 // =====================================================================
-// Live translate in the chat (Premium) and the "My language" picker. The UI and per-chat state around the engine in
-// translate.js; app.js feeds it three things: when a chat starts/ends, when the partner's hello arrives, and each
+// Live translate in the chat (Premium): the switches, the sheet, the slim bar, the lines under messages and the per-chat state
+// around the engine in translate.js. (The "My language" picker is in app.js.) app.js feeds it three things: when a chat starts/ends, when the partner's hello arrives, and each
 // message in or out. Per chat: both switches start off (or as remembered in localStorage 'ac.translate'), and all of it
 // resets on Next. Text is only handed to the engine while the matching switch is on (or on an explicit "Retry").
 // Everything that came from the partner is shown with textContent only.
@@ -23,7 +23,7 @@ const RETRYABLE = new Set(['timeout', 'unavailable', 'busy', 'quota-minute']);
  * S: app state (lang, session, phase)       store: { get, set } over localStorage 'ac.*'
  * engine: createEngine(...)                  isPremium(), openPaywall(reason), toast(text, bad), whenReady() -> Promise
  * sendData(obj)                              the data channel
- * addMessage(who, text) -> ctl               shows a bubble. ctl = { wrap, meta, text, risky, revealed, view, translated, render(), onReveal[] }
+ * addMessage(who, text) -> ctl               shows a bubble. ctl = { wrap, bubble, meta, text, risky, revealed, view, translated, render(), onReveal[] }
  * fmt: { profanity(text), contact(text) }    how text from the partner is masked for display
  * scroll()                                   keep the newest message in view
  */
@@ -123,7 +123,9 @@ export function createLiveTranslate({ S, store, engine, isPremium, openPaywall, 
                 : recvOn() ? `Live translate on: messages into ${langName(recvTarget())}`
                     : `Live translate on: what you type into ${langName(sendTarget())}`;
             chat.sug = 'done';
+            if (bar.dataset.key === text && !bar.classList.contains('hidden')) return; // unchanged: don't rebuild (and re-announce) it
             bar.dataset.kind = 'on';
+            bar.dataset.key = text;
             const label = h('span', 'tr-bar-text');
             label.append(h('span', 'tr-bar-globe', '🌐'), document.createTextNode(' ' + text));
             const settings = h('button', 'tr-bar-btn', 'Settings');
@@ -135,7 +137,9 @@ export function createLiveTranslate({ S, store, engine, isPremium, openPaywall, 
         }
         if (show && isPremium() && partner && partner !== myLang() && chat.sug !== 'done') {
             chat.sug = 'open';
+            if (bar.dataset.key === 'suggest:' + partner && !bar.classList.contains('hidden')) return;
             bar.dataset.kind = 'suggest';
+            bar.dataset.key = 'suggest:' + partner;
             const label = h('span', 'tr-bar-text');
             label.append(h('span', 'tr-bar-globe', '🌐'), document.createTextNode(` ${langName(partner)} speaker: turn on live translate?`));
             const on = h('button', 'tr-bar-btn tr-bar-go', 'Turn on');
@@ -152,6 +156,7 @@ export function createLiveTranslate({ S, store, engine, isPremium, openPaywall, 
         }
         bar.classList.add('hidden');
         bar.replaceChildren();
+        delete bar.dataset.key;
     }
 
     async function openFromButton() {

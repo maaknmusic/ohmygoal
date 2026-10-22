@@ -55,9 +55,10 @@ async function setup({ mode = 'text', viewport = { width: 1280, height: 800 }, l
 }
 const live = p => p.waitForFunction(() => !document.getElementById('msgInput').disabled, null, { timeout: 15000 }).then(() => true, () => false);
 const text = (p, sel) => p.textContent(sel).then(t => t || '');
-const connect = async (a, b) => { await a.click('#startBtn'); await b.click('#startBtn'); return (await live(a)) && (await live(b)); };
+const partnered = p => p.waitForFunction(() => window.__t.S.session?.partner, null, { timeout: 5000 }).then(() => true, () => false); // the greeting arrives just after the channel opens
+const connect = async (a, b) => { await a.click('#startBtn'); await b.click('#startBtn'); return (await live(a)) && (await live(b)) && (await partnered(a)) && (await partnered(b)); };
 const frames = (p, type) => p.evaluate(t => window.__sent.map(s => { try { return JSON.parse(s); } catch { return null; } }).filter(f => f && f.t === t), type);
-const openPrefs = async p => { await p.click('#prefsBtn'); await p.waitForSelector('#prefsSheet:not(.hidden)'); };
+const openPrefs = async p => { await p.click('#prefsBtn'); await p.waitForSelector('#prefsSheet:not(.hidden)'); await p.waitForTimeout(450); /* the sheet's entrance animation: sizes are final after it */ };
 const closePrefs = async p => { await p.keyboard.press('Escape'); await p.waitForSelector('#prefsSheet', { state: 'hidden' }); };
 const noOverflow = p => p.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1);
 const stored = (p, key) => p.evaluate(k => localStorage.getItem('ac.' + k), key);
@@ -112,7 +113,7 @@ const stored = (p, key) => p.evaluate(k => localStorage.getItem('ac.' + k), key)
   await a.reload();
   await a.waitForFunction(() => document.getElementById('startBtn').textContent === 'Start chatting', null, { timeout: 15000 });
   step('A2g. unreadable storage is ignored', (await a.evaluate(() => window.__t.S.lang)) === '');
-  const ext = requests.filter(r => !/^http:\/\/(localhost|127\.0\.0\.1)/.test(r) && !/^(data|blob):/.test(r));
+  const ext = requests.filter(r => !/^http:\/\/(localhost|127\.0\.0\.1)/.test(r) && !/^(data|blob):/.test(r) && !/fonts\.g|country\.is|jsdelivr/.test(r)); // (those three are blocked by the test's own routes)
   step('A2h. anonymous: nothing about the profile goes to any server (no external requests at all in demo mode)', ext.length === 0, ext.slice(0, 3).join(' | ').slice(0, 200));
   await ctx.close();
 }

@@ -325,6 +325,22 @@ describe('echo and link detection helpers', () => {
         assert.equal(introducesLinks('hello', 'a @ b'), false);
         assert.equal(introducesLinks('hello', 'x@y.com'), true);
     });
+    test('introducesLinks: scripts without spaces run straight on from a link; that is not a new link', () => {
+        assert.equal(introducesLinks('see https://a.example/x now', '见 https://a.example/x。谢谢'), false);
+        assert.equal(introducesLinks('see https://a.example/x now', '见https://a.example/x谢谢'), false);
+        assert.equal(introducesLinks('see https://a.example/x now', '見て https://a.example/x、ありがとう'), false);
+        assert.equal(introducesLinks('mail bob@mail.com', '联系bob@mail.com谢谢'), false);
+        assert.equal(introducesLinks('see www.a.com', 'انظر www.a.com،'), false);
+        assert.equal(introducesLinks('see www.a.com', 'देखें www.a.com।'), false);
+        assert.equal(introducesLinks('see shop.in', '看 shop.in。'), false);
+        // ...but a different or extended link is still caught, with or without such punctuation
+        assert.equal(introducesLinks('hello', '访问 http://evil.example。'), true);
+        assert.equal(introducesLinks('hello', '访问www.evil.example谢谢'), true);
+        assert.equal(introducesLinks('see https://a.example/x', '见 https://a.example/x/evil。'), true);
+        assert.equal(introducesLinks('see https://a.example/x', '见 https://a.example.evil.com/x'), true);
+        assert.equal(introducesLinks('mail bob@mail.com', '联系bob@evil.com谢谢'), true);
+        assert.equal(introducesLinks('hello', '关注@evil_account。'), true);
+    });
     test('cleanText and translatable', () => {
         assert.equal(cleanText('a\tb\nc'), 'a\tb\nc');
         assert.equal(cleanText(`a${ZWJ}b${ZWNJ}c`), `a${ZWJ}b${ZWNJ}c`);

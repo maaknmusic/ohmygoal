@@ -3,7 +3,7 @@
  * - firebase: Firebase web config. When null, the app runs in LOCAL DEMO mode
  *   (matching only works between tabs of the same browser).
  * - iceServers: STUN servers (the TURN relay credentials come from the turnCredentials function). TURN lets users behind strict NATs / mobile data connect.
- * - geminiApiKey: optional, enables the "Translate" button on incoming messages.
+ * - Live translate (Premium) needs no key here: it translates on the device, or through the translateText Cloud Function (see README).
  * - ageCheck: on-device face age estimation settings.
  */
 window.APP_CONFIG = {
@@ -34,9 +34,6 @@ window.APP_CONFIG = {
     // with the chat partner and only if both turned it on. Never stored. Larger = more private.
     location: { cellDeg: 0.05 },
 
-    geminiApiKey: '',
-    geminiModel: 'gemini-2.5-flash',
-
     // Face-based age estimation (runs on-device; no image ever leaves the browser).
     // Video effects (background blur/replacement, face masks). Loaded only when a user opens the effects panel.
     effects: {
@@ -53,7 +50,7 @@ window.APP_CONFIG = {
         email: '',      // support email, e.g. 'support@yourdomain.com'
         phone: '',
         address: '',    // city, state, country
-        policiesUpdated: '17 October 2026',
+        policiesUpdated: '22 October 2026',
     },
 
     // Premium = signed in with Google + a pass bought through Razorpay (verified by the Cloud Functions
