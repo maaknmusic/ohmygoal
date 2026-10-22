@@ -91,8 +91,11 @@ const MSG = Object.freeze({
 
 // Control characters (except tab and newline), bidi embeddings / overrides / isolates, zero-width space, word joiner and BOM.
 // Zero-width (non-)joiners are kept: Indic scripts, Persian and emoji sequences need them. U+2028 / U+2029 become newlines first.
-const UNSAFE_CHARS = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F​‪-‮⁠⁦-⁩﻿]/g;
-export const cleanText = s => String(s).toWellFormed().replace(/[  ]/g, '\n').replace(UNSAFE_CHARS, '');
+const UNSAFE_RANGES = [[0x00, 0x08], [0x0B, 0x1F], [0x7F, 0x9F], [0x200B, 0x200B], [0x202A, 0x202E], [0x2060, 0x2060], [0x2066, 0x2069], [0xFEFF, 0xFEFF]];
+const charClass = ranges => `[${ranges.map(([a, b]) => String.fromCodePoint(a) + '-' + String.fromCodePoint(b)).join('')}]`;
+const UNSAFE_CHARS = new RegExp(charClass(UNSAFE_RANGES), 'g');
+const LINE_SEPARATORS = new RegExp(charClass([[0x2028, 0x2029]]), 'g');
+export const cleanText = s => String(s).toWellFormed().replace(LINE_SEPARATORS, '\n').replace(UNSAFE_CHARS, '');
 
 const codePoints = s => { let n = 0; for (const _ of s) n++; return n; };
 
@@ -129,12 +132,12 @@ const ALIASES = new Map([
 export function normalizeLang(raw) {
     if (typeof raw !== 'string' || raw.length > 16) return null;
     const s = raw.trim().toLowerCase().replace(/_/g, '-');
-    if (s === '' || s === 'und' || s === 'unknown' || s === 'auto') return '';
+    if (s === '' || s === 'und' || s === 'unknown') return '';
     if (BY_LOWER.has(s)) return BY_LOWER.get(s);
     if (ALIASES.has(s)) return ALIASES.get(s);
-    const base = s.split('-')[0];
-    if (base !== 'zh' && BY_LOWER.has(base)) return BY_LOWER.get(base);
-    return ALIASES.get(base) && base !== 'zh' ? ALIASES.get(base) : null;
+    const base = s.split('-')[0]; // 'en-US' -> 'en', 'no-NO' -> 'no' -> 'nb'
+    if (base === 'zh') return null; // Chinese must say which script it is
+    return BY_LOWER.get(base) ?? ALIASES.get(base) ?? null;
 }
 
 // ---------------------------------------------------------------------------------------------- the prompt
@@ -306,7 +309,7 @@ export async function callProvider({ text, target, hint = 'auto' }, deps = {}) {
         } catch (e) {
             failure = e instanceof ProviderError ? e : new ProviderError('error');
             if (!failure.retryable) break;
-            await sleep(250);
+            if (tries === 0) await sleep(250);
         }
     }
     throw failure;
