@@ -44,7 +44,7 @@ const remoteVideoTracks = p => p.evaluate(() => (document.getElementById('remote
   await a.waitForTimeout(1500);
   const before = await a.evaluate(() => window.__t.S.session.pc.getSenders().filter(s => s.track?.kind === 'video').length);
   await a.click('#fxBtn');
-  await a.click('#fxPanel .fx-opts[data-kind=mask] button[data-id=dog]');
+  await a.click('#fxPanel .fx-opts[data-kind=mask] button[data-id=origami]'); // (tests 1 and 5 save the retired id "dog", which maps to a full-face mask)
   await a.waitForFunction(() => /couldn.t load/i.test(document.getElementById('toasts').textContent), null, { timeout: 15000 }).catch(() => {});
   await a.waitForTimeout(800);
   const after = await a.evaluate(() => window.__t.S.session.pc.getSenders().filter(s => s.track?.kind === 'video').length);

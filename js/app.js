@@ -1,6 +1,6 @@
 import { createFirebaseTransport, createLocalTransport } from './transport.js';
 import { COUNTRIES, flagOf, countryName, detectCountry } from './geo.js';
-import { Effects, BACKGROUNDS, MASKS, FILTERS } from './effects.js';
+import { Effects, BACKGROUNDS, MASKS, FILTERS, migrateFx } from './effects.js';
 import { NudityGuard } from './safety.js';
 import { Friends, pairIdOf } from './friends.js';
 import { Premium } from './premium.js';
@@ -168,7 +168,7 @@ const S = {
     genderFilter: store.get('genderFilter', 'any'),
     countryFilter: store.get('countryFilter', 'any'),
     timed: store.get('timed', false),
-    fx: { background: 'none', mask: 'none', filter: 'none', ...store.get('fx', {}) },
+    fx: migrateFx({ background: 'none', mask: 'none', filter: 'none', ...store.get('fx', {}) }), // ids saved by older versions are mapped onto current ones
     effects: null,
     country: '',
     phase: 'idle', // idle | searching | connecting | connected | ended

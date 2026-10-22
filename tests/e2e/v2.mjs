@@ -51,7 +51,7 @@ const connect = async (a, b) => { await a.click('#startBtn'); await b.click('#st
   step('1b. dice re-rolls the handle', (await c2.inputValue('#nickInput')) !== before);
   await c2.uncheck('#ageCheck').catch(() => {});
   await c2.click('#startBtn');
-  step('1c. Start without consent nudges instead of failing silently', /18 or older/.test(await text(c2, '#toasts')) && await c2.isVisible('#welcome'));
+  step('1c. Start without consent nudges instead of failing silently', /18\+/.test(await text(c2, '#toasts')) && await c2.isVisible('#welcome'));
   await c2.close();
 
   step('1d. two people match', await connect(a, b));
