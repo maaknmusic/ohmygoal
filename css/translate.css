@@ -1,0 +1,10 @@
+/* =====================================================================
+   Languages and Live translate: the "My language" picker, the partner's language on the match card,
+   and (below) the Live translate sheet, bar and translated lines.
+   ===================================================================== */
+.match-card .speaks { font-size: 13px; color: var(--muted); }
+.lang-suggest {
+    min-height: 44px; margin-top: 8px; padding: 0 16px; border-radius: 999px; font-weight: 700;
+    background: var(--panel-2); border: 1px solid var(--border-strong); color: var(--text);
+}
+.lang-suggest:hover { border-color: var(--primary); color: var(--primary-text); }

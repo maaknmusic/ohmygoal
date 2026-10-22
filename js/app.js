@@ -13,6 +13,8 @@ import { scanMessage, maskContact } from './shield.js';
 import { meterStream } from './audio-meter.js';
 import { callable } from './cloud.js';
 import { initLanding } from './landing.js';
+import { LANGS, sanitizeLang, langNative, langLabel, guessLang } from './languages.js';
+import { ProfileSync, firestoreIo, googleIdentity } from './profile.js';
 import { getApproxCell, parseLocMessage, locMessage, distanceBetweenCells, describeDistance } from './location.js';
 
 // =====================================================================
@@ -137,9 +139,15 @@ function toast(text, bad = false) {
     setTimeout(() => t.remove(), 4000);
 }
 
+// A Google account also keeps these in its profile document (js/profile.js); every change here is passed on to it.
+let profileSync = null;
+const PROFILE_KEYS = new Set(['lang', 'nick', 'avatar', 'interests', 'gender']);
 const store = {
     get(key, fallback) { try { const v = localStorage.getItem('ac.' + key); return v == null ? fallback : JSON.parse(v); } catch { return fallback; } },
-    set(key, value) { try { localStorage.setItem('ac.' + key, JSON.stringify(value)); } catch { /* storage unavailable */ } },
+    set(key, value) {
+        try { localStorage.setItem('ac.' + key, JSON.stringify(value)); } catch { /* storage unavailable */ }
+        if (PROFILE_KEYS.has(key)) profileSync?.touch();
+    },
 };
 
 // =====================================================================
@@ -165,6 +173,7 @@ const S = {
     blocked: new Set(store.get('blocked', [])),
     sound: store.get('sound', true),
     gender: store.get('gender', 'x'),
+    lang: sanitizeLang(store.get('lang', '')), // '' until the person picks one: the browser's language is only a suggestion
     genderFilter: store.get('genderFilter', 'any'),
     countryFilter: store.get('countryFilter', 'any'),
     timed: store.get('timed', false),
@@ -971,7 +980,7 @@ function attachChannel(sess, dc) {
         el.avatar.textContent = (sess.friend?.name || 'S')[0].toUpperCase();
         el.avatar.style.background = '';
         if (sess.friend && sess.role === 'offerer') friends?.clearCall(sess.friend.id);
-        sendData({ t: 'hello', nick: S.nick, avatar: S.avatar, loc: locOffer(), interests: S.interests, country: S.country, gender: S.gender, timed: S.timed, premium: isPremium() });
+        sendData({ t: 'hello', nick: S.nick, avatar: S.avatar, loc: locOffer(), interests: S.interests, country: S.country, gender: S.gender, timed: S.timed, premium: isPremium(), ...(S.lang ? { lang: S.lang } : {}) });
         if (S.timed && !sess.friend) startRound(sess);
         sendData({ t: 'av', muted: S.muted, camOff: S.camOff });
         sess.games = createGamesUi({
@@ -1042,6 +1051,13 @@ function renderMatchCard(p, shared) {
     card.append(av, h('h4', '', p.nick));
     const where = [p.country ? `${flagOf(p.country)} ${countryName(p.country)}` : '', p.gender === 'male' ? 'Male' : p.gender === 'female' ? 'Female' : ''].filter(Boolean).join(' · ');
     if (where) card.appendChild(h('div', 'where', where));
+    if (p.lang) {
+        const speaks = h('div', 'speaks', 'Speaks ');
+        const name = h('span', '', langNative(p.lang));
+        name.lang = p.lang === 'zh-TW' ? 'zh-Hant' : p.lang;
+        speaks.appendChild(name);
+        card.appendChild(speaks);
+    }
     if (shared.length) {
         const chips = h('div', 'shared-chips');
         chips.append(...shared.map(t => h('span', '', '#' + t)));
@@ -1062,7 +1078,8 @@ function onPeerData(sess, msg) {
             const interests = Array.isArray(msg.interests) ? msg.interests.map(String).slice(0, MAX_INTERESTS) : [];
             const country = typeof msg.country === 'string' && /^[A-Z]{2}$/.test(msg.country) ? msg.country : '';
             const gender = ['male', 'female'].includes(msg.gender) ? msg.gender : '';
-            sess.partner = { nick, interests, country, gender, avatar, loc: msg.loc === true };
+            const lang = sanitizeLang(msg.lang); // a code from our list, or '' (untrusted like everything else)
+            sess.partner = { nick, interests, country, gender, avatar, lang, loc: msg.loc === true };
             el.partnerName.textContent = nick;
             el.partnerFlag.textContent = country ? flagOf(country) : '';
             el.partnerFlag.title = country ? countryName(country) : '';
@@ -2206,6 +2223,29 @@ function renderCountryFilter() {
     el.countryFilter.value = S.countryFilter;
 }
 
+// "My language": shown to chat partners and (soon) used for translation. Saved in this browser; a Google account also keeps it in its profile.
+const langSelect = $('langSelect'), langSuggest = $('langSuggest');
+const browserLang = () => guessLang(navigator.languages?.length ? navigator.languages : navigator.language);
+function renderLang() {
+    if (!langSelect.options.length) {
+        langSelect.add(new Option('', ''));
+        for (const l of [...LANGS].sort((a, b) => a.en.localeCompare(b.en))) {
+            const o = new Option(langLabel(l.code), l.code);
+            o.lang = l.code === 'zh-TW' ? 'zh-Hant' : l.code;
+            langSelect.add(o);
+        }
+    }
+    const guess = browserLang();
+    langSelect.options[0].textContent = `Not set · suggested: ${langLabel(guess)}`;
+    langSelect.value = S.lang;
+    langSuggest.textContent = `Use ${langLabel(guess)}`;
+    langSuggest.classList.toggle('hidden', Boolean(S.lang));
+}
+function setLang(code) { S.lang = sanitizeLang(code); store.set('lang', S.lang); renderLang(); }
+langSelect.onchange = () => setLang(langSelect.value);
+langSuggest.onclick = () => setLang(browserLang());
+renderLang();
+
 el.genderSelect.value = S.gender;
 el.genderFilter.value = S.genderFilter;
 el.timedCheck.checked = S.timed;
@@ -2302,6 +2342,16 @@ window.addEventListener('pagehide', () => {
 const drawer = { view: 'list', open: null, unsubMessages: null };
 const handledCalls = new Set();
 
+/** The signed-in account's profile (already validated by ProfileSync) replaces the values on this device. */
+function applyProfile(p) {
+    if (p.lang) { S.lang = p.lang; store.set('lang', S.lang); }
+    if (p.nick) { S.nick = p.nick; el.nickInput.value = S.nick; store.set('nick', S.nick); }
+    if (p.avatar) { S.avatar = p.avatar; store.set('avatar', S.avatar); renderMyAvatar(); }
+    if (p.interests) { S.interests = p.interests.slice(0, MAX_INTERESTS); store.set('interests', S.interests); renderTags(); }
+    if (p.gender) { S.gender = p.gender; el.genderSelect.value = S.gender; store.set('gender', S.gender); }
+    renderLang();
+}
+
 function initFriends() {
     friends = new Friends(S.transport);
     el.friendsBtn.classList.remove('hidden');
@@ -2319,6 +2369,16 @@ function initFriends() {
     });
     friends.start();
     renderDrawer();
+    // Google accounts keep language, nickname, avatar, interests and gender in the account (anonymous ones never do).
+    profileSync = new ProfileSync({
+        io: firestoreIo(S.transport.fb), identity: googleIdentity(S.transport.fb), apply: applyProfile,
+        getLocal: () => ({ lang: S.lang, nick: S.nick, avatar: S.avatar, interests: S.interests, gender: S.gender }),
+        onError: e => console.warn('profile sync', e?.code || e),
+    });
+    friends.onChange(() => profileSync.check());
+    profileSync.check();
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') profileSync.flush(); });
+    window.addEventListener('pagehide', () => profileSync.flush());
     if (PREMIUM_CFG.enabled) {
         premium = new Premium(S.transport, friends, PREMIUM_CFG);
         premium.onChange(renderPremium);
