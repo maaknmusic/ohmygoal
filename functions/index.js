@@ -36,10 +36,19 @@ const PLANS = {
 };
 const CURRENCY = 'INR';
 const DAY_MS = 86400000;
+// A tip is a voluntary payment of any whole-rupee amount in this range. It never grants Premium; the amount is checked here.
+const TIP_MIN_RUPEES = 10;
+const TIP_MAX_RUPEES = 5000;
 
 const entitlementRef = uid => db.doc(`artifacts/${APP_ID.value()}/public/data/entitlements/${uid}`);
 // Outside the public tree: no Firestore rule matches it, so clients can't read or write it.
 const orderRef = orderId => db.doc(`artifacts/${APP_ID.value()}/private/data/orders/${orderId}`);
+
+/** Anyone with a (possibly anonymous) account may leave a tip. */
+function requireUser(request) {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Please reload the page.');
+    return request.auth.uid;
+}
 
 function requireGoogleUser(request) {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Please sign in.');
@@ -106,6 +115,11 @@ async function grantOrder(orderId, paymentId) {
         const oSnap = await t.get(orderRef(orderId));
         if (!oSnap.exists) throw new HttpsError('not-found', 'Unknown order.');
         const order = oSnap.data();
+        if (order.kind === 'tip') {
+            // A tip is recorded as paid (exactly once) and changes nothing else.
+            if (order.status !== 'paid') t.update(orderRef(orderId), { status: 'paid', paymentId, paidAt: Date.now() });
+            return { uid: order.uid, premiumUntil: 0, alreadyGranted: order.status === 'paid', tip: true };
+        }
         const eRef = entitlementRef(order.uid);
         const eSnap = await t.get(eRef);
         if (order.status === 'paid') {
@@ -140,6 +154,7 @@ async function confirmCaptured(paymentId, orderId, order) {
 }
 
 export const createOrder = onCall({ secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET] }, async request => {
+    if (request.data?.tip !== undefined) return createTipOrder(request);
     const uid = requireGoogleUser(request);
     const planId = request.data?.plan;
     const plan = Object.hasOwn(PLANS, planId) ? PLANS[planId] : null;
@@ -167,8 +182,26 @@ export const createOrder = onCall({ secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SECR
     };
 });
 
+/** A tip order: whole rupees between the limits, no Premium. The amount sent by the browser is only a request; it is validated here. */
+async function createTipOrder(request) {
+    const uid = requireUser(request);
+    const rupees = request.data.tip;
+    if (!Number.isInteger(rupees) || rupees < TIP_MIN_RUPEES || rupees > TIP_MAX_RUPEES) {
+        throw new HttpsError('invalid-argument', `A tip must be a whole number of rupees between ₹${TIP_MIN_RUPEES} and ₹${TIP_MAX_RUPEES}.`);
+    }
+    const amount = rupees * 100;
+    await takeOrderSlot(uid);
+    const order = await razorpay('/v1/orders', {
+        method: 'POST',
+        body: { amount, currency: CURRENCY, receipt: `tip-${Date.now()}`.slice(0, 40), notes: { uid, kind: 'tip', appId: APP_ID.value() } },
+    });
+    if (order.amount !== amount || order.currency !== CURRENCY) throw new HttpsError('internal', 'Unexpected order from the payment provider.');
+    await orderRef(order.id).set({ uid, kind: 'tip', days: 0, amount, currency: CURRENCY, status: 'created', createdAt: Date.now() });
+    return { orderId: order.id, amount, currency: CURRENCY, plan: 'tip', label: 'Tip for Anonymous Connect', keyId: RAZORPAY_KEY_ID.value() };
+}
+
 export const verifyPayment = onCall({ secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET] }, async request => {
-    const uid = requireGoogleUser(request);
+    const uid = requireUser(request);
     const { orderId, paymentId, signature } = request.data || {};
     if (![orderId, paymentId, signature].every(v => typeof v === 'string' && v.length > 0 && v.length < 200)) {
         throw new HttpsError('invalid-argument', 'Missing payment details.');
@@ -183,10 +216,11 @@ export const verifyPayment = onCall({ secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SE
     if (!oSnap.exists || oSnap.data().uid !== uid) {
         throw new HttpsError('permission-denied', 'This order belongs to another account.');
     }
+    if (oSnap.data().kind !== 'tip') requireGoogleUser(request); // a Premium pass is only for Google accounts
     // 3. The money must actually have been captured.
     if (oSnap.data().status !== 'paid') await confirmCaptured(paymentId, orderId, oSnap.data());
     const result = await grantOrder(orderId, paymentId);
-    return { premiumUntil: result.premiumUntil, alreadyGranted: result.alreadyGranted };
+    return { premiumUntil: result.premiumUntil, alreadyGranted: result.alreadyGranted, tip: result.tip === true };
 });
 
 /**

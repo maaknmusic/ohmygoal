@@ -1,4 +1,4 @@
-// Connect 4 on a 7x6 board. Move = column index 0-6. The player who starts plays red.
+// Four in a Row on a 7x6 board (the id stays 'connect4' so old and new clients still understand each other). Move = column index 0-6. The player who starts plays red.
 // board is flat, row-major, row 0 at the top: cell = row * COLS + col.
 
 const COLS = 7;
@@ -65,6 +65,6 @@ function status(state) {
 }
 
 export default {
-    id: 'connect4', name: 'Connect 4', emoji: '🔴', blurb: 'Drop discs, line up four.',
+    id: 'connect4', name: 'Four in a Row', emoji: '🔴', blurb: 'Drop discs, line up four.',
     players: 2, simultaneous: false, init, validMove, apply, status,
 };

@@ -39,6 +39,7 @@
             <a href="#refunds">Cancellation &amp; Refunds</a>
             <a href="#delivery">Delivery</a>
             <a href="#contact">Contact Us</a>
+            <a href="#credits">Credits &amp; licences</a>
         </nav>
 
         <h2 id="terms">Terms of Service</h2>
@@ -60,7 +61,7 @@
             <li><b>Approximate distance (optional, off by default).</b> If you turn on “Show how far I am”, your device reads its location when you start a chat, rounds it to a grid square of about 5 km, and sends only that square to your chat partner, and only if their app also says it turned the feature on (we cannot verify that for someone using a modified app, so keep it off if that worries you). We never receive, store or log your location. The other person sees a rough distance band (for example “10–25 km away”), never an exact one. Location is never used for matching.</li>
             <li><b>Likes.</b> When you give someone a “good vibe” after a chat, we store a like count against their anonymous account ID, and a record that you liked that chat (your account ID, theirs and the chat’s ID) so likes cannot be repeated or faked. Likes carry no names or messages. A person’s count can be looked up by anyone who knows their anonymous account ID, such as someone they chatted with.</li>
             <li><b>Safety checks</b> (age estimation, nudity detection) run on your device. Camera frames are not uploaded.</li>
-            <li><b>We store:</b> an anonymous account ID; your chosen nickname, interests, country (detected from your IP address) and declared gender while you are matching; abuse reports; and, if you sign in with Google, your Google account ID, name and email, your friends list and friend messages, and your Premium status.</li>
+            <li><b>We store:</b> an anonymous account ID; your chosen nickname, interests, country (detected from your IP address) and declared gender while you are matching; abuse reports; and, if you sign in with Google, your Google account ID, name and email, your friends list and friend messages, and your Premium status; payment records (order and payment IDs and amounts, never card details) for Premium passes and tips.</li>
             <li><b>Abuse prevention:</b> to enforce age and safety rules we store your IP address and a device identifier (a one-way hash of your browser and device characteristics, not a photo or hardware ID) with your account ID. If the age or nudity check results in a restriction, these are used to apply it to this device, network and account, including private windows. Restrictions expire automatically (usually after 15 minutes or 24 hours) and you can request a review from the restriction screen. If you request a review, we keep your message and any contact details you give for 90 days. The IP address and device identifier stored with your account are deleted 90 days after your last visit, and records of expired restrictions are removed 30 days after they end.</li>
             <li><b>Payments</b> are processed by Razorpay. We never see or store your card, UPI or bank details; we keep the order and payment IDs, amount and date.</li>
             <li><b>Service providers:</b> Google Firebase (database, sign-in and functions), Razorpay (payments), Cloudflare (connection relay), Google Fonts and jsDelivr (fonts and the on-device safety models, which see your IP address when your browser downloads them), country.is (looks up your country from your IP address).</li>
@@ -74,6 +75,7 @@
             <li>Refunds for unused passes can be requested within 48 hours of purchase if Premium features have not been used.</li>
             <li>Approved refunds are returned to the original payment method within 5–7 working days.</li>
             <li>Passes removed because of a ban for breaking these terms are not refundable.</li>
+            <li><b>Tips</b> are voluntary one-time payments of an amount you choose (₹10 to ₹5,000). They unlock nothing and are non-refundable, except if you were charged by mistake or twice: contact us with the payment ID within 7 days and we will refund it.</li>
         </ul>
 
         <h2 id="delivery">Delivery Policy</h2>
@@ -86,6 +88,28 @@
             Phone: <span data-field="phone"></span><br>
             Address: <span data-field="address"></span>
         </p>
+
+        <h2 id="credits">Credits &amp; open-source licences</h2>
+        <p class="muted">Anonymous Connect is built with the following open-source work. Thank you to its authors. All face masks, backgrounds, themes, illustrations and sounds in the app are drawn or generated in code by us.</p>
+        <ul>
+            <li><b>Icons</b>: simple line icons in the style of <b>Lucide</b> (ISC licence) and <b>Feather</b> (MIT licence); some icon shapes are taken from them.</li>
+            <li><b>On-device safety models</b>: NSFWJS by Infinite Red, Inc. (MIT); face-api by Vladimir Mandic, based on face-api.js by Vincent M&uuml;hler (MIT); TensorFlow.js (Apache 2.0).</li>
+            <li><b>Video effects</b>: MediaPipe Tasks Vision by Google (Apache 2.0).</li>
+            <li><b>Fonts</b>: Inter (Rasmus Andersson), Bricolage Grotesque (Mathieu Triay) and Noto Sans Devanagari (Google / Noto Project), all under the SIL Open Font Licence 1.1.</li>
+            <li><b>Services</b>: Google Firebase, Razorpay and Cloudflare (connection relay).</li>
+        </ul>
+        <details>
+            <summary>Lucide: ISC licence</summary>
+            <p class="muted">Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide are held by Lucide Contributors 2022.</p>
+            <p class="muted">Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted, provided that the above copyright notice and this permission notice appear in all copies.</p>
+            <p class="muted">THE SOFTWARE IS PROVIDED &ldquo;AS IS&rdquo; AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.</p>
+        </details>
+        <details>
+            <summary>Feather: MIT licence</summary>
+            <p class="muted">Copyright (c) 2013-2022 Cole Bemis</p>
+            <p class="muted">Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the &ldquo;Software&rdquo;), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</p>
+            <p class="muted">THE SOFTWARE IS PROVIDED &ldquo;AS IS&rdquo;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</p>
+        </details>
     </main>
 
     <script>

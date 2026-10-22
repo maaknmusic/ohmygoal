@@ -147,6 +147,8 @@
     background: rgba(255, 255, 255, 0.08); border: 1px solid var(--vline); color: #fff;
 }
 .fx-opts button.emoji { font-size: 19px; padding: 0 7px; }
+.fx-opts button.thumb { width: 48px; height: 48px; min-width: 48px; padding: 3px; display: grid; place-items: center; }
+.fx-opts button.thumb canvas { width: 40px; height: 40px; border-radius: 8px; display: block; }
 .fx-opts button.active { background: var(--primary); border-color: var(--primary); }
 .fx-opts button.locked { opacity: 0.6; }
 .fx-opts button.locked::after { content: '👑'; font-size: 10px; margin-left: 4px; }
@@ -280,6 +282,13 @@
 @media (min-width: 900px) and (max-width: 1180px) { #chat { grid-template-columns: minmax(0, 1fr) 340px; } }
 
 .exit-btn { display: none; }
+.tip-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
+.tip-chips .chip-btn { min-height: 44px; padding: 0 18px; border-radius: 999px; font-weight: 700; background: var(--panel-2); border: 1px solid var(--border-strong); color: var(--text); }
+.tip-chips .chip-btn.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.tip-field { display: grid; gap: 6px; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.tip-input { display: flex; align-items: center; gap: 8px; padding: 0 14px; border-radius: var(--r-md); background: var(--bg-2); border: 1px solid var(--border-strong); }
+.tip-input b { font-size: 18px; color: var(--text); }
+.tip-input input { flex: 1; min-height: 48px; border: 0; background: transparent; color: var(--text); font: 700 18px/1 var(--font-display); outline: none; width: 100%; }
 @media (max-width: 899px) { .exit-btn { display: grid; } }
 .safety-list { margin: 0 0 var(--space-3); padding-left: 20px; display: grid; gap: 10px; font-size: 14px; color: var(--text); }
 .safety-list li::marker { color: var(--primary-text); }

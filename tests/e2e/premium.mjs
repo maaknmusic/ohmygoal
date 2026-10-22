@@ -73,6 +73,8 @@ const queueFilterA = await sdk(A, ({ db, f, base, auth, tryIt }) => tryIt(() => 
 step('2c. non-premium queue entry with gender filter refused by rules', queueFilterA !== 'ALLOWED', queueFilterA);
 
 // 2d. "Hide my IP address" is a Premium feature: a free user sees it locked and the click opens the paywall
+// the relay credentials are fetched in the background after the access check
+await A.waitForFunction(() => document.getElementById('hideIpLabel').textContent !== 'Unavailable', null, { timeout: 10000 }).catch(() => {});
 const ipFree = await A.evaluate(() => { const label = document.getElementById('hideIpLabel').textContent; document.getElementById('hideIpBtn').click(); return { label, reason: document.getElementById('paywallReason').textContent }; });
 step('2d. free user: Hide my IP shows "Premium" and opens the paywall instead of toggling', /Premium/.test(ipFree.label) && /IP address/.test(ipFree.reason), JSON.stringify(ipFree));
 
@@ -149,6 +151,38 @@ const forgedBody = JSON.stringify({ event: 'order.paid', payload: { payment: { e
 const forgedRes = await fetch(FN + 'razorpayWebhook', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Razorpay-Signature': crypto.createHmac('sha256', 'test_webhook_secret').update(forgedBody).digest('hex') }, body: forgedBody });
 const forgedText = await forgedRes.text();
 step('6d. forged webhook for an unpaid order is refused (no retry loop)', forgedRes.status === 200 && forgedText === 'not confirmed', `${forgedRes.status} ${forgedText}`);
+
+// 8. Tips: whole rupees in range, the amount is checked on the server, a tip never changes Premium
+const tipT = await sdk(B, async ({ call, db, f, base, auth }) => {
+  const entRef = f.doc(db, ...base, 'entitlements', auth.currentUser.uid);
+  const before = (await f.getDoc(entRef)).data()?.premiumUntil ?? 0;
+  const bad = [];
+  for (const v of [9, 5001, 50.5, '50', -10, 0, null]) bad.push((await call('createOrder', { tip: v })).err);
+  const o = (await call('createOrder', { tip: 50, amount: 1, plan: 'week' })).ok; // extra fields are ignored
+  const pay = await fetch('http://127.0.0.1:7777/test/pay', { method: 'POST', body: JSON.stringify({ order_id: o.orderId }) }).then(r => r.json());
+  const body = { orderId: o.orderId, paymentId: pay.razorpay_payment_id, signature: pay.razorpay_signature };
+  const v1 = await call('verifyPayment', body);
+  const v2 = await call('verifyPayment', body);
+  const after = (await f.getDoc(entRef)).data()?.premiumUntil ?? 0;
+  return { bad, o, v1, v2, before, after };
+});
+step('8a. tip amounts outside 10-5000, fractions, strings, negatives and null are refused', tipT.bad.every(e => e === 'functions/invalid-argument'), JSON.stringify(tipT.bad));
+step('8b. a valid tip creates a ₹50 order (amount from the server, not the request), verifies once, replays idempotently and never changes Premium',
+  tipT.o?.amount === 5000 && tipT.o.plan === 'tip' && tipT.v1.ok?.tip === true && tipT.v2.ok?.alreadyGranted === true && tipT.before === tipT.after, JSON.stringify({ o: tipT.o && { a: tipT.o.amount, p: tipT.o.plan }, v1: tipT.v1, v2: tipT.v2, before: tipT.before, after: tipT.after }));
+
+// 8c. The tip sheet: opens from the menu, validates, and a paid tip shows a thank-you without touching Premium
+await B.evaluate(() => { window.__checkoutOpts = null; document.getElementById('tipBtn').click(); });
+step('8c. the tip sheet opens from the menu', await B.isVisible('#tipSheet'));
+await B.fill('#tipAmount', '5'); await B.click('#tipPay');
+step('8d. an amount under ₹10 shows an error and opens no checkout', /₹10/.test(await B.textContent('#tipError')) && !(await B.evaluate(() => window.__checkoutOpts)));
+await B.click('#tipChips [data-amt="100"]');
+step('8e. a quick-amount chip fills the amount', (await B.inputValue('#tipAmount')) === '100');
+const premiumBefore = await B.evaluate(() => document.getElementById('premiumBtn').title);
+await B.click('#tipPay');
+await B.waitForFunction(() => /Thank you for your tip/.test(document.getElementById('toasts').textContent), null, { timeout: 15000 }).catch(() => {});
+step('8f. paying a tip (₹100) shows the thank-you, closes the sheet and leaves Premium as it was',
+  /Thank you for your tip/.test(await B.textContent('#toasts')) && !(await B.isVisible('#tipSheet')) && (await B.evaluate(() => window.__checkoutOpts?.amount)) === 10000 && (await B.evaluate(() => document.getElementById('premiumBtn').title)) === premiumBefore,
+  JSON.stringify(await B.evaluate(() => window.__checkoutOpts)));
 
 // 7. Premium matching: A (premium, wants women) + B (premium, female) match; B sees A's verified badge
 await A.click('#prefsBtn'); await A.selectOption('#genderSelect', 'male');

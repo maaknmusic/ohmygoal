@@ -507,9 +507,18 @@ function renderFxPanel() {
         const kind = box.dataset.kind;
         box.replaceChildren(...lists[kind].map(opt => {
             const locked = fxLocked(kind, opt.id);
-            const b = h('button', (opt.emoji ? 'emoji' : '') + (effectiveFx()[kind] === opt.id ? ' active' : '') + (locked ? ' locked' : ''), opt.label);
+            const thumb = typeof opt.thumb === 'function';
+            const b = h('button', (opt.emoji ? 'emoji' : '') + (thumb ? ' thumb' : '') + (effectiveFx()[kind] === opt.id ? ' active' : '') + (locked ? ' locked' : ''), thumb ? '' : opt.label);
             b.type = 'button';
-            b.title = locked ? `${opt.id} (Premium)` : opt.id;
+            if (thumb) {
+                // Options can draw their own preview picture (effects code draws everything itself: no image files, no emoji).
+                const c = document.createElement('canvas');
+                c.width = c.height = 80;
+                try { opt.thumb(c.getContext('2d'), 80, 80); } catch (e) { console.warn('thumb failed', opt.id, e); }
+                b.append(c);
+                b.setAttribute('aria-label', opt.label + (locked ? ' (Premium)' : ''));
+            }
+            b.title = locked ? `${opt.label || opt.id} (Premium)` : (opt.label || opt.id);
             b.dataset.id = opt.id;
             b.onclick = () => (locked ? openPaywall('effects') : applyEffects({ [kind]: opt.id }));
             return b;
@@ -702,7 +711,7 @@ function setPhase(phase, info = {}) {
         el.partnerSub.textContent = 'Connecting';
         if (friendCall) { el.partnerName.textContent = friendCall.name; el.avatar.textContent = friendCall.name[0].toUpperCase(); }
         el.nextBtn.textContent = friendCall ? 'Hang up' : 'Next';
-        el.nextBtn.title = friendCall ? 'End the call' : 'Skip to the next person (Esc)';
+        el.nextBtn.title = friendCall ? 'End the call' : 'Next person (Esc)';
     } else if (phase === 'connected') {
         el.partnerSub.textContent = 'Connected';
         el.nextBtn.textContent = friendCall ? 'Hang up' : 'Next';
@@ -2224,7 +2233,7 @@ el.ageCheck.onchange = () => { store.set('ageConfirmed', el.ageCheck.checked); r
 el.startBtn.onclick = async () => {
     if (!el.ageCheck.checked) {
         // Nudge instead of leaving a dead, disabled button.
-        toast('Please confirm you’re 18 or older to continue.', true);
+        toast('Please confirm you are 18+ to continue.', true);
         const box = el.ageCheck.closest('label, .check') || el.ageCheck;
         box.classList.remove('nudge'); void box.offsetWidth; box.classList.add('nudge');
         el.ageCheck.focus();
@@ -2423,6 +2432,54 @@ document.querySelectorAll('[data-open-premium]').forEach(b => b.addEventListener
     openPaywall('menu');
 }));
 el.paywallClose.onclick = () => closeSheet(el.paywall);
+
+// Tip: any whole-rupee amount in range. The server re-checks it; it never changes Premium.
+const TIP_MIN = 10, TIP_MAX = 5000;
+let tipping = false;
+$('tipBtn').onclick = () => {
+    closeSheet(el.menuSheet);
+    if (!premium) { toast('Tips are available on the online version of the site.', true); return; }
+    $('tipError').textContent = '';
+    openSheet($('tipSheet'));
+};
+$('tipChips').addEventListener('click', e => {
+    const b = e.target.closest('[data-amt]');
+    if (!b) return;
+    $('tipAmount').value = b.dataset.amt;
+    $('tipError').textContent = '';
+    $('tipChips').querySelectorAll('[data-amt]').forEach(x => x.classList.toggle('on', x === b));
+});
+$('tipAmount').addEventListener('input', () => {
+    $('tipError').textContent = '';
+    $('tipChips').querySelectorAll('[data-amt]').forEach(x => x.classList.toggle('on', x.dataset.amt === $('tipAmount').value));
+});
+$('tipPay').onclick = async () => {
+    if (tipping) return;
+    const raw = $('tipAmount').value.trim();
+    const rupees = Number(raw);
+    if (!/^\d+$/.test(raw) || rupees < TIP_MIN || rupees > TIP_MAX) {
+        $('tipError').textContent = `Enter a whole number of rupees from ₹${TIP_MIN} to ₹${TIP_MAX.toLocaleString('en-IN')}.`;
+        return;
+    }
+    tipping = true;
+    const pay = $('tipPay');
+    pay.disabled = true;
+    pay.textContent = 'Opening secure checkout…';
+    try {
+        await premium.tip(rupees);
+        closeSheet($('tipSheet'));
+        $('tipAmount').value = '';
+        toast('💖 Thank you for your tip!');
+        SOUND.match();
+    } catch (e) {
+        if (e.code === 'pending') { closeSheet($('tipSheet')); toast(e.message); }
+        else if (e.code !== 'cancelled') { console.warn('tip failed', e); $('tipError').textContent = e.message || 'The payment could not be completed.'; }
+    } finally {
+        tipping = false;
+        pay.disabled = false;
+        pay.textContent = 'Pay with Razorpay';
+    }
+};
 
 el.paywallCta.onclick = async () => {
     if (purchasing) return;

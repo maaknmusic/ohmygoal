@@ -163,6 +163,11 @@ const nopass = await run(async ({ V, X }) => ({
   afterPass: ((await X.call('checkAccess', { fp: 'c'.repeat(32) })).ok?.allowed === true) && Array.isArray((await X.call('turnCredentials', {})).ok?.iceServers),
 }));
 step('9. turnCredentials refuses a person with no access pass (permission-denied) and answers once they have one', nopass.before === 'functions/permission-denied' && nopass.afterPass === true, JSON.stringify(nopass));
+const anonTip = await run(async ({ V }) => ({
+  tip: (await V.call('createOrder', { tip: 20 })).ok?.plan,
+  premium: (await V.call('createOrder', { plan: 'month' })).err,
+}));
+step('10. an anonymous (not Google) account can leave a tip but cannot buy Premium', anonTip.tip === 'tip' && anonTip.premium === 'functions/failed-precondition', JSON.stringify(anonTip));
 console.log(failures ? `${failures} FAILED` : 'ALL PASSED');
 await browser.close();
 process.exit(failures ? 1 : 0);

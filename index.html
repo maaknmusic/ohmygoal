@@ -164,7 +164,7 @@
 
                     <label class="lp-consent">
                         <input type="checkbox" id="ageCheck">
-                        <span class="lp-consent-text">I'm 18 or older and agree to the <a href="legal.html#terms" target="_blank" rel="noopener">rules</a></span>
+                        <span class="lp-consent-text">I confirm I am 18+ and accept the <a href="legal.html#terms" target="_blank" rel="noopener">rules</a></span>
                     </label>
 
                     <div class="lp-start-wrap">
@@ -238,7 +238,7 @@
             <header class="lp-head reveal">
                 <span class="lp-eyebrow">How it works</span>
                 <h2 id="howTitle" class="lp-h2">Hello, in three steps.</h2>
-                <p class="lp-lede">No sign-up and no profile to fill in. We make you a handle and an avatar. Change them whenever you like.</p>
+                <p class="lp-lede">Nothing to fill in: we pick a nickname and a picture for you, and you can swap them any time.</p>
             </header>
             <ol class="lp-steps">
                 <li class="lp-step reveal" style="--d:0">
@@ -409,7 +409,7 @@
                     </li>
                     <li class="lp-game-card reveal" style="--d:2">
                         <div class="lp-gv lp-gv--c4" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="a"></i><i class="b"></i><i></i><i></i><i></i><i class="b"></i><i class="a"></i><i class="a"></i><i class="b"></i><i></i><i class="b"></i><i class="a"></i><i class="a"></i><i class="b"></i><i class="b"></i><i class="a"></i></div>
-                        <h3>Connect Four</h3><p>Drop discs, plan ahead, groan loudly.</p>
+                        <h3>Four in a Row</h3><p>Drop discs, plan ahead, groan loudly.</p>
                     </li>
                     <li class="lp-game-card reveal" style="--d:3">
                         <div class="lp-gv lp-gv--cricket" aria-hidden="true"><span class="lp-bat">🏏</span><span class="lp-run">4</span><span class="lp-run lp-run--out">OUT</span></div>
@@ -582,7 +582,7 @@
             <div class="lp-faq reveal">
                 <details name="lp-faq" open>
                     <summary>Is it really free?</summary>
-                    <p>Yes. Chatting, interests, games, reactions and every safety tool are free, and you don't need an account to chat. Friends need a Google sign-in. Premium is an optional pass for extras like gender and country filters.</p>
+                    <p>Yes. Chatting, interests, games, reactions and every safety tool are free, and you don't need an account to chat. Friends need a Google sign-in. Premium is an optional pass for extras such as choosing who you meet by gender or country.</p>
                 </details>
                 <details name="lp-faq">
                     <summary>Is my video recorded?</summary>
@@ -610,7 +610,7 @@
                 </details>
                 <details name="lp-faq">
                     <summary>Does it work on my phone?</summary>
-                    <p>Yes. It runs in your browser on Android, iPhone and desktop, and you can add it to your home screen. Video needs a camera and a steady connection. Text chat is lighter if your data is low.</p>
+                    <p>Yes. It works in a modern browser on Android, iPhone and desktop, and you can pin it to your home screen. Video needs a camera and a steady connection. Text chat is lighter if your data is low.</p>
                 </details>
                 <details name="lp-faq">
                     <summary>When do voice mode and rooms arrive?</summary>
@@ -841,7 +841,7 @@
                         <button id="reactBtn" class="icon-btn" title="Send a reaction" aria-label="Send a reaction" disabled><i class="icon" data-icon="heart"></i></button>
                         <button id="fullBtn" class="icon-btn" title="Fullscreen" aria-label="Fullscreen"><i class="icon" data-icon="max"></i></button>
                     </div>
-                    <div class="stage-next" id="nextSlotStage"><button id="nextBtn" class="btn btn-primary btn-next" title="Skip to the next person (Esc)">Next</button></div>
+                    <div class="stage-next" id="nextSlotStage"><button id="nextBtn" class="btn btn-primary btn-next" title="Next person (Esc)">Next</button></div>
                 </div>
                 <div class="fx-panel hidden" id="fxPanel">
                     <div class="fx-head"><b>Effects</b><span id="fxStatus"></span><button id="fxClose" class="icon-btn" title="Close" aria-label="Close effects">×</button></div>
@@ -915,6 +915,7 @@
                     <button id="installBtn" class="menu-item hidden" type="button"><i class="icon" data-icon="download"></i><span>Install the app</span></button>
                     <div class="menu-item static" id="vibesRow"><i class="icon" data-icon="heart"></i><span>Good vibes you’ve received</span><small id="myVibes">–</small></div>
                     <button id="shareBtn" class="menu-item" type="button"><i class="icon" data-icon="users"></i><span>Invite friends</span></button>
+                    <button id="tipBtn" class="menu-item" type="button"><i class="icon" data-icon="heart"></i><span>Support us with a tip</span></button>
                     <button class="menu-item" type="button" data-sheet-open="safetySheet"><i class="icon" data-icon="shield"></i><span>Safety &amp; help</span></button>
                     <a class="menu-item" href="legal.html" target="_blank" rel="noopener"><i class="icon" data-icon="flag"></i><span>Terms, privacy &amp; refunds</span></a>
                 </div>
@@ -989,6 +990,29 @@
                 <div class="pay-methods" aria-label="Payment methods"><span>UPI</span><span>GPay</span><span>PhonePe</span><span>Paytm</span><span>Cards</span><span>Netbanking</span></div>
                 <div class="hint paywall-hint" id="paywallHint">One-time payment, no auto-renewal. Secure checkout by Razorpay. <a href="legal.html#refunds" target="_blank" rel="noopener">Refund policy</a></div>
                 <div class="paywall-promise">Not for sale, ever: safety tools, age verification and unbans.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tip: a voluntary payment of any whole-rupee amount (never unlocks anything) -->
+    <div id="tipSheet" class="sheet-bg hidden" role="dialog" aria-modal="true" aria-labelledby="tipTitle">
+        <div class="sheet">
+            <div class="sheet-grab"></div>
+            <div class="sheet-head"><h3 id="tipTitle">Support Anonymous Connect</h3><button class="icon-btn" data-sheet-close aria-label="Close"><i class="icon" data-icon="x"></i></button></div>
+            <div class="sheet-body">
+                <p class="hint" style="margin-top:0">Chatting, games and every safety tool stay free. A tip is a voluntary thank-you that helps pay for servers. It doesn’t unlock anything.</p>
+                <div class="tip-chips" id="tipChips" role="group" aria-label="Quick amounts">
+                    <button type="button" class="chip-btn" data-amt="20">₹20</button>
+                    <button type="button" class="chip-btn" data-amt="50">₹50</button>
+                    <button type="button" class="chip-btn" data-amt="100">₹100</button>
+                    <button type="button" class="chip-btn" data-amt="500">₹500</button>
+                </div>
+                <label class="tip-field"><span>Or enter any amount (₹10 to ₹5,000)</span>
+                    <span class="tip-input"><b>₹</b><input id="tipAmount" type="number" inputmode="numeric" min="10" max="5000" step="1" placeholder="Amount" autocomplete="off"></span>
+                </label>
+                <p class="hint" id="tipError" role="alert" style="color:var(--danger);min-height:1.2em"></p>
+                <button class="btn btn-primary btn-block btn-lg" id="tipPay" type="button">Pay with Razorpay</button>
+                <div class="hint">Secure checkout by Razorpay (UPI, cards, netbanking). Tips are non-refundable. <a href="legal.html#refunds" target="_blank" rel="noopener">Policy</a></div>
             </div>
         </div>
     </div>

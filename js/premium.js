@@ -94,12 +94,15 @@ export class Premium {
      * Buy a pass. Resolves with premiumUntil once the server has verified the payment.
      * Rejects with { code: 'cancelled' } if the buyer closes the checkout.
      */
-    async buy(planId) {
-        if (!this.friends.signedIn) throw Object.assign(new Error('Sign in with Google first'), { code: 'signin' });
+    /** Leave a voluntary tip (whole rupees; the server checks the range). It never changes Premium. */
+    tip(rupees) { return this.buy('tip', { tip: rupees }); }
+
+    async buy(planId, { tip = null } = {}) {
+        if (tip === null && !this.friends.signedIn) throw Object.assign(new Error('Sign in with Google first'), { code: 'signin' });
         const [createOrder, verifyPayment, Razorpay] = await Promise.all([
             this.callable('createOrder'), this.callable('verifyPayment'), this.loadCheckout(),
         ]);
-        const { data: order } = await createOrder({ plan: planId });
+        const { data: order } = await createOrder(tip === null ? { plan: planId } : { tip });
         const user = this.auth.currentUser;
         const response = await new Promise((resolve, reject) => {
             let lastError = null;
@@ -111,7 +114,7 @@ export class Premium {
                 name: 'Anonymous Connect',
                 description: order.label,
                 prefill: { name: user?.displayName || '', email: user?.email || '' },
-                theme: { color: '#4f46e5' },
+                theme: { color: '#d9266c' },
                 handler: resolve,
                 // The checkout stays open after a failed attempt so the buyer can retry; only give up
                 // when they close it (reporting the last failure, if any).
@@ -136,6 +139,7 @@ export class Premium {
             if (wait) await new Promise(r => setTimeout(r, wait));
             try {
                 const { data } = await verifyPayment(payload);
+                if (data.tip) return null; // a tip changes nothing about Premium
                 this.setUntil(Math.max(this.premiumUntil, data.premiumUntil || 0));
                 return data.premiumUntil;
             } catch (e) {
@@ -144,6 +148,8 @@ export class Premium {
             }
         }
         console.warn('verifyPayment failed after retries', lastErr);
-        throw Object.assign(new Error(`Your payment went through (ID ${payload.paymentId}). Premium will activate within a minute; if it doesn’t, contact support with that ID.`), { code: 'pending' });
+        throw Object.assign(new Error(tip === null
+            ? `Your payment went through (ID ${payload.paymentId}). Premium will activate within a minute; if it doesn’t, contact support with that ID.`
+            : `Your tip went through (ID ${payload.paymentId}). Thank you!`), { code: 'pending' });
     }
 }
