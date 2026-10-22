@@ -51,6 +51,39 @@ service cloud.firestore {
         allow list, write: if false;
       }
 
+      // ---------------- Profiles (native language, nick, avatar, interests, gender) ----------------
+      // Only for people signed in with Google: their profile follows them across devices. Anonymous accounts keep the
+      // same details in their own browser and never write here. Read and written only by the owner, never listable.
+      // The language list must stay in step with functions/languages.js and js/languages.js.
+      function validLang(l) {
+        return l is string && l in ['en', 'hi', 'bn', 'ta', 'te', 'mr', 'gu', 'kn', 'ml', 'pa', 'ur', 'or', 'as', 'ne', 'es', 'fr', 'de', 'pt',
+                                    'it', 'nl', 'ru', 'uk', 'pl', 'tr', 'ar', 'fa', 'he', 'id', 'ms', 'th', 'vi', 'zh', 'zh-TW', 'ja',
+                                    'ko', 'sw', 'fil', 'el', 'cs', 'sv', 'ro', 'hu', 'da', 'fi', 'nb'];
+      }
+      // Rules can't loop over a list, so each of the (at most five) interests is checked by position.
+      function validInterestAt(items, i) { return items.size() <= i || (items[i] is string && items[i].size() <= 24); }
+      function validProfile(d) {
+        return d.keys().hasOnly(['lang', 'nick', 'avatar', 'interests', 'gender', 'updatedAt'])
+          && validLang(d.get('lang', 'en'))
+          && d.get('nick', 'x') is string && d.get('nick', 'x').size() >= 1 && d.get('nick', 'x').size() <= 20
+          && (!('avatar' in d.keys())
+              || (d.avatar is map && d.avatar.keys().hasOnly(['e', 'h'])
+                  && d.avatar.e is string && d.avatar.e.size() >= 1 && d.avatar.e.size() <= 8
+                  && d.avatar.h is int && d.avatar.h >= 0 && d.avatar.h <= 359))
+          && d.get('interests', []) is list && d.get('interests', []).size() <= 5
+          && validInterestAt(d.get('interests', []), 0) && validInterestAt(d.get('interests', []), 1)
+          && validInterestAt(d.get('interests', []), 2) && validInterestAt(d.get('interests', []), 3)
+          && validInterestAt(d.get('interests', []), 4)
+          && d.get('gender', '') is string && d.get('gender', '') in ['male', 'female', 'x', '']
+          && d.updatedAt is int;
+      }
+      match /profiles/{uid} {
+        allow get: if google() && request.auth.uid == uid;
+        allow list: if false;
+        allow create, update: if google() && request.auth.uid == uid && validProfile(request.resource.data);
+        allow delete: if google() && request.auth.uid == uid;
+      }
+
       // ---------------- Matchmaking queue ----------------
       function validQueue(d) {
         return d.keys().hasOnly(['mode', 'interests', 'blocked', 'gender', 'country', 'genderFilter',

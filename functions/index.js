@@ -21,6 +21,8 @@ export { checkAccess, reportViolation, requestUnban, admin } from './moderation.
 export { likeUser } from './likes.js';
 // Short-lived relay (Cloudflare TURN) credentials.
 export { turnCredentials } from './turn.js';
+// Live translate (Premium): Gemini on Vertex AI. See the header of translate.js for setup, quotas and cost.
+export { translateText } from './translate.js';
 
 const RAZORPAY_KEY_ID = defineSecret('RAZORPAY_KEY_ID');
 const RAZORPAY_KEY_SECRET = defineSecret('RAZORPAY_KEY_SECRET');

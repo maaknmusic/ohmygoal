@@ -65,8 +65,8 @@ export function classifyError(e) {
 // ---------------------------------------------------------------------
 // Control codes, zero-width space, bidi overrides/isolates and the BOM: nothing a translation needs, and the last two can
 // make text appear to read differently from what it says. ZWJ/ZWNJ and the direction marks stay (emoji, Persian, Indic).
-const NOISE = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F​‪-‮⁦-⁩﻿]/g;
-export const cleanOutput = s => String(s).replace(/[  ]/g, ' ').replace(NOISE, '').trim();
+const NOISE = /[\u{0}-\u{8}\u{B}-\u{1F}\u{7F}-\u{9F}\u{200B}\u{202A}-\u{202E}\u{2066}-\u{2069}\u{FEFF}]/gu;
+export const cleanOutput = s => String(s).replace(/[\u{2028}\u{2029}]/gu, ' ').replace(NOISE, '').trim();
 
 const URLS = /\b(?:https?:\/\/|www\.)\S+/gi;
 const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;

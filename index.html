@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="css/landing.css">
     <link rel="stylesheet" href="css/chat.css">
+    <link rel="stylesheet" href="css/translate.css">
     <script src="config.js"></script>
 </head>
 <body>
@@ -552,6 +553,7 @@
                         <li>Priority matching</li>
                         <li>All backgrounds, face masks and filters</li>
                         <li>Hide your IP address from the people you chat with</li>
+                        <li>Live translate: chat with people in 45+ languages</li>
                         <li>Diwali, Holi, Chai and Neon Mumbai themes</li>
                         <li>A 👑 next to your handle</li>
                     </ul>
@@ -689,6 +691,13 @@
                     </select>
                 </div>
 
+                <div class="lp-pf">
+                    <label class="lp-pf-h" for="langSelect">My language</label>
+                    <select id="langSelect" class="input" aria-describedby="langHint"></select>
+                    <div class="hint" id="langHint">The people you chat with see it (“Speaks हिन्दी”), and Live translate uses it. Saved on this device; with a Google sign-in it follows you to your other devices.</div>
+                    <button type="button" class="chip-btn lang-suggest hidden" id="langSuggest"></button>
+                </div>
+
                 <div class="lp-pf lp-pf--pro">
                     <div class="lp-pf-h">Choose who you meet <span class="pro-tag">👑 Premium</span></div>
                     <div class="lp-pf-row">
@@ -787,6 +796,7 @@
             </div>
             <div class="panel-actions">
                 <button id="likeBtn" class="icon-btn" title="Send a good vibe" aria-label="Send a good vibe" disabled><i class="icon" data-icon="heart"></i></button>
+                <button id="translateBtn" class="icon-btn translate-btn" title="Live translate" aria-label="Live translate" aria-haspopup="dialog" disabled><i class="icon" data-icon="languages"></i></button>
                 <button id="addFriendBtn" class="icon-btn hidden" title="Add as friend" aria-label="Add as friend" disabled><i class="icon" data-icon="userPlus"></i></button>
                 <button id="reportBtn" class="icon-btn" title="Report" aria-label="Report" disabled><i class="icon" data-icon="flag"></i></button>
                 <button id="blockBtn" class="icon-btn" title="Block (never match again)" aria-label="Block" disabled><i class="icon" data-icon="ban"></i></button>
@@ -865,6 +875,7 @@
             <div id="messages" aria-live="polite"></div>
             <div class="icebreakers hidden" id="icebreakers" aria-label="Conversation starters"></div>
             <div id="piiWarn" class="pii-warn hidden">This looks like personal info (email/phone/link). Press Send again if you really want to share it.</div>
+            <div class="tr-bar hidden" id="trBar" role="region" aria-label="Live translate"></div>
 
             <div class="composer">
                 <div class="composer-next" id="nextSlotComposer"></div>
@@ -934,10 +945,40 @@
                 <div class="menu-list">
                     <button class="menu-item" type="button" data-proxy="addFriendBtn"><i class="icon" data-icon="userPlus"></i><span>Add as friend</span></button>
                     <button class="menu-item" type="button" data-proxy="reportBtn"><i class="icon" data-icon="flag"></i><span>Report</span></button>
+                    <button class="menu-item" type="button" data-proxy="translateBtn"><i class="icon" data-icon="languages"></i><span>Live translate</span><small id="translateMoreLabel"></small></button>
                     <button class="menu-item" type="button" data-proxy="blockBtn"><i class="icon" data-icon="ban"></i><span>Block (never match again)</span></button>
                     <button class="menu-item" type="button" data-sheet-open="safetySheet"><i class="icon" data-icon="shield"></i><span>Safety tips</span></button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Live translate (Premium): per chat, off by default -->
+    <div id="translateSheet" class="sheet-bg hidden" role="dialog" aria-modal="true" aria-labelledby="translateTitle">
+        <div class="sheet">
+            <div class="sheet-grab"></div>
+            <div class="sheet-head"><h3 id="translateTitle">Live translate <span class="pro-tag">👑 Premium</span></h3><button class="icon-btn" data-sheet-close aria-label="Close"><i class="icon" data-icon="x"></i></button></div>
+            <div class="sheet-body tr-sheet">
+                <p class="hint tr-intro" id="trIntro">Chat across languages. It translates on your device when your browser can; otherwise the text of each message is sent to our translation service (Google Cloud) and not stored. Only while a switch below is on.</p>
+
+                <div class="tr-group">
+                    <label class="toggle"><input type="checkbox" id="trRecv"><span class="switch"></span><span>Translate messages I receive into <b id="trRecvName">English</b></span></label>
+                    <label class="lbl" for="trRecvTarget">Into</label>
+                    <select id="trRecvTarget" class="input"></select>
+                </div>
+
+                <div class="tr-group">
+                    <label class="toggle"><input type="checkbox" id="trSend"><span class="switch"></span><span>Translate what I type into <b id="trSendName">their language</b></span></label>
+                    <label class="lbl" for="trSendTarget">Into</label>
+                    <select id="trSendTarget" class="input"></select>
+                    <div class="hint" id="trSendHint"></div>
+                </div>
+
+                <label class="toggle tr-remember"><input type="checkbox" id="trRemember"><span class="switch"></span><span>Remember my choice for new chats</span></label>
+                <div class="hint" id="trEngine" aria-live="polite"></div>
+                <div class="hint">Your partner sees what you send in their language, with your original underneath. <a href="legal.html#privacy" target="_blank" rel="noopener">Privacy</a></div>
+            </div>
+            <div class="sheet-foot"><button type="button" class="btn btn-primary" data-sheet-close>Done</button></div>
         </div>
     </div>
 
@@ -981,6 +1022,7 @@
                         <tr><td>Gender &amp; country filters</td><td class="no">–</td><td class="yes">✓</td></tr>
                         <tr><td>Priority matching</td><td class="no">–</td><td class="yes">✓</td></tr>
                         <tr><td>Hide my IP address</td><td class="no">–</td><td class="yes">✓</td></tr>
+                        <tr><td>Live translate</td><td class="no">–</td><td class="yes">✓</td></tr>
                         <tr><td>Every effect &amp; colour theme</td><td class="no">–</td><td class="yes">✓</td></tr>
                         <tr><td>👑 Premium badge</td><td class="no">–</td><td class="yes">✓</td></tr>
                     </tbody>

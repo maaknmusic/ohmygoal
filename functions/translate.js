@@ -36,12 +36,12 @@
 //   30 translations per minute, 500 per rolling 24 hours. Counted in the private tree (private/data/translateLimits/{uid}: a list of
 //   timestamps), which no client rule matches, exactly like likeUser's counters. A request answered from the cache, a same-language
 //   shortcut or a text with no letters does not count; an attempt that fails at the provider DOES count (so garbage can't be hammered for free).
-//   Worst case per person per day is 500 messages, about two US cents.
+//   Worst case per person per day is 500 messages, about three US cents.
 //
 // COST. Gemini 2.5 Flash-Lite is about $0.10 per million input tokens and $0.40 per million output tokens. One short chat message sends
-// roughly 300 tokens (the fixed instruction is most of that) and gets back roughly 30, which is about $0.00004 (0.004 US cents): on the order of
-// $40 per million translated messages. Cloud Translation costs about $20 per million characters, roughly $1,000 per million messages of
-// 50 characters, i.e. about 25 times more. Browsers that translate on the device (Chrome's Translator API) cost nothing and never reach this function.
+// roughly 400 tokens (the fixed instruction is most of that) and gets back roughly 40, which is about $0.00006 (0.006 US cents): on the order of
+// $50 per million translated messages. Cloud Translation costs about $20 per million characters, roughly $1,000 per million messages of
+// 50 characters, i.e. about 20 times more. Browsers that translate on the device (Chrome's Translator API) cost nothing and never reach this function.
 //
 // PROMPT INJECTION. The message is untrusted data from a stranger. It goes to the model as one JSON string field in the user turn, the
 // instruction (which tells the model to treat it as data) is the system instruction, and the output is never trusted: it must be JSON of the
