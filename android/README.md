@@ -5,14 +5,14 @@ notifications as Chrome, and updates whenever you deploy the site. There is no s
 
 You need (once): a Google Play developer account (one-time US$25), a Windows/Mac/Linux computer with Node 18+ and Java 17, and
 about an hour. The steps below use Google's Bubblewrap; if you would rather not install anything, **pwabuilder.com** does the same
-thing in the browser (enter `https://ohmygoal.web.app`, choose Android, and use the values in `twa-manifest.json`).
+thing in the browser (enter `https://ohmygoal.app`, choose Android, and use the values in `twa-manifest.json`).
 
 ## 1. Build the app bundle
 ```
 npm i -g @bubblewrap/cli
 mkdir anonconnect-android && cd anonconnect-android
 cp <repo>/android/twa-manifest.json .
-bubblewrap init --manifest=https://ohmygoal.web.app/manifest.webmanifest   # accepts the answers from twa-manifest.json
+bubblewrap init --manifest=https://ohmygoal.app/manifest.webmanifest   # accepts the answers from twa-manifest.json
 bubblewrap build                                                           # makes app-release-bundle.aab and a test .apk
 ```
 Bubblewrap creates a signing key (`android.keystore`) the first time. **Back it up and keep the password**: it is how you
@@ -30,7 +30,7 @@ package name there must match `packageId`), then deploy hosting:
 ```
 bash deploy.sh      # or: npx firebase-tools deploy --only hosting
 ```
-Check it: open `https://ohmygoal.web.app/.well-known/assetlinks.json` (it is served from `well-known/` by a rewrite in
+Check it: open `https://ohmygoal.app/.well-known/assetlinks.json` (it is served from `well-known/` by a rewrite in
 `firebase.json`, because Firebase Hosting ignores folders that start with a dot). Without this file the app opens with a
 browser bar showing the address.
 

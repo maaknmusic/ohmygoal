@@ -76,7 +76,7 @@ fi
 
 # Google sign-in only works on addresses listed in Firebase Authentication → Settings → Authorized domains.
 echo
-echo "!! One-time: add $SITE.web.app (and $SITE.firebaseapp.com) under Firebase console → Authentication → Settings → Authorized domains, or Google sign-in will fail on the new address."
+echo "!! One-time: add $SITE.web.app, $SITE.firebaseapp.com and your own domain (ohmygoal.app) under Firebase console → Authentication → Settings → Authorized domains, or Google sign-in will fail on that address."
 
 cat <<EOF
 

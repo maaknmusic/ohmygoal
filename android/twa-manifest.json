@@ -1,6 +1,6 @@
 {
   "packageId": "in.co.webtel.anonconnect",
-  "host": "ohmygoal.web.app",
+  "host": "ohmygoal.app",
   "name": "OhMyGoal",
   "launcherName": "OhMyGoal",
   "display": "standalone",
@@ -9,8 +9,8 @@
   "navigationColor": "#090a12",
   "backgroundColor": "#090a12",
   "startUrl": "/",
-  "iconUrl": "https://ohmygoal.web.app/icons/icon-512.png",
-  "maskableIconUrl": "https://ohmygoal.web.app/icons/icon-maskable-512.png",
+  "iconUrl": "https://ohmygoal.app/icons/icon-512.png",
+  "maskableIconUrl": "https://ohmygoal.app/icons/icon-maskable-512.png",
   "enableNotifications": true,
   "enableSiteSettingsShortcut": true,
   "fallbackType": "customtabs",
