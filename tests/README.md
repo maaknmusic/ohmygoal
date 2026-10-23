@@ -17,6 +17,8 @@ node tests/e2e/admin-inbox.mjs <scratch>   # admin Inbox (needs the emulators)
 node tests/e2e/admin-analytics.mjs <scratch>   # admin Dashboard, Premium, Payments, People, CSV (needs the emulators)
 node tests/e2e/hardening.mjs          # hostile peer (floods, oversize frames, extra channels)
 node tests/e2e/distance.mjs           # approximate distance
+node tests/e2e/world-languages.mjs <scratch>   # the 8 world languages on the landing page, Arabic right-to-left, phone and desktop
+node tests/e2e/world-narrow.mjs <scratch>      # the language picker fits at 320-390 px in every language
 node tests/e2e/reactions.mjs          # drawn reactions: tap, hold burst, Premium pack, hostile peer, phone
 node tests/e2e/failclosed.mjs         # masks never fall back to the raw camera; distance toggle race
 node tests/e2e/translate-live-demo.mjs <scratch-dir>   # Live translate (fake on-device Translator): sheet, receive/send, failures, queue, hostile frames, phones

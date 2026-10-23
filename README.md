@@ -130,6 +130,12 @@ Until the API is enabled the function answers *Translation is unavailable right 
 
 **Language profile.** For a Google account the preferences are stored in `artifacts/<app>/public/data/profiles/{uid}`: readable and writable only by that account (and only with a Google sign-in), with a strict schema in `firestore.rules`. After signing in the app loads it (what the account holds wins; a missing document is created from the values on the device), and later edits are saved a moment after they are made. Anonymous accounts never write it.
 
+## Page language
+
+The menu at the top lets people read the whole interface in **English, Hindi and eight more Indian languages, plus Spanish, Portuguese, Arabic, Indonesian, Turkish, Russian, French and German**. The first visit follows the browser's language (a phone set to Spanish opens in Spanish); the choice is remembered on that device. It does not depend on the visitor's country. Arabic switches the page to right-to-left.
+
+Each language is one file in `js/i18n/` that maps the exact English text to its translation (see the header of `js/i18n.js`). Text that is not in a file stays in English, so a partly translated language never breaks the page. To add a language: copy a file, translate the values, add the code to `UI_LANGS` in `js/i18n.js` (and to `RTL_LANGS` if it is written right to left), and add the code to the list in `tests/unit/i18n.test.mjs`. The translations were written without a native-speaker review: have a native speaker read the main screens before you promote the site in that country. This is separate from *Live translate*, which translates chat messages between 45 languages.
+
 ## Bans & the admin page
 
 **How bans work.** On every visit the app calls the `checkAccess` function, which looks up bans for the visitor's **IP address**, **device fingerprint** and **account**, and, if they're allowed, writes a short-lived *access pass* (`access/{uid}`, 2 hours, renewed automatically). The security rules only let people join the matching queue or start a call with a valid pass, so a ban holds even in a private window or a modified copy of the app.

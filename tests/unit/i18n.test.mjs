@@ -2,12 +2,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { UI_LANGS, sanitizeUiLang, guessUiLang, compile, translate } from '/home/user/ohmygoal/js/i18n.js';
+import { UI_LANGS, RTL_LANGS, sanitizeUiLang, guessUiLang, compile, translate } from '/home/user/ohmygoal/js/i18n.js';
 
 const load = async code => (await import(`/home/user/ohmygoal/js/i18n/${code}.js`)).default;
 
 test('language codes: only listed codes, English otherwise', () => {
-    assert.deepEqual(UI_LANGS.map(l => l.code), ['en', 'hi', 'bn', 'ta', 'te', 'mr', 'gu', 'kn', 'ml', 'pa']);
+    assert.deepEqual(UI_LANGS.map(l => l.code), ['en', 'hi', 'bn', 'ta', 'te', 'mr', 'gu', 'kn', 'ml', 'pa', 'es', 'pt', 'ar', 'id', 'tr', 'ru', 'fr', 'de']);
     assert.ok(Object.isFrozen(UI_LANGS));
     for (const l of UI_LANGS) assert.ok(l.native);
     for (const code of ['hi', 'ta', 'en']) assert.equal(sanitizeUiLang(code), code);
@@ -17,8 +17,13 @@ test('language codes: only listed codes, English otherwise', () => {
 test('the browser language picks the interface language', () => {
     assert.equal(guessUiLang(['hi-IN', 'en-US']), 'hi');
     assert.equal(guessUiLang(['en-US', 'hi']), 'en');
-    assert.equal(guessUiLang(['fr-FR', 'ta']), 'ta');
-    assert.equal(guessUiLang(['fr-FR']), 'en');
+    assert.equal(guessUiLang(['ja-JP', 'ta']), 'ta');
+    assert.equal(guessUiLang(['fr-FR']), 'fr');
+    assert.equal(guessUiLang(['pt-BR', 'en']), 'pt');
+    assert.equal(guessUiLang(['ar-EG']), 'ar');
+    assert.equal(guessUiLang(['id-ID']), 'id');
+    assert.equal(guessUiLang(['ja-JP', 'de']), 'de');
+    assert.equal(guessUiLang(['ja-JP']), 'en');   // a language we do not have yet
     assert.equal(guessUiLang([]), 'en');
     assert.equal(guessUiLang(undefined), 'en');
     assert.equal(guessUiLang('hi'), 'en'); // not a list
@@ -99,4 +104,38 @@ test('Hindi covers the page: every English string in the app’s start card and 
     // the strings the failure and progress modules produce
     const src = ['failures.js', 'progress.js'].map(f => fs.readFileSync(`/home/user/ohmygoal/js/${f}`, 'utf8')).join('\n');
     for (const k of ['Couldn’t connect', 'You’re offline', 'Matching failed', 'Chat for a minute to start a streak.']) { assert.ok(src.includes(k), 'source has ' + k); assert.ok(k in hi, 'Hindi has ' + k); }
+});
+
+const WORLD = ['es', 'pt', 'ar', 'id', 'tr', 'ru', 'fr', 'de'];
+
+test('the eight world languages cover exactly the same strings as Hindi, each translated into something different', async () => {
+    const hi = await load('hi');
+    for (const code of WORLD) {
+        const t = await load(code);
+        assert.deepEqual(Object.keys(t), Object.keys(hi), `${code}: keys differ from Hindi's table`);
+        let same = 0;
+        for (const [k, v] of Object.entries(t)) if (v === k) same++;
+        assert.ok(same < 120, `${code}: ${same} entries are left in English`); // names, key labels and the like stay as they are
+    }
+});
+
+test('world languages use their own script, and brand and payment names are never translated away', async () => {
+    const script = { ar: /[؀-ۿ]/, ru: /[Ѐ-ӿ]/ };
+    for (const [code, re] of Object.entries(script)) {
+        const t = await load(code);
+        for (const k of ['Start chatting', 'Next', 'Report', 'Find someone new', 'Send']) assert.ok(re.test(t[k]), `${code}: "${t[k]}"`);
+    }
+    for (const code of WORLD) {
+        const t = await load(code);
+        for (const [k, v] of Object.entries(t)) {
+            for (const word of ['Razorpay', 'UPI', 'OhMyGoal', 'Google', '1930']) if (k.includes(word)) assert.ok(v.includes(word), `${code}: "${word}" lost in "${k.slice(0, 50)}"`);
+        }
+        // the same fixed amounts survive (formats differ: 349 ₹, ₹5.000)
+        for (const [k, v] of Object.entries(t)) for (const n of k.match(/₹\d[\d,]*\d|₹\d/g) || []) assert.ok(v.replace(/[.,\s\u00a0\u202f]/g, '').includes(n.slice(1).replace(/,/g, '')), `${code}: ${n} missing in "${v.slice(0, 60)}"`);
+    }
+});
+
+test('Arabic is right to left, everything else left to right', () => {
+    assert.deepEqual([...RTL_LANGS], ['ar']);
+    assert.ok(Object.isFrozen(RTL_LANGS));
 });

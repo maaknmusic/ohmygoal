@@ -18,7 +18,17 @@ export const UI_LANGS = Object.freeze([
     Object.freeze({ code: 'kn', native: 'ಕನ್ನಡ' }),
     Object.freeze({ code: 'ml', native: 'മലയാളം' }),
     Object.freeze({ code: 'pa', native: 'ਪੰਜਾਬੀ' }),
+    Object.freeze({ code: 'es', native: 'Español' }),
+    Object.freeze({ code: 'pt', native: 'Português' }),
+    Object.freeze({ code: 'ar', native: 'العربية' }),
+    Object.freeze({ code: 'id', native: 'Indonesia' }),
+    Object.freeze({ code: 'tr', native: 'Türkçe' }),
+    Object.freeze({ code: 'ru', native: 'Русский' }),
+    Object.freeze({ code: 'fr', native: 'Français' }),
+    Object.freeze({ code: 'de', native: 'Deutsch' }),
 ]);
+/** Languages written right to left: the page direction flips for these. */
+export const RTL_LANGS = Object.freeze(new Set(['ar']));
 const CODES = new Set(UI_LANGS.map(l => l.code));
 
 /** A language code we have a file for, or 'en'. */
@@ -144,6 +154,7 @@ export function createI18n({ doc = document, loadTable }) {
             lang = code;
             c = table ? compile(table) : null;
             doc.documentElement.lang = lang;
+            doc.documentElement.dir = RTL_LANGS.has(lang) ? 'rtl' : 'ltr';
             if (c) { tree(doc.body); watch(); }
             return lang;
         },

@@ -40,7 +40,7 @@ const setUi = async (p, code) => { await p.selectOption('#uiLang', code); await 
 {
   const { ctx, open } = await setup();
   const a = await open('Aarav');
-  step('1a. the language picker lists English plus nine Indian languages', await a.locator('#uiLang option').count() === 10);
+  step('1a. the language picker lists English, nine Indian languages and eight world languages', await a.locator('#uiLang option').count() === 18 && (await a.locator('#uiLang option').allTextContents()).includes('العربية'));
   step('1b. English by default (the browser language is English)', (await text(a, '#startBtn')) === 'Start chatting' && (await a.evaluate(() => document.documentElement.lang)) === 'en');
   await setUi(a, 'hi');
   step('1c. choosing Hindi translates the start card', (await text(a, '#startBtn')) === 'चैटिंग शुरू करें' && /चैट शुरू करें/.test(await text(a, '#start')), await text(a, '#startBtn'));
