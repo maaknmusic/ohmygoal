@@ -132,13 +132,15 @@ Until the API is enabled the function answers *Translation is unavailable right 
 
 ## Bots and App Check
 
-**Firebase App Check** makes every request to the database and the functions carry a short-lived token that only a real browser on your own website can get (from Google reCAPTCHA v3, invisible to people). Scripts that call the backend directly have no token and can be refused. It works alongside the age check, the rate limits and the bans; it does not replace them.
+**Firebase App Check** makes every request to the database and the functions carry a short-lived token that only a real browser on your own website can get (from Google **Fraud Defense**, formerly reCAPTCHA Enterprise, invisible to people). Scripts that call the backend directly have no token and can be refused. It works alongside the age check, the rate limits and the bans; it does not replace them.
 
 It is built in but **off until you add a site key**, and then it only *counts* (monitor mode) until you switch enforcement on. Nobody is turned away by mistake.
 
-1. **Create the reCAPTCHA key.** Open https://www.google.com/recaptcha/admin/create, label it `OhMyGoal`, choose **Score based (v3)**, add the domains `ohmygoal.app`, `www.ohmygoal.app`, `ohmygoal.web.app` and `ohmygoal-c8a4a.firebaseapp.com`, accept the terms and submit. You get a **site key** (public) and a **secret key** (private).
-2. **Tell Firebase.** Firebase console → **App Check** → **Apps** → your web app → **reCAPTCHA** → paste the **secret key** → Save.
-3. **Put the site key on the website.** In `config.js` set `appCheck: { siteKey: 'your-site-key' }`, commit, then publish: `bash deploy.sh` (functions and website) or `npx --yes firebase-tools@15.32.1 deploy --only hosting --project ohmygoal-c8a4a`.
+**Cost.** Fraud Defense includes a free allowance (10,000 assessments a month at the time of writing; check Google's pricing page) and then charges per 1,000. One assessment happens each time a browser gets a fresh App Check token, so a longer token lifetime means fewer assessments. A browser needs a new token about once per lifetime, so with a 1-day lifetime a person who visits daily costs roughly one assessment a day. At a few hundred visitors a day this stays inside the free allowance; at very large traffic it becomes a real cost, so watch the usage in Google Cloud and set a budget alert.
+
+1. **Create the key (Google Cloud).** Open https://console.cloud.google.com/security/recaptcha?project=ohmygoal-c8a4a, enable the *reCAPTCHA Enterprise API* if asked, and click **Create key**: name `OhMyGoal web`, platform **Website**, domains `ohmygoal.app`, `www.ohmygoal.app`, `ohmygoal.web.app` and `ohmygoal-c8a4a.firebaseapp.com`, no checkbox challenge (score based). Copy the **key ID**: that is the site key (public).
+2. **Tell Firebase.** Firebase console → **App Check** → **Apps** → your web app → **Fraud Defense (reCAPTCHA Enterprise)** → paste the **site key** → set the token lifetime (1 day is a good start) → Save.
+3. **Put the site key on the website.** In `config.js` set `appCheck: { siteKey: 'your-site-key' }`, commit, then publish: `bash deploy.sh` (functions and website) or `npx --yes firebase-tools@15.32.1 deploy --only hosting --project ohmygoal-c8a4a`. (Only if you must use the older classic reCAPTCHA v3 key, add `provider: 'v3'`.)
 4. **Watch it (a few days).** Firebase console → App Check → **APIs** → *Cloud Functions* and *Cloud Firestore*. You see how many requests are **verified** (real browsers) and **unverified** (old cached pages, scripts, bots). Wait until nearly all are verified.
 5. **Enforce.** First *Cloud Firestore* → **Enforce** (console button). Then for the functions set `ENFORCE_APP_CHECK=true` in `functions/.env` and run `bash deploy.sh`. Unverified calls are refused from then on.
 6. **If something goes wrong,** press **Unenforce** in the console (instant) and set `ENFORCE_APP_CHECK=false` again.

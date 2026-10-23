@@ -7,8 +7,9 @@ import { callOpts, ENFORCE_APP_CHECK } from '/home/user/ohmygoal/functions/commo
 
 const fakeModule = () => {
     const calls = [];
-    class ReCaptchaV3Provider { constructor(key) { this.key = key; } }
-    return { calls, mod: { ReCaptchaV3Provider, initializeAppCheck: (app, opts) => { calls.push({ app, opts }); return { token: 'x' }; } } };
+    class ReCaptchaV3Provider { constructor(key) { this.key = key; this.kind = 'v3'; } }
+    class ReCaptchaEnterpriseProvider { constructor(key) { this.key = key; this.kind = 'enterprise'; } }
+    return { calls, mod: { ReCaptchaV3Provider, ReCaptchaEnterpriseProvider, initializeAppCheck: (app, opts) => { calls.push({ app, opts }); return { token: 'x' }; } } };
 };
 
 test('without a site key, in the emulator, or without an app, nothing is started and nothing is loaded', async () => {
@@ -20,7 +21,7 @@ test('without a site key, in the emulator, or without an app, nothing is started
     assert.equal(loaded, 0);
 });
 
-test('with a site key it starts App Check with reCAPTCHA v3 and automatic token refresh', async () => {
+test('with a site key it starts App Check with Fraud Defense (reCAPTCHA Enterprise) and automatic token refresh', async () => {
     const { calls, mod } = fakeModule();
     const urls = [];
     const app = { name: 'app' };
@@ -29,15 +30,24 @@ test('with a site key it starts App Check with reCAPTCHA v3 and automatic token 
     assert.equal(calls.length, 1);
     assert.equal(calls[0].app, app);
     assert.equal(calls[0].opts.provider.key, '6Lc-test-key');
+    assert.equal(calls[0].opts.provider.kind, 'enterprise');
     assert.equal(calls[0].opts.isTokenAutoRefreshEnabled, true);
     assert.match(urls[0], /^https:\/\/www\.gstatic\.com\/firebasejs\/[\d.]+\/firebase-app-check\.js$/);
+});
+
+test('provider "v3" still selects the classic reCAPTCHA v3 provider; anything else means Enterprise', async () => {
+    for (const [provider, kind] of [['v3', 'v3'], ['enterprise', 'enterprise'], [undefined, 'enterprise'], ['nonsense', 'enterprise']]) {
+        const { calls, mod } = fakeModule();
+        await startAppCheck({}, { siteKey: 'k', provider }, { loadModule: async () => mod });
+        assert.equal(calls[0].opts.provider.kind, kind, String(provider));
+    }
 });
 
 test('a failure to load or start never throws: the site carries on without App Check', async () => {
     const warn = console.warn; console.warn = () => {};
     try {
         assert.equal(await startAppCheck({}, { siteKey: 'k' }, { loadModule: async () => { throw new Error('blocked by an ad blocker'); } }), null);
-        assert.equal(await startAppCheck({}, { siteKey: 'k' }, { loadModule: async () => ({ ReCaptchaV3Provider: class {}, initializeAppCheck() { throw new Error('bad key'); } }) }), null);
+        assert.equal(await startAppCheck({}, { siteKey: 'k' }, { loadModule: async () => ({ ReCaptchaEnterpriseProvider: class {}, initializeAppCheck() { throw new Error('bad key'); } }) }), null);
     } finally { console.warn = warn; }
 });
 
