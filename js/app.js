@@ -18,6 +18,7 @@ import { mediaErrorText, matchFailure, connectionLostCopy, CAMERA_UNAVAILABLE } 
 import { THEMES, OPEN, themeId, themeById, isBusy, nextBusy, featured, scheduleText } from './rooms.js';
 import { sanitizeProgress, recordChat, levelFor, streakNow, progressLine } from './progress.js';
 import { createI18n, UI_LANGS, sanitizeUiLang, guessUiLang } from './i18n.js';
+import { pushSupported, pushPermission, enablePush, disablePush, announceOnline } from './push.js';
 import { REACTIONS, reactionById, parseReaction, takeBudget, spriteURL, MAX_BURST, HOLD_MAX, SEND_CAP, RECEIVE_CAP } from './reactions.js';
 import { LANGS, sanitizeLang, langNative, langLabel, guessLang } from './languages.js';
 import { createEngine, createDeviceProvider, parseChatMessage } from './translate.js';
@@ -82,6 +83,7 @@ const ICONS = {
     x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
     chevronLeft: '<path d="m15 18-6-6 6-6"/>',
     lock: '<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+    bell: '<path d="M10.27 21a2 2 0 0 0 3.46 0"/><path d="M3.26 15.33A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.67C19.41 13.96 18 12.5 18 8A6 6 0 0 0 6 8c0 4.5-1.41 5.96-2.74 7.33"/>',
     languages: '<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>',
 };
 function setIcon(el, name) {
@@ -2448,6 +2450,10 @@ function setMode(mode) {
     if (mode === 'text' || (mode === 'voice' && hasVideo) || (mode === 'video' && S.localStream && !hasVideo)) stopMedia();
 }
 document.querySelectorAll('.seg').forEach(b => (b.onclick = () => setMode(b.dataset.mode)));
+{ // the app shortcuts (long-press the icon) open /?mode=video or /?mode=text
+    const qm = new URLSearchParams(location.search).get('mode');
+    if (['video', 'voice', 'text'].includes(qm)) setMode(qm);
+}
 
 // =====================================================================
 // Rooms (themed chats) and streaks / levels on the start screen
@@ -2722,6 +2728,49 @@ function applyProfile(p) {
     lt?.refresh();
 }
 
+// Friend notifications (see js/push.js and functions/push.js): opt-in, Google sign-in only, off until the Web Push key is in config.js.
+const PUSH_CFG = CFG.push || {};
+const pushOn = () => store.get('pushOn', false) && pushPermission() === 'granted';
+function renderPush() {
+    const usable = Boolean(PUSH_CFG.vapidKey) && pushSupported() && S.transport?.kind === 'firebase' && Boolean(friends?.signedIn);
+    $('pushBtn').classList.toggle('hidden', !usable);
+    $('hearOnlineBtn').classList.toggle('hidden', !usable || !pushOn());
+    $('shareOnlineBtn').classList.toggle('hidden', !usable || !pushOn());
+    $('pushLabel').textContent = pushPermission() === 'denied' ? 'Blocked in browser' : pushOn() ? 'On' : 'Off';
+    $('hearOnlineLabel').textContent = store.get('pushHear', false) ? 'On' : 'Off';
+    $('shareOnlineLabel').textContent = store.get('pushShare', false) ? 'On' : 'Off';
+}
+async function syncPush() {
+    return enablePush({ transport: S.transport, region: PREMIUM_CFG.functionsRegion, vapidKey: PUSH_CFG.vapidKey, friendOnline: store.get('pushHear', false), shareOnline: store.get('pushShare', false) });
+}
+$('pushBtn').onclick = async () => {
+    if (pushOn()) {
+        await disablePush({ transport: S.transport, region: PREMIUM_CFG.functionsRegion, token: store.get('pushToken', '') || undefined });
+        store.set('pushOn', false); store.set('pushToken', ''); store.set('pushHear', false); store.set('pushShare', false);
+    } else {
+        const r = await syncPush();
+        if (r.ok) { store.set('pushOn', true); store.set('pushToken', r.token); toast('Friend notifications are on for this device.'); }
+        else toast({ denied: 'Notifications are blocked. Allow them in your browser’s site settings, then try again.', unsupported: 'This browser can’t show notifications.', 'no-key': 'Notifications aren’t set up yet.' }[r.reason] || 'Couldn’t turn notifications on. Try again in a moment.', true);
+    }
+    renderPush();
+};
+for (const [id, key, label] of [['hearOnlineBtn', 'pushHear', 'You’ll hear when a friend who shares it comes online.'], ['shareOnlineBtn', 'pushShare', 'Friends who asked will hear when you come online.']]) {
+    $(id).onclick = async () => {
+        store.set(key, !store.get(key, false));
+        const r = await syncPush();
+        if (!r.ok) store.set(key, !store.get(key, false));
+        else if (store.get(key, false)) toast(label);
+        renderPush();
+    };
+}
+/** Once per visit (and at most every 30 minutes) tell friends who asked that this person is here. */
+function maybeAnnounceOnline() {
+    if (!pushOn() || !store.get('pushShare', false) || !friends?.signedIn) return;
+    if (Date.now() - store.get('lastAnnounce', 0) < 30 * 60000) return;
+    store.set('lastAnnounce', Date.now());
+    announceOnline({ transport: S.transport, region: PREMIUM_CFG.functionsRegion });
+}
+
 function initFriends() {
     friends = new Friends(S.transport);
     el.friendsBtn.classList.remove('hidden');
@@ -2729,6 +2778,8 @@ function initFriends() {
     let lastUid = friends.uid;
     friends.onChange(() => {
         renderDrawer();
+        renderPush();
+        maybeAnnounceOnline();
         checkIncomingCalls();
         if (friends.uid !== lastUid) {
             lastUid = friends.uid;

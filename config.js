@@ -76,6 +76,10 @@ window.APP_CONFIG = {
         strikesForBan: 3,      // strikes within 24 h before video chat is locked for 24 h
     },
 
+    // Friend notifications (Web Push). Firebase console, Project settings, Cloud Messaging, Web Push certificates, Generate key pair; paste the
+    // public key here. Until it is set the notification items stay hidden. See android/README.md.
+    push: { vapidKey: '' },
+
     ageCheck: {
         enabled: true,
         passAge: 21,        // estimated age needed to pass (margin for model error; 25 = stricter "Challenge 25")
