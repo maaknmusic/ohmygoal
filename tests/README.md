@@ -33,3 +33,6 @@ Two pages of one browser context match each other in demo mode.
 3. Install the web SDK (`npm i firebase@11.6.1`) and pass its folder via the path the scripts read (`FB`, `<scratch>/fb`).
 4. `fixes.mjs` (rules attacks, real matching, signalling, reports), `friends.mjs`, `bans.mjs` (58 checks),
    `premium.mjs` (22), `privacy.mjs` (attacker reads/writes), `likes.mjs` (52).
+
+## Android and push
+`android/README.md` has the steps to package the site as an Android app and to switch on friend notifications.
