@@ -622,7 +622,7 @@ export default {
     "Tell me when friends are online": "Сообщать мне, когда друзья онлайн",
     "Tell friends when I’m online": "Сообщать друзьям, когда я онлайн",
     "Coins": "Монеты",
-    "Coins buy gifts for the people you chat with. They never unlock safety tools, and gifts can’t be cashed out or sold.": "На монеты можно купить подарки людям, с которыми вы общаетесь. Они никогда не открывают инструменты безопасности, а подарки нельзя обналичить или продать.",
+    "Coins buy gifts for the people you chat with and entry to private live sessions. They never unlock safety tools, and coins can’t be cashed out or sold. Live hosts are paid a share of what is spent on them.": "На монеты можно купить подарки людям, с которыми вы общаетесь, и вход в закрытые прямые эфиры. Они никогда не открывают инструменты безопасности, а монеты нельзя обналичить или продать. Ведущим прямых эфиров выплачивается часть потраченного на них.",
     "coins now.": "монет сейчас.",
     "Claim today’s free coins": "Забрать бесплатные монеты на сегодня",
     "One-time payment by Razorpay (UPI, cards, netbanking). Coins need a Google sign-in so they stay with you. Purchases are non-refundable once spent.": "Разовый платёж через Razorpay (UPI, карты, интернет-банкинг). Для монет нужен вход через Google, чтобы они оставались с вами. Покупки не возвращаются после траты.",

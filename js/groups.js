@@ -239,6 +239,10 @@ export function createLocalGroups(selfId) {
             post({ k: 'here', gid, member });
             return { gid, cap: groupCap(mode) };
         },
+        async joinLive() { throw Object.assign(new Error('Live sessions are available on the online version of the site.'), { code: 'online-only' }); },
+        watchSession() { return () => {}; },
+        watchEvents() { return () => {}; },
+        async call() { throw Object.assign(new Error('Live sessions are available on the online version of the site.'), { code: 'online-only' }); },
         watchMembers(gid, fn) { const s = memberWatchers.get(gid) || new Set(); s.add(fn); memberWatchers.set(gid, s); fn(list(gid)); return () => s.delete(fn); },
         watchSignals(gid, fn) {
             const s = signalWatchers.get(gid) || new Set(); s.add(fn); signalWatchers.set(gid, s);
@@ -263,6 +267,25 @@ export function createFirebaseGroups(transport, { callable, region }) {
             const fn = await callable(transport, 'joinGroup', region);
             const { data } = await fn({ topic, mode, nick: meta.nick, avatar: meta.avatar });
             return { gid: data.gid, cap: data.cap };
+        },
+        /** Live sessions (functions/live.js): the server charges a private session's fee and adds us as a member. */
+        async joinLive({ sid, meta }) {
+            const fn = await callable(transport, 'joinLive', region);
+            const { data } = await fn({ sid, nick: meta.nick, avatar: meta.avatar });
+            return { gid: data.gid, cap: data.cap, host: data.host === true, kind: data.kind, title: data.title, charged: data.charged || 0, hostUid: data.hostUid };
+        },
+        /** The session document (status 'live' or 'ended'): null when it is gone. */
+        watchSession(gid, fn) {
+            return fs.onSnapshot(fs.doc(db, ...base, 'groups', gid), snap => fn(snap.exists() ? snap.data() : null), e => console.warn('live session', e));
+        },
+        /** Gifts sent to the host, one call per new gift. */
+        watchEvents(gid, fn) {
+            return fs.onSnapshot(col(gid, 'events'), snap => snap.docChanges().forEach(c => { if (c.type === 'added') fn(c.doc.data()); }), e => console.warn('live events', e));
+        },
+        /** Any live-session function by name (sendLiveGift, endLive, kickLive, listLive, myHost...). */
+        async call(name, data) {
+            const fn = await callable(transport, name, region);
+            return (await fn(data || {})).data;
         },
         watchMembers(gid, fn) {
             return fs.onSnapshot(col(gid, 'members'), snap => fn(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => console.warn('group members', e));

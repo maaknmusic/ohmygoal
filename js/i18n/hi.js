@@ -622,7 +622,7 @@ export default {
     "Tell me when friends are online": "दोस्तों के ऑनलाइन होने पर मुझे बताएँ",
     "Tell friends when I’m online": "मेरे ऑनलाइन होने पर दोस्तों को बताएँ",
     "Coins": "सिक्के",
-    "Coins buy gifts for the people you chat with. They never unlock safety tools, and gifts can’t be cashed out or sold.": "सिक्कों से आप चैट करने वालों के लिए गिफ़्ट ख़रीदते हैं। ये कभी सुरक्षा टूल नहीं खोलते, और गिफ़्ट को भुनाया या बेचा नहीं जा सकता।",
+    "Coins buy gifts for the people you chat with and entry to private live sessions. They never unlock safety tools, and coins can’t be cashed out or sold. Live hosts are paid a share of what is spent on them.": "सिक्कों से आप चैट करने वालों के लिए गिफ़्ट और निजी लाइव सेशन में प्रवेश ख़रीदते हैं। ये कभी सुरक्षा टूल नहीं खोलते, और सिक्कों को भुनाया या बेचा नहीं जा सकता। लाइव होस्ट को उन पर ख़र्च हुई रकम का एक हिस्सा दिया जाता है।",
     "coins now.": "सिक्के अभी।",
     "Claim today’s free coins": "आज के मुफ़्त सिक्के लें",
     "One-time payment by Razorpay (UPI, cards, netbanking). Coins need a Google sign-in so they stay with you. Purchases are non-refundable once spent.": "Razorpay से एकमुश्त भुगतान (UPI, कार्ड, नेटबैंकिंग)। सिक्के आपके पास रहें, इसके लिए Google साइन-इन ज़रूरी है। ख़र्च हो जाने के बाद ख़रीद वापस नहीं होती।",

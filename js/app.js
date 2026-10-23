@@ -2947,6 +2947,15 @@ const groupUi = createGroupUi({
         toast('Your camera was turned off: nudity detected.', true);
     },
     onClose: () => { el.welcome.classList.remove('hidden'); },
+    // live sessions (js/liveui.js): sign-in and the coin wallet live in this file
+    signedIn: () => Boolean(friends?.signedIn),
+    signIn: () => signInFlow(),
+    coins: {
+        get: () => walletState.coins,
+        set: n => { walletState.coins = n; renderCoins(); },
+        refresh: () => refreshWallet(),
+        openShop: () => $('getCoinsBtn').click(),
+    },
 });
 el.groupBtn.onclick = async () => {
     if (!el.ageCheck.checked) { toast('Please confirm you are 18+ to continue.', true); el.ageCheck.focus(); return; }

@@ -70,35 +70,19 @@ const boss = await page.evaluate(() => window.T.mk('boss', { email: 'boss@exampl
 const hostUid = await mk('host'), g1 = await mk('g1'), g2 = await mk('g2'), g3 = await mk('g3'), g4 = await mk('g4'), anon = await mk('anon', { google: false });
 const stamp = await P(() => window.T.stamp);
 
-// ------------------------------------------------------------------------------------------------ 1. applying
-const good = { name: 'Riya Live', bio: 'I host Hindi song nights and chat about films.', contact: 'riya@example.com' };
-const a1 = await call('host', 'applyHost', { ...good, name: '' });
-const a2 = await call('host', 'applyHost', { ...good, bio: 'short' });
-const a3 = await call('host', 'applyHost', { ...good, contact: 'x' });
-const a4 = await call('anon', 'applyHost', good);
-step('1a. an application needs a name, a real description and a way to reach you; anonymous accounts cannot apply', [a1, a2, a3].every(r => r.err === 'functions/invalid-argument') && a4.err === 'functions/failed-precondition', JSON.stringify([a1.err, a2.err, a3.err, a4.err]));
-const a5 = await call('host', 'applyHost', good);
-const a6 = await call('host', 'applyHost', good);
-step('1b. a good application is accepted once and then waits for review', a5.ok?.status === 'pending' && a6.err === 'functions/already-exists');
-const early = await call('host', 'startLive', { title: 'Hindi songs', mode: 'voice', kind: 'public' });
-step('1c. nobody can go live before being approved', early.err === 'functions/permission-denied', JSON.stringify(early));
-
-// ------------------------------------------------------------------------------------------------ 2. approval
+// ------------------------------------------------------------------------------------------------ 1. who can go live
+const early = await call('anon', 'startLive', { title: 'Hindi songs', mode: 'voice', kind: 'public' });
 const na = await call('g1', 'adminHosts', { action: 'list' });
-step('2a. the admin functions refuse non-admins', na.err === 'functions/permission-denied');
-const lst = await call('boss', 'adminHosts', { action: 'list' });
-const mine = lst.ok?.hosts.find(h => h.uid === hostUid);
-step('2b. the admin sees the waiting application', mine?.status === 'pending' && mine.name === 'Riya Live' && /riya@example.com/.test(mine.contact), JSON.stringify(mine));
-const bad = await call('boss', 'adminHosts', { action: 'decide', uid: hostUid, decision: 'launch' });
-const ap = await call('boss', 'adminHosts', { action: 'decide', uid: hostUid, decision: 'approve', note: 'looks good' });
-const ap2 = await call('boss', 'adminHosts', { action: 'decide', uid: hostUid, decision: 'approve' });
-step('2c. approving works once; unknown decisions and double approvals are refused', bad.err === 'functions/invalid-argument' && ap.ok?.status === 'approved' && ap2.err === 'functions/failed-precondition');
+step('1a. there is no application: but anonymous accounts cannot host, and the admin functions refuse non-admins', early.err === 'functions/failed-precondition' && na.err === 'functions/permission-denied', JSON.stringify([early.err, na.err]));
+const t0 = await call('host', 'startLive', { name: 'Riya Live', title: 'Hindi songs', mode: 'voice', kind: 'public' });
+step('1b. any Google account can try; with no coins they are told it costs 49', t0.err === 'functions/failed-precondition' && /49 coins/.test(t0.msg), t0.msg);
 const my = await call('host', 'myHost', {});
-step('2d. the host sees their status and the fixed numbers', my.ok?.status === 'approved' && my.ok.startFee === 49 && my.ok.privateFee === 200 && my.ok.sharePct === 70, JSON.stringify(my.ok));
+step('1c. the host screen data shows the fixed numbers and an active status', my.ok?.status === 'active' && my.ok.startFee === 49 && my.ok.privateFee === 200 && my.ok.sharePct === 70 && my.ok.coins === 0, JSON.stringify(my.ok));
+const u0 = (await call('boss', 'adminHosts', { action: 'list' })).ok.usage.today;
+const approveTry = await call('boss', 'adminHosts', { action: 'decide', uid: hostUid, decision: 'approve' });
+step('1d. approval no longer exists', approveTry.err === 'functions/invalid-argument');
 
 // ------------------------------------------------------------------------------------------------ 3. going live
-const t1 = await call('host', 'startLive', { title: 'Hindi songs', mode: 'voice', kind: 'public' });
-step('3a. going live with no coins is refused and says so', t1.err === 'functions/failed-precondition' && /49 coins/.test(t1.msg), t1.msg);
 await seedCoins(hostUid, 1000);
 const t2 = await call('host', 'startLive', { title: 'call me 9876543210', mode: 'voice', kind: 'public' });
 const t3 = await call('host', 'startLive', { title: 'Hindi songs', mode: 'hologram', kind: 'public' });
@@ -108,7 +92,7 @@ const t6 = await call('host', 'startLive', { title: 'Hindi songs', mode: 'video'
 step('3b. a title with a phone number, an unknown mode or kind, and a private session with too many or no guests are refused', [t2, t3, t4, t5, t6].every(r => r.err === 'functions/invalid-argument'), JSON.stringify([t2.err, t3.err, t4.err, t5.err, t6.err]));
 const w0 = await read(`${base}/private/data/wallet/${hostUid}`);
 step('3c. the refused attempts cost nothing', w0.coins === 1000);
-const pub = await call('host', 'startLive', { title: 'Hindi songs night', mode: 'video', kind: 'public' });
+const pub = await call('host', 'startLive', { name: 'Riya Live', title: 'Hindi songs night', mode: 'video', kind: 'public' });
 const sid = pub.ok?.sid;
 const w1 = await read(`${base}/private/data/wallet/${hostUid}`);
 step('3d. a public session opens, costs exactly 49 coins, and holds the host plus 3 guests on video', Boolean(sid) && w1.coins === 951 && pub.ok.cap === 4, JSON.stringify(pub.ok));
@@ -116,7 +100,7 @@ const gdoc = await read(`${base}/public/data/groups/${sid}`);
 const hmem = await read(`${base}/public/data/groups/${sid}/members/${hostUid}`);
 step('3e. the session document says who hosts it; the host is its first member with a host mark set by the server', gdoc?.hostUid === hostUid && gdoc.kind === 'public' && gdoc.fee === 0 && gdoc.live === true && hmem?.host === true, JSON.stringify(gdoc));
 const lv = await call('g1', 'listLive', {});
-step('3f. everyone can see it in the live list, with no host user id or private data', lv.ok?.sessions.some(s => s.sid === sid && s.title === 'Hindi songs night' && s.kind === 'public' && s.count === 1) && !JSON.stringify(lv.ok).includes(hostUid), JSON.stringify(lv.ok?.sessions[0]));
+step('3f. everyone can see it in the live list, with no host user id or private data', lv.ok?.sessions.some(s => s.sid === sid && s.title === 'Hindi songs night' && s.kind === 'public' && s.count === 1 && s.hostName === 'Riya Live') && !JSON.stringify(lv.ok).includes(hostUid), JSON.stringify(lv.ok?.sessions[0]));
 
 // ------------------------------------------------------------------------------------------------ 4. joining a public session
 const j0 = await call('g1', 'joinLive', { sid: 'doesnotexist12345' });
@@ -236,7 +220,18 @@ const back = await call('boss', 'adminHosts', { action: 'decide', uid: hostUid, 
 const again = await call('host', 'startLive', { title: 'Late night talk', mode: 'voice', kind: 'public' });
 step('9b. reinstating lets them host again', back.ok && again.ok?.sid);
 const logs = (await list(`${base}/private/data/adminLog`)).map(l => l.what);
-step('9c. every decision and payout is in the admin log', ['host-approve', 'host-suspend', 'host-reinstate', 'payoutPaid', 'payoutReject'].every(k => logs.includes(k)), logs.join(','));
+step('9c. every decision and payout is in the admin log', ['host-suspend', 'host-reinstate', 'payoutPaid', 'payoutReject'].every(k => logs.includes(k)), logs.join(','));
+
+// ------------------------------------------------------------------------------------------------ 9d. what the admin sees
+const adm2 = (await call('boss', 'adminHosts', { action: 'list' })).ok;
+const hrow = adm2.hosts.find(x => x.uid === hostUid);
+step('9d. the admin list shows the host with name, status and earnings, and what is live now', hrow?.name === 'Riya Live' && hrow.status === 'active' && hrow.coins === 700 && adm2.live.some(x => x.sid === again.ok.sid && x.hostName === 'Riya Live') && adm2.liveNow >= 1, JSON.stringify(hrow));
+const u1 = adm2.usage.today;
+const dd = k => u1[k] - u0[k];
+step('9e. the usage numbers for the admin: starts, fees, private seats, gifts, the 70/30 split, sessions ended', dd('liveStarts') === 4 && dd('liveFeeCoins') === 196 && dd('privateJoins') === 2 && dd('privateCoins') === 400 && dd('liveGifts') === 33 && dd('hostShareCoins') === 280 + 131 && dd('platformShareCoins') === 120 + 79 && dd('liveEnded') === 3 && dd('liveMinutes') >= 0 && dd('liveParticipantMinutes') >= 0, JSON.stringify(Object.fromEntries(Object.keys(u1).map(k => [k, dd(k)]))));
+const endNow = await call('boss', 'adminHosts', { action: 'end', sid: again.ok.sid });
+const ended = await read(`${base}/public/data/groups/${again.ok.sid}`);
+step('9f. an admin can end any live session', endNow.ok && ended.status === 'ended' && ended.endReason === 'admin');
 
 // ------------------------------------------------------------------------------------------------ 10. what a browser can never do
 const sec = await page.evaluate(async ([sid2, host, g1id]) => {

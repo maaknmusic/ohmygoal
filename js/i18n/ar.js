@@ -622,7 +622,7 @@ export default {
     "Tell me when friends are online": "أخبرني عندما يكون أصدقائي متصلين",
     "Tell friends when I’m online": "أخبر أصدقائي عندما أكون متصلًا",
     "Coins": "العملات",
-    "Coins buy gifts for the people you chat with. They never unlock safety tools, and gifts can’t be cashed out or sold.": "تشتري العملات هدايا لمن تدردش معهم. لا تفتح أبدًا أدوات الأمان، ولا يمكن صرف الهدايا نقدًا ولا بيعها.",
+    "Coins buy gifts for the people you chat with and entry to private live sessions. They never unlock safety tools, and coins can’t be cashed out or sold. Live hosts are paid a share of what is spent on them.": "تشتري العملات هدايا لمن تدردش معهم ودخول الجلسات المباشرة الخاصة. لا تفتح أبدًا أدوات الأمان، ولا يمكن صرف العملات نقدًا ولا بيعها. يحصل مضيفو البث المباشر على حصة مما يُنفق عليهم.",
     "coins now.": "عملة الآن.",
     "Claim today’s free coins": "احصل على عملات اليوم المجانية",
     "One-time payment by Razorpay (UPI, cards, netbanking). Coins need a Google sign-in so they stay with you. Purchases are non-refundable once spent.": "دفعة واحدة عبر Razorpay (UPI والبطاقات والخدمات المصرفية). تتطلب العملات تسجيل الدخول عبر Google لتبقى معك. المشتريات غير قابلة للاسترداد بعد إنفاقها.",

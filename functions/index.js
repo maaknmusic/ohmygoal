@@ -18,7 +18,7 @@ import { COIN_PACKS } from './gifts.js';
 import { addCoinsTx, walletDoc } from './wallet.js';
 
 // Live sessions: hosts, paid private sessions, gifts to the host, payouts and the admin side.
-export { applyHost, myHost, startLive, joinLive, endLive, kickLive, listLive, sendLiveGift, requestPayout, adminHosts } from './live.js';
+export { myHost, startLive, joinLive, endLive, kickLive, listLive, sendLiveGift, requestPayout, adminHosts } from './live.js';
 // Bans, access passes, unban requests and the admin API.
 export { checkAccess, reportViolation, requestUnban, admin } from './moderation.js';
 // "Good vibe" likes after a chat.

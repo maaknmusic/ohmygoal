@@ -622,7 +622,7 @@ export default {
     "Tell me when friends are online": "Arkadaşlarım çevrimiçi olunca bana haber ver",
     "Tell friends when I’m online": "Çevrimiçi olduğumda arkadaşlarıma haber ver",
     "Coins": "Jetonlar",
-    "Coins buy gifts for the people you chat with. They never unlock safety tools, and gifts can’t be cashed out or sold.": "Jetonlar, sohbet ettiğin kişilere hediye alır. Güvenlik araçlarının kilidini asla açmaz ve hediyeler nakde çevrilemez veya satılamaz.",
+    "Coins buy gifts for the people you chat with and entry to private live sessions. They never unlock safety tools, and coins can’t be cashed out or sold. Live hosts are paid a share of what is spent on them.": "Jetonlar, sohbet ettiğin kişilere hediye alır ve özel canlı oturumlara giriş sağlar. Güvenlik araçlarının kilidini asla açmaz ve jetonlar nakde çevrilemez veya satılamaz. Canlı sunuculara, kendilerine harcanan tutarın bir kısmı ödenir.",
     "coins now.": "jeton şimdi.",
     "Claim today’s free coins": "Bugünün ücretsiz jetonlarını al",
     "One-time payment by Razorpay (UPI, cards, netbanking). Coins need a Google sign-in so they stay with you. Purchases are non-refundable once spent.": "Razorpay ile tek seferlik ödeme (UPI, kartlar, internet bankacılığı). Jetonlar seninle kalsın diye Google girişi gerektirir. Harcandıktan sonra satın alımlar iade edilemez.",

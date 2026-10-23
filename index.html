@@ -840,12 +840,19 @@
             <h2>Group rooms <span class="lp-soon lp-soon--inline">Beta</span></h2>
         </div>
         <section id="groupLobby">
+            <div class="segmented live-tabs" role="group" aria-label="Group rooms">
+                <button type="button" class="seg active" data-gtab="topics" aria-pressed="true">Topic rooms</button>
+                <button type="button" class="seg" data-gtab="live" aria-pressed="false">Live sessions <span class="lp-soon lp-soon--inline">New</span></button>
+            </div>
+            <div id="groupTopicsPane">
             <p class="hint">Talk with up to 8 people about something you all like. You’re connected directly to each person (nothing is recorded), and you can report or block anyone from their tile.</p>
             <div class="segmented" role="group" aria-label="Room type">
                 <button type="button" class="seg active" data-gmode="voice" aria-pressed="true"><i class="icon" data-icon="mic"></i>Voice · up to 8</button>
                 <button type="button" class="seg" data-gmode="video" aria-pressed="false"><i class="icon" data-icon="video"></i>Video · up to 4</button>
             </div>
             <div id="groupTopics" class="group-topics"></div>
+            </div>
+            <div id="livePane" class="live-pane hidden"></div>
         </section>
         <section id="groupRoom" class="hidden">
             <div class="group-bar"><b id="groupTitle"></b><span id="groupCount"></span><button type="button" id="groupLeave" class="btn btn-danger btn-sm">Leave</button></div>
@@ -853,6 +860,12 @@
             <div class="group-controls">
                 <button type="button" id="gMic" class="icon-btn" title="Mute microphone" aria-label="Mute microphone" aria-pressed="false"><i class="icon" data-icon="mic"></i></button>
                 <button type="button" id="gCam" class="icon-btn hidden" title="Turn camera off" aria-label="Turn camera off" aria-pressed="false"><i class="icon" data-icon="video"></i></button>
+                <button type="button" id="gGift" class="btn btn-primary btn-sm hidden">Send a gift</button>
+                <button type="button" id="gEnd" class="btn btn-danger btn-sm hidden">End session</button>
+            </div>
+            <div id="gGiftPop" class="sticker-pop g-gift-pop hidden">
+                <div class="sticker-grid" id="gGiftGrid"></div>
+                <div class="g-gift-foot">Your coins: <b id="gGiftCoins">0</b> <button type="button" id="gGetCoins" class="btn btn-ghost btn-sm">Get coins</button></div>
             </div>
             <div class="group-chat">
                 <div id="groupMessages" class="group-messages" aria-live="polite"></div>
@@ -1174,7 +1187,7 @@
             <div class="sheet-grab"></div>
             <div class="sheet-head"><h3 id="coinTitle">Coins</h3><button class="icon-btn" data-sheet-close aria-label="Close"><i class="icon" data-icon="x"></i></button></div>
             <div class="sheet-body">
-                <p>Coins buy gifts for the people you chat with. They never unlock safety tools, and gifts can’t be cashed out or sold. <b id="coinBalance">0</b> coins now.</p>
+                <p>Coins buy gifts for the people you chat with and entry to private live sessions. They never unlock safety tools, and coins can’t be cashed out or sold. Live hosts are paid a share of what is spent on them. <b id="coinBalance">0</b> coins now.</p>
                 <button type="button" class="btn btn-ghost" id="dailyCoinsBtn">Claim today’s free coins</button>
                 <div class="coin-packs" id="coinPacks"></div>
                 <p class="hint">One-time payment by Razorpay (UPI, cards, netbanking). Coins need a Google sign-in so they stay with you. Purchases are non-refundable once spent.</p>

@@ -2,22 +2,22 @@
 // Live sessions: approved hosts open a small live room (it is a group room, see groups.js), people join, send gifts to the host,
 // and a host can run a paid private session. All money moves here, in transactions, and the browser never decides a price or a share.
 //
-//   Hosts apply (applyHost) and you approve them in the admin panel (adminHosts). Only approved hosts can go live.
-//   startLive      a host pays LIVE_START_FEE coins and a room opens: public (anyone joins free) or private (every guest pays PRIVATE_FEE coins).
+//   Anyone signed in with Google (and past the age check) can host: no application, no approval. You can suspend a host in the admin panel.
+//   startLive      the host pays LIVE_START_FEE coins and a room opens: public (anyone joins free) or private (every guest pays PRIVATE_FEE coins).
 //   joinLive       adds the caller to the room. A private session charges the guest once per session, in the same transaction that
 //                  credits the host.
 //   sendLiveGift   spends gift coins; the host gets HOST_SHARE_PCT of them, the rest is yours.
 //   endLive        the host (or an admin) closes the room.
 //   requestPayout  a host asks to be paid what they earned; you pay by hand (UPI or bank) and mark it paid in the admin panel.
 // Money records (private tree, nobody but these functions can read or write them):
-//   hosts/{uid}            application and status          hostWallet/{uid}   { coins: owed to the host, pending, paidOut, lifetime }
+//   hosts/{uid}            name and status (active or suspended)   hostWallet/{uid}   { coins: owed to the host, pending, paidOut, lifetime }
 //   hostLedger/{id}        every credit to a host          payouts/{id}       a payout request and how it ended
 //   livePaid/{sid}_{uid}   a guest already paid for that private session (re-joining is free)
 // =====================================================================
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { db, publicCol, publicDoc, privateCol, privateDoc, callOpts } from './common.js';
 import { ADMIN_EMAILS, requireAdmin } from './moderation.js';
-import { bump } from './stats.js';
+import { bump, istDay, statsRef } from './stats.js';
 import { cleanNick, cleanAvatar, CAPS, STALE_MS } from './groups.js';
 import { GIFTS, GIFT_HOURLY_CAP } from './gifts.js';
 
@@ -28,6 +28,8 @@ export const COIN_VALUE_PAISE = 75;         // what one earned coin is worth whe
 export const MIN_PAYOUT_COINS = 500;        // smallest payout a host can ask for
 export const MAX_SESSION_MS = 3 * 3600000;  // a session closes by itself after this
 export const STARTS_PER_DAY = 12;
+/** Rough running cost of one person in a live room for one hour, in paise (database writes and reads, plus an allowance for the video relay). Only used for the admin usage panel. */
+export const INFRA_PAISE_PER_PARTICIPANT_HOUR = 50;
 const HOUR = 3600000;
 const DAY = 86400000;
 const HOST_STALE_MS = 3 * 60000;            // a session whose host has not been heard from for this long is over
@@ -111,32 +113,41 @@ function creditHost(t, hostUid, hw, share, entry, now) {
     t.set(privateCol('hostLedger').doc(), { hostUid, ...entry, hostShare: share, at: now });
 }
 
-async function approvedHost(uid) {
-    const h = (await privateDoc(`hosts/${uid}`).get()).data();
-    if (h?.status !== 'approved') throw new HttpsError('permission-denied', 'Only approved hosts can do this.');
+/** A person can host unless an admin suspended them. Returns their host record (or an empty one for a first-timer). */
+async function hostGate(uid) {
+    const h = (await privateDoc(`hosts/${uid}`).get()).data() || {};
+    if (h.status === 'suspended') throw new HttpsError('permission-denied', 'Hosting is paused for your account. Contact us if you think this is a mistake.');
     return h;
 }
 
-// ---------------------------------------------------------------- hosts
-
-export const applyHost = onCall(callOpts(), async request => {
-    const uid = requireGoogle(request);
-    await requirePass(uid);
-    const name = cleanNick(request.data?.name);
-    const bio = cleanText(request.data?.bio, 200);
-    const contact = cleanText(request.data?.contact, 80);
-    if (name === 'Guest' || name.length < 2) throw new HttpsError('invalid-argument', 'Tell us the name you want to host under.');
-    if (bio.length < 10) throw new HttpsError('invalid-argument', 'Write a sentence or two about what you will host (at least 10 characters).');
-    if (contact.length < 5) throw new HttpsError('invalid-argument', 'Add an e-mail or phone number so we can reach you about your application.');
-    const ref = privateDoc(`hosts/${uid}`);
-    const now = Date.now();
-    await db.runTransaction(async t => {
-        const cur = (await t.get(ref)).data();
-        if (cur && cur.status !== 'rejected') throw new HttpsError('already-exists', cur.status === 'pending' ? 'Your application is already waiting for review.' : 'You are already a host.');
-        t.set(ref, { status: 'pending', name, bio, contact, avatar: cleanAvatar(request.data?.avatar), createdAt: now, email: request.auth.token.email || '' });
+/**
+ * Ends a session once (a second call does nothing) and records how much it was used: minutes live, minutes people spent in it.
+ * Returns true when this call is the one that ended it.
+ */
+async function closeSession(sid, now, reason) {
+    const ref = publicDoc(`groups/${sid}`);
+    const g = await db.runTransaction(async t => {
+        const s = (await t.get(ref)).data();
+        if (!s || s.live !== true || s.status !== 'live') return null;
+        t.update(ref, { status: 'ended', endedAt: now, endReason: reason });
+        return s;
     });
-    return { status: 'pending' };
-});
+    if (!g) return false;
+    try {
+        const members = await membersCol(sid).get();
+        const end = Math.min(now, typeof g.endsAt === 'number' ? g.endsAt : now);
+        const minutes = Math.max(0, Math.round((end - (g.created || end)) / 60000));
+        let people = 0;
+        for (const d of members.docs) {
+            const m = d.data();
+            people += Math.max(0, Math.round((Math.min(typeof m.ts === 'number' ? m.ts : end, end) - (typeof m.joined === 'number' ? m.joined : end)) / 60000));
+        }
+        await bump('liveEnded'); await bump('liveMinutes', minutes); await bump('liveParticipantMinutes', people);
+    } catch (e) { /* the numbers are only for the admin panel */ }
+    return true;
+}
+
+// ---------------------------------------------------------------- hosts
 
 export const myHost = onCall(callOpts(), async request => {
     const uid = requireGoogle(request);
@@ -144,14 +155,13 @@ export const myHost = onCall(callOpts(), async request => {
         privateDoc(`hosts/${uid}`).get(), hostWalletRef(uid).get(),
         privateCol('payouts').where('uid', '==', uid).limit(20).get(), publicCol('groups').where('hostUid', '==', uid).limit(10).get(),
     ]);
-    const host = h.data();
-    if (!host) return { status: 'none', startFee: LIVE_START_FEE, privateFee: PRIVATE_FEE, sharePct: HOST_SHARE_PCT };
+    const host = h.data() || {};
     const wallet = w.data() || {};
     const now = Date.now();
     const active = live.docs.find(d => sessionIsLive(d.data(), now, now)); // a session still inside its time limit
     const coins = asInt(wallet.coins);
     return {
-        status: host.status, name: host.name, note: host.status === 'rejected' ? host.note || '' : '',
+        status: host.status === 'suspended' ? 'suspended' : 'active', name: host.name || '',
         coins, pendingCoins: asInt(wallet.pending), paidOutCoins: asInt(wallet.paidOut), lifetimeCoins: asInt(wallet.lifetime),
         paise: coinsToPaise(coins), coinPaise: COIN_VALUE_PAISE, minPayoutCoins: MIN_PAYOUT_COINS,
         startFee: LIVE_START_FEE, privateFee: PRIVATE_FEE, sharePct: HOST_SHARE_PCT,
@@ -166,7 +176,7 @@ export const myHost = onCall(callOpts(), async request => {
 export const startLive = onCall(callOpts(), async request => {
     const uid = requireGoogle(request);
     const pass = await requirePass(uid);
-    const host = await approvedHost(uid);
+    const host = await hostGate(uid);
     const { mode, kind } = request.data || {};
     if (typeof mode !== 'string' || !Object.hasOwn(CAPS, mode)) throw new HttpsError('invalid-argument', 'Choose voice or video.');
     if (kind !== 'public' && kind !== 'private') throw new HttpsError('invalid-argument', 'Choose a public or a private session.');
@@ -179,9 +189,13 @@ export const startLive = onCall(callOpts(), async request => {
         if (!Number.isInteger(maxGuests) || maxGuests < 1 || maxGuests > cap - 1) throw new HttpsError('invalid-argument', `A private ${mode} session can have 1 to ${cap - 1} guests.`);
     }
     const now = Date.now();
+    // the name people see: what the host typed, else the name they used before, else "Host"
+    const typed = cleanNick(request.data?.name);
+    const hostName = typed !== 'Guest' ? typed : host.name || 'Host';
+    const hostAvatar = cleanAvatar(request.data?.avatar) || host.avatar || null;
     // one live session at a time: close any earlier one
     const mine = await publicCol('groups').where('hostUid', '==', uid).limit(20).get();
-    for (const d of mine.docs) if (d.data().status === 'live') await d.ref.update({ status: 'ended', endedAt: now });
+    for (const d of mine.docs) if (d.data().status === 'live') await closeSession(d.id, now, 'replaced');
 
     const sid = publicCol('groups').doc().id;
     const limitRef = privateDoc(`liveStarts/${uid}`);
@@ -194,10 +208,11 @@ export const startLive = onCall(callOpts(), async request => {
         t.set(walletRef(uid), { coins: coins - LIVE_START_FEE }, { merge: true });
         t.set(limitRef, { times: [...times, now] });
         t.set(publicDoc(`groups/${sid}`), {
-            topic: 'live', live: true, status: 'live', hostUid: uid, hostName: host.name, hostAvatar: host.avatar || null, title, mode, cap, kind,
+            topic: 'live', live: true, status: 'live', hostUid: uid, hostName, hostAvatar, title, mode, cap, kind,
             fee: kind === 'private' ? PRIVATE_FEE : 0, maxGuests, created: now, endsAt: now + MAX_SESSION_MS,
         });
-        t.set(membersCol(sid).doc(uid), { nick: host.name, avatar: host.avatar || null, ts: now, joined: now, host: true });
+        t.set(membersCol(sid).doc(uid), { nick: hostName, avatar: hostAvatar, ts: now, joined: now, host: true });
+        t.set(privateDoc(`hosts/${uid}`), { status: host.status || 'active', name: hostName, avatar: hostAvatar, email: request.auth.token.email || '', lastLiveAt: now, firstLiveAt: host.firstLiveAt || now }, { merge: true });
         t.set(privateCol('liveFees').doc(), { hostUid: uid, sid, coins: LIVE_START_FEE, at: now });
     });
     await bump('liveStarts'); await bump('liveFeeCoins', LIVE_START_FEE);
@@ -246,7 +261,10 @@ export const joinLive = onCall(callOpts(), async request => {
         t.set(membersCol(sid).doc(uid), member);
         return { cap: g.cap, kind: g.kind, charged, host: isHost, title: g.title, mode: g.mode, hostUid: g.hostUid };
     });
-    if (out.charged) { await bump('privateJoins'); await bump('privateCoins', out.charged); }
+    if (out.charged) {
+        const sh = splitCoins(out.charged);
+        await bump('privateJoins'); await bump('privateCoins', out.charged); await bump('hostShareCoins', sh.host); await bump('platformShareCoins', sh.platform);
+    }
     return { gid: sid, ...out };
 });
 
@@ -257,7 +275,7 @@ export const endLive = onCall(callOpts(), async request => {
     const g = (await ref.get()).data();
     if (!g || g.live !== true) throw new HttpsError('not-found', 'Unknown session.');
     if (g.hostUid !== request.auth.uid) throw new HttpsError('permission-denied', 'Only the host can end a session.');
-    if (g.status === 'live') await ref.update({ status: 'ended', endedAt: Date.now() });
+    await closeSession(sid, Date.now(), 'host');
     return { ok: true };
 });
 
@@ -285,7 +303,7 @@ export const listLive = onCall(callOpts(), async request => {
         const members = await membersCol(d.id).get();
         const hostDoc = members.docs.find(m => m.id === g.hostUid);
         if (!sessionIsLive(g, hostDoc?.data().ts, now)) {
-            if (now - (hostDoc?.data().ts || g.created || 0) > HOST_STALE_MS * 2) d.ref.update({ status: 'ended', endedAt: now }).catch(() => {});
+            if (now - (hostDoc?.data().ts || g.created || 0) > HOST_STALE_MS * 2) closeSession(d.id, now, 'stale').catch(() => {});
             continue;
         }
         const fresh = members.docs.filter(m => typeof m.data().ts === 'number' && now - m.data().ts <= STALE_MS).length;
@@ -333,7 +351,8 @@ export const sendLiveGift = onCall(callOpts(), async request => {
         t.set(publicCol(`groups/${sid}/events`).doc(), { kind: 'gift', gift, price, nick: mineDoc?.data().nick || nickGiven || 'Someone', at: now });
         return { coins: coins - price, hostShare: share };
     });
-    await bump('liveGifts'); await bump('liveGiftCoins', price);
+    const sh = splitCoins(price);
+    await bump('liveGifts'); await bump('liveGiftCoins', price); await bump('hostShareCoins', sh.host); await bump('platformShareCoins', sh.platform);
     return { coins: res.coins };
 });
 
@@ -341,7 +360,7 @@ export const sendLiveGift = onCall(callOpts(), async request => {
 
 export const requestPayout = onCall(callOpts(), async request => {
     const uid = requireGoogle(request);
-    await approvedHost(uid);
+    await hostGate(uid);
     const details = cleanText(request.data?.details, 120);
     if (details.length < 5) throw new HttpsError('invalid-argument', 'Tell us where to pay you: your UPI ID or bank account details.');
     const now = Date.now();
@@ -371,41 +390,42 @@ export const adminHosts = onCall(callOpts({ secrets: [ADMIN_EMAILS], timeoutSeco
 
     switch (action) {
         case 'list': {
-            const [hosts, pays, live] = await Promise.all([
-                privateCol('hosts').limit(300).get(), privateCol('payouts').orderBy('at', 'desc').limit(100).get(),
-                publicCol('groups').where('live', '==', true).where('status', '==', 'live').limit(60).get(),
+            const days = Array.from({ length: 30 }, (_, i) => istDay(now - (29 - i) * DAY));
+            const [hosts, pays, live, statDocs] = await Promise.all([
+                privateCol('hosts').limit(500).get(), privateCol('payouts').orderBy('at', 'desc').limit(100).get(),
+                publicCol('groups').where('live', '==', true).where('status', '==', 'live').limit(60).get(), db.getAll(...days.map(statsRef)),
             ]);
-            const paid = hosts.docs.filter(d => d.data().status === 'approved' || d.data().status === 'suspended').map(d => hostWalletRef(d.id));
-            const wallets = paid.length ? await db.getAll(...paid) : [];       // getAll needs at least one document
+            const wallets = hosts.docs.length ? await db.getAll(...hosts.docs.map(d => hostWalletRef(d.id))) : [];
             const wmap = new Map(wallets.map(w => [w.ref.id, w.data() || {}]));
             const rows = hosts.docs.map(d => {
                 const h = d.data(), w = wmap.get(d.id) || {};
-                return { uid: d.id, status: h.status, name: h.name, bio: h.bio, contact: h.contact, email: h.email || '', createdAt: h.createdAt || 0, decidedAt: h.decidedAt || 0, note: h.note || '', coins: asInt(w.coins), pending: asInt(w.pending), paidOut: asInt(w.paidOut), lifetime: asInt(w.lifetime) };
-            }).sort((a, b) => b.createdAt - a.createdAt);
+                return { uid: d.id, status: h.status === 'suspended' ? 'suspended' : 'active', name: h.name || '', email: h.email || '', firstLiveAt: h.firstLiveAt || 0, lastLiveAt: h.lastLiveAt || 0, note: h.note || '', coins: asInt(w.coins), pending: asInt(w.pending), paidOut: asInt(w.paidOut), lifetime: asInt(w.lifetime) };
+            }).sort((a, b) => b.lastLiveAt - a.lastLiveAt);
+            const FIELDS = ['liveStarts', 'liveFeeCoins', 'privateJoins', 'privateCoins', 'liveGifts', 'liveGiftCoins', 'hostShareCoins', 'platformShareCoins', 'liveEnded', 'liveMinutes', 'liveParticipantMinutes'];
+            const sum = (from, to) => Object.fromEntries(FIELDS.map(f => [f, statDocs.slice(from, to).reduce((a, d) => a + asInt(d.data()?.[f]), 0)]));
+            const sessions = live.docs.filter(d => sessionIsLive(d.data(), now, now)).map(d => ({ sid: d.id, title: d.data().title, hostName: d.data().hostName, mode: d.data().mode, kind: d.data().kind, created: d.data().created }));
             return {
-                hosts: rows, coinPaise: COIN_VALUE_PAISE, minPayoutCoins: MIN_PAYOUT_COINS,
+                hosts: rows, coinPaise: COIN_VALUE_PAISE, minPayoutCoins: MIN_PAYOUT_COINS, infraPaise: INFRA_PAISE_PER_PARTICIPANT_HOUR,
                 payouts: pays.docs.map(d => ({ id: d.id, ...d.data() })),
-                liveNow: live.docs.filter(d => sessionIsLive(d.data(), now, now)).length,
+                live: sessions, liveNow: sessions.length,
+                usage: { today: sum(29, 30), d7: sum(23, 30), d30: sum(0, 30) },
             };
         }
         case 'decide': {
             const uid = uidOf();
             const decision = request.data?.decision;
-            if (!['approve', 'reject', 'suspend', 'reinstate'].includes(decision)) throw new HttpsError('invalid-argument', 'Unknown decision.');
+            if (decision !== 'suspend' && decision !== 'reinstate') throw new HttpsError('invalid-argument', 'Unknown decision.');
             const ref = privateDoc(`hosts/${uid}`);
-            const h = (await ref.get()).data();
-            if (!h) throw new HttpsError('not-found', 'No such application.');
-            const next = { approve: 'approved', reinstate: 'approved', reject: 'rejected', suspend: 'suspended' }[decision];
-            if ((decision === 'approve' || decision === 'reject') && h.status !== 'pending') throw new HttpsError('failed-precondition', 'That application was already decided.');
+            const h = (await ref.get()).data() || {};
+            if (decision === 'suspend' && h.status === 'suspended') throw new HttpsError('failed-precondition', 'That person is already suspended.');
             if (decision === 'reinstate' && h.status !== 'suspended') throw new HttpsError('failed-precondition', 'Only a suspended host can be reinstated.');
-            if (decision === 'suspend' && h.status !== 'approved') throw new HttpsError('failed-precondition', 'Only an approved host can be suspended.');
-            await ref.set({ status: next, decidedAt: now, decidedBy: email, note: note() }, { merge: true });
-            if (next !== 'approved') {
+            await ref.set({ status: decision === 'suspend' ? 'suspended' : 'active', decidedAt: now, decidedBy: email, note: note() }, { merge: true });
+            if (decision === 'suspend') {
                 const mine = await publicCol('groups').where('hostUid', '==', uid).limit(20).get();
-                for (const d of mine.docs) if (d.data().status === 'live') await d.ref.update({ status: 'ended', endedAt: now });
+                for (const d of mine.docs) if (d.data().status === 'live') await closeSession(d.id, now, 'suspended');
             }
             await log(`host-${decision}`, { uid, note: note() });
-            return { ok: true, status: next };
+            return { ok: true, status: decision === 'suspend' ? 'suspended' : 'active' };
         }
         case 'payoutPaid': case 'payoutReject': {
             const id = request.data?.id;
@@ -431,9 +451,9 @@ export const adminHosts = onCall(callOpts({ secrets: [ADMIN_EMAILS], timeoutSeco
         }
         case 'end': {
             const sid = sidOf(request.data);
-            const ref = publicDoc(`groups/${sid}`);
-            if ((await ref.get()).data()?.live !== true) throw new HttpsError('not-found', 'Unknown session.');
-            await ref.update({ status: 'ended', endedAt: now });
+            const g = (await publicDoc(`groups/${sid}`).get()).data();
+            if (g?.live !== true) throw new HttpsError('not-found', 'Unknown session.');
+            await closeSession(sid, now, 'admin');
             await log('live-end', { sid });
             return { ok: true };
         }

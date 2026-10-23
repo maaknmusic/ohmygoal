@@ -2,6 +2,8 @@
 // app.js gives this module the few things it shares (toasts, the safety model, reporting, avatars); the rest is here.
 import { GROUP_TOPICS, GROUP_MODES, HEARTBEAT_MS, MAX_GROUP_MSG, createMesh, createLocalGroups, createFirebaseGroups, groupCap } from './groups.js';
 import { meterStream } from './audio-meter.js';
+import { GIFTS, giftById, stickerURL } from './stickers.js';
+import { createLiveUi } from './liveui.js';
 
 const $ = id => document.getElementById(id);
 function h(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
@@ -24,6 +26,17 @@ export function createGroupUi(ctx) {
     }
     root.querySelectorAll('[data-gmode]').forEach(b => { b.onclick = () => { mode = b.dataset.gmode; renderLobby(); }; });
 
+    // ---- the lobby has two tabs: topic rooms (as before) and live sessions with hosts ----
+    let live = null;
+    function lobbyTab(which) {
+        root.querySelectorAll('[data-gtab]').forEach(b => { b.classList.toggle('active', b.dataset.gtab === which); b.setAttribute('aria-pressed', String(b.dataset.gtab === which)); });
+        $('groupTopicsPane').classList.toggle('hidden', which !== 'topics');
+        $('livePane').classList.toggle('hidden', which !== 'live');
+        if (which === 'live') (live ||= createLiveUi({ pane: $('livePane'), ctx, enter: s => joinLiveSession(s) })).open();
+        else live?.pause();
+    }
+    root.querySelectorAll('[data-gtab]').forEach(b => { b.onclick = () => lobbyTab(b.dataset.gtab); });
+
     function show(view) {
         $('groupLobby').classList.toggle('hidden', view !== 'lobby');
         $('groupRoom').classList.toggle('hidden', view !== 'room');
@@ -39,6 +52,7 @@ export function createGroupUi(ctx) {
         media.appendChild(av);
         const name = h('div', 'g-name');
         name.append(h('span', '', self ? `${meta.nick} (you)` : meta.nick));
+        if (meta.host) name.append(h('span', 'g-host', 'Host'));
         const state = h('small', 'g-state', self ? '' : 'Connecting…');
         name.appendChild(state);
         tile.append(media, name);
@@ -132,6 +146,15 @@ export function createGroupUi(ctx) {
         const blk = h('button', '', 'Block (mute and hide)'); blk.type = 'button';
         blk.onclick = () => { closeMenu(); blockPerson(id); };
         menu.append(rep, blk);
+        if (room.live?.host) {
+            const kick = h('button', '', 'Remove from session'); kick.type = 'button';
+            kick.onclick = async () => {
+                closeMenu();
+                if (!confirm(`Remove ${meta.nick} from this session? They can’t come back.`)) return;
+                try { await room.backend.call('kickLive', { sid: room.live.sid, uid: id }); ctx.toast(`${meta.nick} was removed.`); } catch (e) { ctx.toast(e.message || 'That didn’t work.', true); }
+            };
+            menu.append(kick);
+        }
         anchor.parentElement.appendChild(menu);
     }
     function blockPerson(id) {
@@ -176,8 +199,9 @@ export function createGroupUi(ctx) {
     function setCam(on) { for (const t of room.stream?.getVideoTracks() || []) t.enabled = on; room.cam = on; $('gCam').classList.toggle('off', !on); $('gCam').setAttribute('aria-pressed', String(!on)); }
     $('gMic').onclick = () => room && setMic(!room.mic);
     $('gCam').onclick = () => room && setCam(!room.cam);
-    $('groupLeave').onclick = () => leave();
-    $('groupBack').onclick = () => { if (room) leave(); else close(); };
+    // a host who leaves ends the session (nobody should be left in a room without its host)
+    $('groupLeave').onclick = () => { if (room?.live?.host) $('gEnd').click(); else leave(); };
+    $('groupBack').onclick = () => { if (room?.live?.host) $('gEnd').click(); else if (room) leave(); else close(); };
 
     async function acquire(m) {
         return navigator.mediaDevices.getUserMedia({
@@ -186,42 +210,59 @@ export function createGroupUi(ctx) {
         });
     }
 
-    async function join(topic) {
+    function joinErrorText(e, isLive) {
+        const c = e?.code || '';
+        if (c === 'full') return 'That room is full right now. Try again in a moment, or pick another topic.';
+        if (c === 'online-only') return e.message;
+        if (isLive) {
+            if (/not-found/.test(c)) return 'That session is not open any more.';
+            if (/failed-precondition|permission-denied|resource-exhausted|invalid-argument/.test(c) && e.message) return e.message;
+            return 'Couldn’t join that session. Try again.';
+        }
+        if (c === 'functions/resource-exhausted') return 'You’re joining rooms very quickly. Try again in a little while.';
+        if (/permission-denied/.test(c)) return e.message || 'Couldn’t join that room.';
+        return 'Couldn’t join that room. Try again.';
+    }
+
+    /** Opens the camera or microphone, asks the backend to let us in (`run`), and builds the room. Used for topic rooms and live sessions. */
+    async function joinRoom({ mode: m, topic = null, liveInfo = null, run }) {
         if (room) return;
         const meta = { nick: ctx.nick(), avatar: ctx.avatar() };
         let stream;
-        try { stream = await acquire(mode); }
-        catch (e) { ctx.toast(ctx.mediaError(e, mode === 'video' ? 'video' : 'voice') + (mode === 'video' ? ' Try a voice room instead.' : ''), true); return; }
+        try { stream = await acquire(m); }
+        catch (e) { ctx.toast(ctx.mediaError(e, m === 'video' ? 'video' : 'voice') + (m === 'video' ? ' Try a voice room instead.' : ''), true); return; }
         const backend = ctx.makeBackend();
-        $('groupTopics').classList.add('busy');
+        const busyBox = liveInfo ? $('livePane') : $('groupTopics');
+        busyBox.classList.add('busy');
         let joined;
-        try { joined = await backend.join({ topic, mode, meta }); }
+        try { joined = await run(backend, meta); }
         catch (e) {
             stream.getTracks().forEach(t => t.stop());
             backend.close?.();
-            $('groupTopics').classList.remove('busy');
-            ctx.toast(e?.code === 'full' ? 'That room is full right now. Try again in a moment, or pick another topic.' : e?.code === 'functions/resource-exhausted' ? 'You’re joining rooms very quickly. Try again in a little while.' : /permission-denied/.test(e?.code || '') ? (e.message || 'Couldn’t join that room.') : 'Couldn’t join that room. Try again.', true);
+            busyBox.classList.remove('busy');
+            ctx.toast(joinErrorText(e, Boolean(liveInfo)), true);
             return;
         }
-        $('groupTopics').classList.remove('busy');
-        room = { gid: joined.gid, topic, mode, backend, stream, tiles: new Map(), timers: [], stops: [], meta, mic: true, cam: true };
-        $('groupTitle').textContent = `${GROUP_TOPICS.find(t => t.id === topic)?.name || topic} · ${mode === 'video' ? 'Video' : 'Voice'}`;
+        busyBox.classList.remove('busy');
+        room = { gid: joined.gid, topic, mode: m, backend, stream, tiles: new Map(), timers: [], stops: [], meta, mic: true, cam: true, live: null };
+        $('groupTitle').textContent = joined.title ? `${joined.title} · ${m === 'video' ? 'Video' : 'Voice'}` : `${GROUP_TOPICS.find(t => t.id === topic)?.name || topic} · ${m === 'video' ? 'Video' : 'Voice'}`;
         $('groupMessages').replaceChildren();
         $('groupGrid').replaceChildren();
-        $('gCam').classList.toggle('hidden', mode !== 'video');
+        $('gGiftPop').classList.add('hidden');
+        $('gCam').classList.toggle('hidden', m !== 'video');
         setMic(true); setCam(true);
         show('room');
-        const me = addTile('self', meta, true);
-        if (mode === 'video') {
+        const me = addTile('self', { ...meta, host: Boolean(liveInfo && joined.host) }, true);
+        if (m === 'video') {
             const v = h('video', 'g-video'); v.autoplay = true; v.playsInline = true; v.muted = true; v.srcObject = stream; me.media.prepend(v); me.tile.classList.add('has-video'); room.selfVideo = v;
         }
         me.stopMeter = meterStream(stream, lv => me.tile.classList.toggle('speaking', lv > 0.15 && room.mic));
         room.mesh = createMesh({
-            backend, gid: joined.gid, selfId: ctx.selfId(), mode, stream, iceConfig: ctx.iceConfig,
+            backend, gid: joined.gid, selfId: ctx.selfId(), mode: m, stream, iceConfig: ctx.iceConfig,
             handlers: {
-                onPeer: (id, m) => { addTile(id, { nick: ctx.nickOf(m.nick), avatar: ctx.avatarOf(m.avatar) }); updateCount(); ctx.chime(); if (mode === 'video') room.mesh.setSenderCaps(room.tiles.size > 3 ? 220000 : 350000, 1, 20); },
+                onPeer: (id, mm) => { addTile(id, { nick: ctx.nickOf(mm.nick), avatar: ctx.avatarOf(mm.avatar), host: mm.host === true }); updateCount(); ctx.chime(); if (m === 'video') room.mesh.setSenderCaps(room.tiles.size > 3 ? 220000 : 350000, 1, 20); },
                 onGone: id => { removeTile(id); },
-                onStream: (id, s) => attachStream(id, s),
+                onStream: (id, st) => attachStream(id, st),
                 onState: (id, st) => { const t = room?.tiles.get(id); if (t && !t.blocked) t.state.textContent = st === 'connected' ? '' : st === 'failed' ? 'Connection lost' : st === 'disconnected' ? 'Reconnecting…' : 'Connecting…'; },
                 onMessage: (id, msg) => { const t = room?.tiles.get(id); if (!t || t.blocked) return; addChat('them', msg.text, t.meta); },
             },
@@ -231,8 +272,92 @@ export function createGroupUi(ctx) {
         // a person who closed the tab never says goodbye: the member list drops them when their heartbeat stops
         watchSelf();
         updateCount();
-        ctx.toast(`You’re in. Say hi!`);
+        if (liveInfo) startLiveRoom(joined);
+        else ctx.toast(`You’re in. Say hi!`);
     }
+
+    function join(topic) { return joinRoom({ mode, topic, run: (backend, meta) => backend.join({ topic, mode, meta }) }); }
+
+    // ---- live sessions: a host, gifts, and the host can end the room ----
+    function joinLiveSession(s) {
+        return joinRoom({ mode: s.mode, liveInfo: s, run: (backend, meta) => backend.joinLive({ sid: s.sid, meta }) });
+    }
+
+    function startLiveRoom(joined) {
+        const sid = joined.gid;
+        room.live = { sid, host: joined.host, title: joined.title, kind: joined.kind, startedAt: Date.now() };
+        $('gGift').classList.toggle('hidden', joined.host);
+        $('gEnd').classList.toggle('hidden', !joined.host);
+        $('groupCount').dataset.live = joined.kind;
+        room.stops.push(room.backend.watchSession(sid, g => { if (room?.live?.sid === sid && (!g || g.status !== 'live')) { ctx.toast(joined.host ? 'Your session has ended.' : 'The host ended this session.'); leave(); } }));
+        room.stops.push(room.backend.watchEvents(sid, ev => onGift(ev)));
+        if (joined.charged) { ctx.toast(`${joined.charged} coins paid for this private session.`); }
+        ctx.coins?.refresh();
+        ctx.toast(joined.host ? 'You’re live. Say hi!' : 'You’re in. Say hi!');
+    }
+
+    function addSystem(text) {
+        const row = h('div', 'g-msg g-sys');
+        row.append(h('span', '', text));
+        const list = $('groupMessages');
+        list.appendChild(row);
+        while (list.childElementCount > 200) list.firstElementChild.remove();
+        list.scrollTop = list.scrollHeight;
+    }
+    function onGift(ev) {
+        if (!room?.live || !ev || ev.kind !== 'gift') return;
+        if (typeof ev.at === 'number' && ev.at < room.live.startedAt - 3000) return;   // gifts from before we came in
+        const g = giftById(ev.gift);
+        if (!g) return;
+        const who = typeof ev.nick === 'string' ? ev.nick.slice(0, 20) : 'Someone';
+        addSystem(`${who} sent a ${g.label}`);
+        const fx = new Image();
+        fx.className = 'g-fx'; fx.alt = ''; fx.src = stickerURL(g.id);
+        fx.style.left = `${20 + Math.random() * 60}%`;
+        $('groupRoom').appendChild(fx);
+        fx.addEventListener('animationend', () => fx.remove());
+        ctx.chime();
+    }
+    function renderGiftPop() {
+        $('gGiftGrid').replaceChildren(...GIFTS.map(g => {
+            const b = h('button', 'sticker-item');
+            b.type = 'button';
+            b.title = `${g.label} · ${g.coins} coins`;
+            b.setAttribute('aria-label', b.title);
+            const img = new Image(); img.src = stickerURL(g.id); img.alt = ''; img.draggable = false;
+            b.append(img, h('small', '', String(g.coins)));
+            b.onclick = () => sendRoomGift(g.id);
+            return b;
+        }));
+        $('gGiftCoins').textContent = ctx.coins?.get() == null ? '…' : String(ctx.coins.get());
+    }
+    async function sendRoomGift(id) {
+        const g = giftById(id);
+        if (!g || !room?.live || room.live.host) return;
+        if (!ctx.signedIn() && !(await ctx.signIn())) return;
+        try {
+            const r = await room.backend.call('sendLiveGift', { sid: room.live.sid, gift: id, nick: room.meta.nick });
+            ctx.coins?.set(r.coins);
+            $('gGiftCoins').textContent = String(r.coins);
+            $('gGiftPop').classList.add('hidden');
+        } catch (e) {
+            if (/failed-precondition/.test(e.code || '') && /coins/i.test(e.message || '')) { ctx.toast('You need more coins for that gift.', true); ctx.coins?.openShop(); }
+            else ctx.toast(e.code === 'functions/resource-exhausted' ? 'That’s a lot of gifts for one hour. Try again later.' : e.code === 'functions/failed-precondition' ? 'That session has ended.' : e.message || 'Couldn’t send the gift.', true);
+        }
+    }
+    $('gGift').onclick = e => {
+        e.stopPropagation();
+        const open = $('gGiftPop').classList.toggle('hidden') === false;
+        if (open) { renderGiftPop(); Promise.resolve(ctx.coins?.refresh()).then(() => { if (room?.live) $('gGiftCoins').textContent = ctx.coins?.get() == null ? '…' : String(ctx.coins.get()); }); }
+    };
+    $('gGetCoins').onclick = () => ctx.coins?.openShop();
+    document.addEventListener('click', e => { const pop = $('gGiftPop'); if (!pop.classList.contains('hidden') && !pop.contains(e.target) && !$('gGift').contains(e.target)) pop.classList.add('hidden'); });
+    $('gEnd').onclick = async () => {
+        if (!room?.live?.host) return;
+        if (!confirm('End this session for everyone?')) return;
+        try { await room.backend.call('endLive', { sid: room.live.sid }); } catch (e) { ctx.toast(e.message || 'That didn’t work.', true); return; }
+        leave();
+    };
 
     async function leave() {
         const r = room;
@@ -246,12 +371,15 @@ export function createGroupUi(ctx) {
         await r.backend.leave(r.gid).catch(() => {});
         r.backend.close?.();
         closeMenu();
+        $('gGiftPop').classList.add('hidden');
         show('lobby');
+        if (r.live) { lobbyTab('live'); live?.refresh(); }
     }
 
     function open() {
         mode = 'voice';
         renderLobby();
+        lobbyTab('topics');
         show('lobby');
         root.classList.remove('hidden');
     }

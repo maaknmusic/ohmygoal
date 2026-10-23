@@ -7,6 +7,7 @@ const CFG = window.APP_CONFIG || {};
 const V = '11.6.1';
 import { createAnalytics } from './admin-analytics.js';
 import { startAppCheck } from './appcheck.js';
+import { createHosts } from './admin-hosts.js';
 
 const [appMod, authMod, fnMod] = await Promise.all([
     import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`),
@@ -24,6 +25,7 @@ if (CFG.emulators) { // local testing only
 }
 const adminFn = fnMod.httpsCallable(functions, 'admin');
 const analyticsFn = fnMod.httpsCallable(functions, 'adminAnalytics');
+const hostsFn = fnMod.httpsCallable(functions, 'adminHosts');
 
 // The admin page has its own light/dark choice (button in the top bar). Until you press it, it follows the website's theme.
 const readTheme = key => { try { const v = JSON.parse(localStorage.getItem(key)); return v === 'light' || v === 'dark' ? v : null; } catch { return null; } };
@@ -122,8 +124,10 @@ const analytics = createAnalytics({
     openTab: name => { tab = name; history.replaceState(null, '', '#' + name); render(); },
 });
 
+const hosts = createHosts({ $, h, toast, button, empty, kv, when, short, fn: hostsFn });
+
 let data = null;
-const TABS = ['dashboard', 'premium', 'payments', 'people', 'inbox', 'requests', 'bans', 'whitelist', 'reports'];
+const TABS = ['dashboard', 'hosts', 'premium', 'payments', 'people', 'inbox', 'requests', 'bans', 'whitelist', 'reports'];
 let tab = TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'dashboard';
 
 async function load() {
@@ -142,6 +146,7 @@ async function load() {
     $('meEmail').textContent = data.me.email;
     $('meIp').textContent = data.me.ip || 'unknown';
     show('panel');
+    hosts.badge();
     announceNew();
     render();
 }
@@ -160,6 +165,7 @@ function render() {
     renderWhitelist();
     renderReports();
     analytics.show(tab);
+    if (tab === 'hosts') hosts.show();
 }
 
 // ---------------- unban requests ----------------
@@ -385,7 +391,7 @@ document.querySelectorAll('#tabs button').forEach(b => (b.onclick = () => {
     history.replaceState(null, '', '#' + tab);
     render();
 }));
-$('refreshBtn').onclick = async () => { $('refreshBtn').disabled = true; await load(); analytics.refresh(tab); $('refreshBtn').disabled = false; };
+$('refreshBtn').onclick = async () => { $('refreshBtn').disabled = true; await load(); analytics.refresh(tab); if (tab === 'hosts') hosts.refresh(); $('refreshBtn').disabled = false; };
 
 $('signInBtn').onclick = async () => {
     const provider = new authMod.GoogleAuthProvider();
