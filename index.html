@@ -791,7 +791,7 @@
             <div class="partner">
                 <div class="avatar" id="avatar">?</div>
                 <div style="min-width:0">
-                    <div class="partner-name"><span id="partnerName">Searching…</span> <span id="partnerFlag" class="flag"></span> <span id="partnerBadge" class="pro-badge hidden" title="Verified Premium member">👑</span></div>
+                    <div class="partner-name"><span id="partnerName">Searching…</span> <span id="partnerFlag" class="flag"></span> <span id="partnerBadge" class="pro-badge hidden" title="Verified Premium member">👑</span> <span id="partnerAge" class="age-chip hidden" tabindex="0" title="Their device ran our on-device age check. It is an estimate made on their device, not an ID check.">✓ 18+</span></div>
                     <div class="partner-sub"><span class="status-dot wait" id="statusDot"></span><span id="partnerSub">Finding a match</span></div>
                 </div>
             </div>
@@ -994,6 +994,8 @@
                     <li><b>Never share</b> your phone number, UPI ID, OTPs, address or social handles. Scams start by moving you to another app.</li>
                     <li><b>Nobody needs money</b> from you here. Don’t send any, and don’t click links from strangers.</li>
                     <li><b>Report and block</b> in one tap (flag and ban icons). We review reports, and repeat offenders are banned by device and network.</li>
+                    <li><b>The “✓ 18+” chip</b> next to a name means that person’s device ran our on-device age check. It is an estimate, not ID verification, so it never replaces your own judgement.</li>
+                    <li><b>Report a single message</b> with the “Report” link under it. That message’s text is sent to moderators with your report. If someone sends several messages we flag, we’ll offer to skip or report them.</li>
                     <li><b>Your IP address</b> can be seen by the person you chat with, as in any peer-to-peer call. Premium members can hide it (Menu → Hide my IP address).</li>
                     <li><b>Your video is never recorded.</b> It is encrypted and goes only to your partner (directly, or through a relay that cannot read it). Partner video stays blurred until our on-device check passes.</li>
                     <li><b>Asked for photos or threatened?</b> Stop replying, block, and report. In India call <b>1930</b> (cybercrime helpline) or visit <a href="https://cybercrime.gov.in" target="_blank" rel="noopener">cybercrime.gov.in</a>.</li>
@@ -1084,6 +1086,7 @@
             <div class="sheet-head"><h3 id="reportTitle">Report this person</h3><button class="icon-btn" data-sheet-close aria-label="Close"><i class="icon" data-icon="x"></i></button></div>
             <div class="sheet-body">
                 <p id="reportWho" style="font-weight:700;color:var(--text)"></p>
+                <p id="reportEvidence" class="report-evidence hidden"></p>
                 <p>Moderators review reports. They’ll also be blocked and you’ll move on to someone new.</p>
                 <div class="reasons" id="reasons">
                     <label><input type="radio" name="reason" value="sexual" checked> Nudity or sexual content</label>

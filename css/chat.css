@@ -410,3 +410,13 @@ body.is-premium .react-lock { display: none; }
     .chat-more { display: grid; }
 }
 .gc-x.armed { width: auto; padding: 0 10px; background: var(--danger-btn); border-color: var(--danger-btn); color: #fff; font-size: 13px; font-weight: 700; }
+
+/* Safety: the age chip, the per-message report link, the repeat-flag card */
+.age-chip { display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; vertical-align: middle; color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); border: 1px solid color-mix(in srgb, var(--success) 40%, transparent); cursor: help; }
+.match-card .age-line { margin-top: 4px; font-size: 12px; color: var(--success); font-weight: 600; }
+.msg-report { opacity: 0.55; }
+.msg:hover .msg-report, .msg-report:focus-visible { opacity: 1; }
+@media (hover: none) { .msg-report { opacity: 0.8; } }
+.report-evidence { padding: 8px 10px; border-radius: var(--r-md); background: var(--panel-2); border: 1px solid var(--border); font-size: 13px; color: var(--text); overflow-wrap: anywhere; }
+.flag-card { border-color: color-mix(in srgb, var(--danger) 45%, transparent); background: color-mix(in srgb, var(--danger) 8%, var(--panel)); }
+.flag-card b { color: var(--danger); }

@@ -121,6 +121,7 @@ const el = {
     shield: $('shield'), shieldTitle: $('shieldTitle'), shieldSub: $('shieldSub'), shieldActions: $('shieldActions'),
     shieldSkip: $('shieldSkip'), shieldReport: $('shieldReport'), fxBtn: $('fxBtn'), fxPanel: $('fxPanel'), fxClose: $('fxClose'), fxStatus: $('fxStatus'),
     round: $('round'), roundFill: $('roundFill'), roundTime: $('roundTime'), roundNote: $('roundNote'), extendBtn: $('extendBtn'),
+    partnerAge: $('partnerAge'), reportEvidence: $('reportEvidence'),
     hideIpBtn: $('hideIpBtn'), hideIpLabel: $('hideIpLabel'), shieldShow: $('shieldShow'), reportWho: $('reportWho'),
     exitBtn: $('exitBtn'), shareBtn: $('shareBtn'), themeLabel: $('themeLabel'), soundLabel: $('soundLabel'), accentGrid: $('accentGrid'), menuSheet: $('menuSheet'),
     overlayChips: $('overlayChips'), overlayTip: $('overlayTip'), endPauseBtn: $('endPauseBtn'), endReportBtn: $('endReportBtn'),
@@ -741,6 +742,7 @@ function setPhase(phase, info = {}) {
         el.avatar.style.background = '';
         el.partnerFlag.textContent = '';
         el.partnerBadge.classList.add('hidden');
+        el.partnerAge.classList.add('hidden');
         el.nextBtn.textContent = 'Stop';
         el.nextBtn.title = 'Stop searching';
     } else if (phase === 'connecting') {
@@ -1051,7 +1053,7 @@ function attachChannel(sess, dc) {
         el.avatar.textContent = (sess.friend?.name || 'S')[0].toUpperCase();
         el.avatar.style.background = '';
         if (sess.friend && sess.role === 'offerer') friends?.clearCall(sess.friend.id);
-        sendData({ t: 'hello', nick: S.nick, avatar: S.avatar, loc: locOffer(), interests: S.interests, country: S.country, gender: S.gender, timed: S.timed, premium: isPremium(), ...(S.lang ? { lang: S.lang } : {}) });
+        sendData({ t: 'hello', nick: S.nick, avatar: S.avatar, loc: locOffer(), interests: S.interests, country: S.country, gender: S.gender, timed: S.timed, premium: isPremium(), ...(S.lang ? { lang: S.lang } : {}), ...(AGE.enabled && ageVerified() ? { age: 'checked' } : {}) });
         if (S.timed && !sess.friend) startRound(sess);
         sendData({ t: 'av', muted: S.muted, camOff: S.camOff });
         sess.games = createGamesUi({
@@ -1130,6 +1132,7 @@ function renderMatchCard(p, shared) {
         speaks.appendChild(name);
         card.appendChild(speaks);
     }
+    if (p.adult) card.appendChild(h('div', 'age-line', '✓ 18+ checked on their device'));
     if (shared.length) {
         const chips = h('div', 'shared-chips');
         chips.append(...shared.map(t => h('span', '', '#' + t)));
@@ -1151,7 +1154,9 @@ function onPeerData(sess, msg) {
             const country = typeof msg.country === 'string' && /^[A-Z]{2}$/.test(msg.country) ? msg.country : '';
             const gender = ['male', 'female'].includes(msg.gender) ? msg.gender : '';
             const lang = sanitizeLang(msg.lang); // a code from our list, or '' (untrusted like everything else)
-            sess.partner = { nick, interests, country, gender, avatar, lang, loc: msg.loc === true };
+            const adult = msg.age === 'checked'; // only that exact word; the chip says what it means (an on-device estimate), not that they are verified
+            sess.partner = { nick, interests, country, gender, avatar, lang, loc: msg.loc === true, adult };
+            el.partnerAge.classList.toggle('hidden', !adult);
             el.partnerName.textContent = nick;
             el.partnerFlag.textContent = country ? flagOf(country) : '';
             el.partnerFlag.title = country ? countryName(country) : '';
@@ -1286,6 +1291,7 @@ function endSession({ notify }) {
     clearInterval(sess.voiceTimer);
     if (sess.friend && sess.role === 'offerer') friends?.clearCall(sess.friend.id); // stop the friend's phone ringing
     el.partnerBadge.classList.add('hidden');
+    el.partnerAge.classList.add('hidden');
     clearTimeout(sess.safetyFailOpen);
     setShield('off');
     el.round.classList.add('hidden');
@@ -1426,6 +1432,26 @@ function riskCard(scan, ctl, senderId) {
     return card;
 }
 
+/** After three flagged messages from the same person, offer to skip or report them (once per chat). */
+function noteFlagged(sess, text) {
+    if (!sess || sess !== S.session || sess.friend) return;
+    sess.flagged = (sess.flagged || 0) + 1;
+    if (sess.flagged !== 3) return;
+    const card = h('div', 'alert-card flag-card');
+    card.setAttribute('role', 'alert');
+    card.append(h('b', '', 'Several messages were flagged. '), document.createTextNode('This person has sent a few messages that look like scams, personal details or abuse. You don’t have to keep chatting.'));
+    const row = h('div', 'row');
+    const mk = (label, cls, fn) => { const b = h('button', cls, label); b.type = 'button'; b.onclick = () => { fn(); }; return b; };
+    row.append(
+        mk('Report & skip', 'btn btn-danger btn-sm', () => { card.remove(); openReport({ evidence: text }); }),
+        mk('Skip', 'btn btn-ghost btn-sm', () => { card.remove(); onNext(); }),
+        mk('Keep chatting', 'btn btn-ghost btn-sm', () => card.remove()),
+    );
+    card.appendChild(row);
+    el.messages.insertBefore(card, typingNode?.isConnected ? typingNode : null);
+    scrollMessages();
+}
+
 /**
  * Shows one chat bubble and returns its controller, which Live translate reads and updates (js/livetranslate.js).
  * orig: the sender's own wording, when they had it translated for us. The scam shield checks both texts; a masked
@@ -1454,8 +1480,17 @@ function addMessage(who, text, { orig = '' } = {}) {
     ctl.render();
     wrap.appendChild(bubble);
     if (risk.risky) wrap.appendChild(riskCard(risk, ctl, S.session?.partnerId));
+    if (them && S.session?.partnerId) {
+        const rep = h('button', 'msg-report', 'Report');
+        rep.type = 'button';
+        rep.title = 'Report this message';
+        rep.setAttribute('aria-label', 'Report this message');
+        rep.onclick = () => openReport({ evidence: ctl.text });
+        meta.appendChild(rep);
+    }
     wrap.appendChild(meta);
     el.messages.insertBefore(wrap, typingNode?.isConnected ? typingNode : null);
+    if (them && (risk.risky || maskProfanity(text) !== text)) noteFlagged(S.session, text);
     scrollMessages();
     return ctl;
 }
@@ -1870,15 +1905,22 @@ el.blockBtn.onclick = () => {
 /** The person to report: the current partner, or the one who just left (so a quick disconnect can still be reported). */
 const reportTarget = () => S.session || S.last || null;
 let reportFor = null; // fixed when the sheet opens, so a new match can never be reported by mistake
-function openReport() {
+/** opts.evidence: the text of one message the person is reporting. It is shown to them, and sent with the report. */
+function openReport(opts = {}) {
     const t = reportTarget();
     if (!t) { toast('Too late to report this person.', true); return; }
-    reportFor = { partnerId: t.partnerId, roomId: t.roomId, nick: t.partner?.nick || t.nick || 'Stranger', live: t === S.session };
+    const evidence = typeof opts.evidence === 'string' ? opts.evidence.trim().slice(0, REPORT_EVIDENCE_MAX) : '';
+    reportFor = { partnerId: t.partnerId, roomId: t.roomId, nick: t.partner?.nick || t.nick || 'Stranger', live: t === S.session, evidence };
     el.reportWho.textContent = `You’re reporting ${reportFor.nick}.`;
+    el.reportEvidence.classList.toggle('hidden', !evidence);
+    el.reportEvidence.textContent = evidence ? `This message is sent to moderators with your report: “${evidence}”` : '';
+    const reasonRadio = document.querySelector(`input[name="reason"][value="${evidence ? 'harassment' : 'sexual'}"]`);
+    if (reasonRadio) reasonRadio.checked = true;
     openSheet(el.reportModal);
 }
-el.reportBtn.onclick = openReport;
-el.endReportBtn.onclick = openReport;
+const REPORT_EVIDENCE_MAX = 300;
+el.reportBtn.onclick = () => openReport();
+el.endReportBtn.onclick = () => openReport();
 el.reportCancel.onclick = () => { reportFor = null; closeSheet(el.reportModal); };
 el.reportModal.addEventListener('sheet:close', () => { reportFor = null; });
 el.reportSubmit.onclick = async () => {
@@ -1889,7 +1931,7 @@ el.reportSubmit.onclick = async () => {
     const reason = document.querySelector('input[name="reason"]:checked')?.value || 'other';
     S.blocked.add(target.partnerId);
     store.set('blocked', [...S.blocked].slice(-200));
-    S.transport.report({ partnerId: target.partnerId, roomId: target.roomId, reason })
+    S.transport.report({ partnerId: target.partnerId, roomId: target.roomId, reason, ...(target.evidence ? { evidence: target.evidence } : {}) })
         .then(() => toast('Thanks, report sent.'))
         .catch(e => toast(e?.code === 'permission-denied' ? 'You already reported this chat.' : 'Could not send report.', e?.code !== 'permission-denied'));
     if (S.last?.partnerId === target.partnerId) S.last = null;

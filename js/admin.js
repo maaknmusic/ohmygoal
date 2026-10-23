@@ -252,6 +252,7 @@ function renderReports() {
         head.append(h('span', 'pill ' + (r.reason === 'minor' || r.reason === 'sexual' || r.reason === 'auto-nudity' ? 'all' : 'video'), reasonText(r.reason)), h('b', '', when(r.ts)));
         if (r.count > 1) head.append(h('span', '', `${r.count} reports about this person`));
         item.append(head, kv([['Reported user', short(r.reported), r.reported], ['IP', r.ip], ['Device', short(r.fp), r.fp], ['Reporter', short(r.reporter), r.reporter]]));
+        if (r.evidence) item.appendChild(h('p', 'item-msg', `Reporter says they received (not verified): “${String(r.evidence).slice(0, 300)}”`));
         const actions = h('div', 'actions');
         const ban = (hours, scope) => b => act(b, 'ban', { uid: r.reported, hours, scope, reason: `report-${r.reason}` },
             `Banned ${scope === 'video' ? 'from video ' : ''}for ${hours >= 48 ? `${hours / 24} days` : `${hours} hours`}.`);

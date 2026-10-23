@@ -296,7 +296,8 @@ service cloud.firestore {
       match /reports/{reportId} {
         allow create: if request.auth != null
           && reportId == request.auth.uid + '_' + request.resource.data.roomId + '_' + request.resource.data.reason
-          && request.resource.data.keys().hasOnly(['reporter', 'reported', 'roomId', 'reason', 'ts'])
+          && request.resource.data.keys().hasOnly(['reporter', 'reported', 'roomId', 'reason', 'evidence', 'ts'])
+          && (!('evidence' in request.resource.data) || (request.resource.data.evidence is string && request.resource.data.evidence.size() <= 300))
           && request.resource.data.reporter == request.auth.uid
           && request.resource.data.ts == request.time
           && request.resource.data.reason in ['sexual', 'minor', 'harassment', 'spam', 'other', 'auto-nudity']
