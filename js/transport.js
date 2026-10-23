@@ -206,7 +206,15 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
         // One report per reporter, room and reason (the rules enforce the id), so sending the same one again is a no-op.
         const key = `${me()}_${roomId}_${reason}`;
         if (sentReports.has(key)) return;
-        await setDoc(doc(reportsCol, key), { reporter: me(), reported: partnerId, roomId, reason, ...(typeof evidence === 'string' && evidence ? { evidence: evidence.slice(0, 300) } : {}), ts: serverTimestamp() });
+        const base = { reporter: me(), reported: partnerId, roomId, reason };
+        const text = typeof evidence === 'string' && evidence ? evidence.slice(0, 300) : '';
+        try {
+            await setDoc(doc(reportsCol, key), { ...base, ...(text ? { evidence: text } : {}), ts: serverTimestamp() });
+        } catch (e) {
+            // Rules from before message reports existed refuse the extra field: still file the report, without the text.
+            if (!text || e?.code !== 'permission-denied') throw e;
+            await setDoc(doc(reportsCol, key), { ...base, ts: serverTimestamp() });
+        }
         sentReports.add(key);
     }
 
