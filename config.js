@@ -78,7 +78,7 @@ window.APP_CONFIG = {
 
     // Friend notifications (Web Push). Firebase console, Project settings, Cloud Messaging, Web Push certificates, Generate key pair; paste the
     // public key here. Until it is set the notification items stay hidden. See android/README.md.
-    push: { vapidKey: '' },
+    push: { vapidKey: 'BN3vXVqXLYm2K66nLAMXRcQiMOesdTFhi-aUv0emD4d_gNEhlq29TYWSC4kZtzK86mUSy3YPLyi5vHRjs6-D5PE' },
 
     ageCheck: {
         enabled: true,
