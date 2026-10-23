@@ -1,0 +1,25 @@
+{
+  "packageId": "in.co.webtel.anonconnect",
+  "host": "ohmygoal.web.app",
+  "name": "Anonymous Connect",
+  "launcherName": "AnonConnect",
+  "display": "standalone",
+  "orientation": "default",
+  "themeColor": "#d9266c",
+  "navigationColor": "#090a12",
+  "backgroundColor": "#090a12",
+  "startUrl": "/",
+  "iconUrl": "https://ohmygoal.web.app/icons/icon-512.png",
+  "maskableIconUrl": "https://ohmygoal.web.app/icons/icon-maskable-512.png",
+  "enableNotifications": true,
+  "enableSiteSettingsShortcut": true,
+  "fallbackType": "customtabs",
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "minSdkVersion": 23,
+  "signingKey": { "path": "./android.keystore", "alias": "anonconnect" },
+  "shortcuts": [
+    { "name": "Video chat", "shortName": "Video", "url": "/?mode=video" },
+    { "name": "Text chat", "shortName": "Text", "url": "/?mode=text" }
+  ]
+}
