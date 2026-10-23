@@ -36,6 +36,7 @@ async function setup({ mode = 'text', viewport = { width: 1280, height: 800 }, l
     if (!sessionStorage.getItem('seeded')) { // only the first load: later loads must see what the app itself saved
       sessionStorage.setItem('seeded', '1');
       localStorage.setItem('ac.ageVerifiedUntil', String(ageUntil));
+      localStorage.setItem('ac.uiLang', '"en"'); // the test reads English labels even when the browser language is Hindi
       localStorage.setItem('ac.mode', JSON.stringify(m));
     }
   }, [mode, Date.now() + 864e5]);

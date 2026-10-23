@@ -192,7 +192,7 @@
 #welcome .lp-prefs-ico { flex: none; width: 38px; height: 38px; padding: 9px; border-radius: 12px; color: var(--primary-text); background: var(--primary-soft); }
 #welcome .lp-prefs-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 #welcome .lp-prefs-main b { font-size: 15px; font-weight: 600; }
-#welcome .lp-prefs-sum { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#welcome .lp-prefs-sum { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
 #welcome .lp-chev { width: 18px; height: 18px; color: var(--faint); }
 #welcome .lp-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
 #welcome .lp-chips:empty { display: none; }
