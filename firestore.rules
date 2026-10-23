@@ -307,6 +307,11 @@ service cloud.firestore {
             && recentTs(request.resource.data.ts);
           allow delete: if request.auth != null && request.auth.uid == uid;
         }
+        // gifts sent to a live host (written by the sendLiveGift function only), shown to the room as a small animation
+        match /events/{eventId} {
+          allow read: if request.auth != null;
+          allow write: if false;
+        }
         match /signals/{signalId} {
           function inRoom(u) {
             return exists(/databases/$(database)/documents/artifacts/anon-connect/public/data/groups/$(gid)/members/$(u));

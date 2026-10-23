@@ -495,3 +495,50 @@ body.is-premium .react-lock { display: none; }
 .group-form input { flex: 1; min-width: 0; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
 @media (max-width: 360px) { .topbar .brand-name { display: none; } }
 @media (max-width: 480px) { #onlineChip .chip-label { display: none; } #onlineChip { padding-inline: 8px; } }
+
+/* Live sessions (js/liveui.js) */
+.live-tabs { display: flex; gap: 6px; margin: 4px 0 12px; }
+.live-tabs .seg { flex: 1; padding: 10px 12px; border-radius: var(--r-md); border: 1px solid var(--border); background: var(--panel); color: var(--text); font-weight: 700; }
+.live-tabs .seg.active { background: var(--primary-soft, rgba(217,38,108,.15)); border-color: var(--primary); }
+.live-pane.busy { opacity: 0.5; pointer-events: none; }
+.live-bar { display: flex; align-items: center; gap: 8px; margin: 6px 0 10px; }
+.live-bar b { flex: 1; font-size: 18px; }
+.live-h2 { display: block; margin: 22px 0 8px; font-size: 18px; }
+.live-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.live-card { border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--panel); padding: 14px; margin: 0 0 10px; display: grid; gap: 8px; }
+.live-list .live-card { margin: 0; }
+.live-card > b { font-size: 16px; }
+.live-card p.hint { margin: 0; }
+.live-head { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.live-avatar { width: 42px; height: 42px; font-size: 22px; flex: none; }
+.live-who { display: grid; min-width: 0; }
+.live-who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-who span { font-size: 12px; color: var(--muted); }
+.live-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.live-tag { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--panel-2); color: var(--muted); }
+.live-tag.priv { background: var(--gold-soft, rgba(245,158,11,.18)); color: var(--gold-text, #b45309); }
+.live-dot { background: rgba(239,68,68,.16); color: #ef4444; }
+.live-dot::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #ef4444; margin-right: 5px; }
+.live-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.live-field { display: grid; gap: 4px; }
+.live-field label { font-size: 12px; font-weight: 600; color: var(--muted); }
+.live-field small, .live-problem { font-size: 12px; color: var(--muted); }
+.live-problem { color: var(--danger, #ef4444); min-height: 0; }
+.live-field .input, .live-card textarea.input { width: 100%; box-sizing: border-box; padding: 10px 12px; }
+.live-note { margin: 0; padding: 8px 10px; border-radius: var(--r-md); background: var(--panel-2); font-size: 13px; }
+.live-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.live-tile { background: var(--panel-2); border-radius: var(--r-md); padding: 10px 12px; display: grid; gap: 2px; }
+.live-tile small { color: var(--muted); font-size: 12px; }
+.live-tile b { font-size: 18px; }
+.live-history { display: grid; gap: 4px; }
+.live-line { font-size: 13px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 4px; }
+.live-gift-box { border: 1px solid var(--primary); border-radius: var(--r-lg); background: var(--panel); padding: 12px; margin-bottom: 12px; display: grid; gap: 8px; }
+.live-gift-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; }
+#groupRoom { position: relative; }
+.g-gift-pop { left: 0; right: 0; bottom: 120px; max-width: 380px; margin: 0 auto; }
+.g-gift-foot { display: flex; align-items: center; gap: 8px; padding: 6px 4px 0; font-size: 13px; }
+.g-host { margin-left: 6px; font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 999px; background: var(--gold-soft, rgba(245,158,11,.25)); color: var(--gold-text, #fbbf24); text-transform: uppercase; letter-spacing: .04em; }
+.g-sys { color: var(--muted); font-size: 13px; }
+.g-fx { position: absolute; bottom: 130px; width: 84px; height: 84px; pointer-events: none; z-index: 6; animation: gFx 3s ease-out forwards; }
+@keyframes gFx { 0% { transform: translateY(0) scale(.6); opacity: 0; } 15% { opacity: 1; transform: translateY(-30px) scale(1.1); } 100% { transform: translateY(-260px) scale(1); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .g-fx { animation: none; opacity: 0; } }

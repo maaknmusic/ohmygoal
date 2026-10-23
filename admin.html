@@ -126,6 +126,7 @@
 
             <nav class="tabs" id="tabs">
                 <button data-tab="dashboard">Dashboard</button>
+                <button data-tab="hosts">Hosts<span class="count" id="countHosts">0</span></button>
                 <button data-tab="premium">Premium</button>
                 <button data-tab="payments">Payments</button>
                 <button data-tab="people">People</button>
@@ -146,6 +147,10 @@
                     </select>
                 </div>
                 <div id="dashBody"></div>
+            </section>
+
+            <section data-view="hosts" class="hidden">
+                <div id="hostsBody"></div>
             </section>
 
             <section data-view="premium" class="hidden">

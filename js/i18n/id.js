@@ -622,7 +622,7 @@ export default {
     "Tell me when friends are online": "Beri tahu saya saat teman online",
     "Tell friends when I’m online": "Beri tahu teman saat saya online",
     "Coins": "Koin",
-    "Coins buy gifts for the people you chat with. They never unlock safety tools, and gifts can’t be cashed out or sold.": "Koin dipakai membeli hadiah untuk orang yang Anda ajak ngobrol. Koin tidak pernah membuka alat keamanan, dan hadiah tidak bisa diuangkan atau dijual.",
+    "Coins buy gifts for the people you chat with and entry to private live sessions. They never unlock safety tools, and coins can’t be cashed out or sold. Live hosts are paid a share of what is spent on them.": "Koin dipakai membeli hadiah untuk orang yang Anda ajak ngobrol dan tiket masuk sesi live privat. Koin tidak pernah membuka alat keamanan, dan koin tidak bisa diuangkan atau dijual. Host live dibayar sebagian dari yang dibelanjakan untuk mereka.",
     "coins now.": "koin sekarang.",
     "Claim today’s free coins": "Klaim koin gratis hari ini",
     "One-time payment by Razorpay (UPI, cards, netbanking). Coins need a Google sign-in so they stay with you. Purchases are non-refundable once spent.": "Pembayaran sekali oleh Razorpay (UPI, kartu, perbankan internet). Koin memerlukan masuk Google agar tetap bersama Anda. Pembelian tidak dapat dikembalikan setelah dipakai.",

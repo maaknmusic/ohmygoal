@@ -622,7 +622,7 @@ export default {
     "Tell me when friends are online": "Avisarme cuando mis amigos estén en línea",
     "Tell friends when I’m online": "Avisar a mis amigos cuando yo esté en línea",
     "Coins": "Monedas",
-    "Coins buy gifts for the people you chat with. They never unlock safety tools, and gifts can’t be cashed out or sold.": "Las monedas compran regalos para las personas con las que chateas. Nunca desbloquean herramientas de seguridad, y los regalos no se pueden canjear por dinero ni vender.",
+    "Coins buy gifts for the people you chat with and entry to private live sessions. They never unlock safety tools, and coins can’t be cashed out or sold. Live hosts are paid a share of what is spent on them.": "Las monedas compran regalos para las personas con las que chateas y la entrada a sesiones privadas en directo. Nunca desbloquean herramientas de seguridad, y las monedas no se pueden canjear por dinero ni vender. A los anfitriones en directo se les paga una parte de lo que se gasta en ellos.",
     "coins now.": "monedas ahora.",
     "Claim today’s free coins": "Reclamar las monedas gratis de hoy",
     "One-time payment by Razorpay (UPI, cards, netbanking). Coins need a Google sign-in so they stay with you. Purchases are non-refundable once spent.": "Pago único con Razorpay (UPI, tarjetas, banca en línea). Las monedas requieren iniciar sesión con Google para quedarse contigo. Las compras no son reembolsables una vez gastadas.",

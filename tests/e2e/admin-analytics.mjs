@@ -207,8 +207,13 @@ await p.waitForFunction(() => /No account/.test(document.getElementById('personR
 step('7l. a path-like query finds nothing and breaks nothing', /No account/.test(await text('#personResult')));
 
 // ---- the log is written by the server and only the server
-const logs = await (await fetch(FS + `${base}/private/data/adminLog`, { headers: { Authorization: 'Bearer owner' } })).json();
-const kinds = (logs.documents || []).map(d => d.fields.what.stringValue);
+const kinds = [];                      // all pages of the log (the emulator returns a limited number at a time)
+for (let token = ''; ;) {
+  const logs = await (await fetch(FS + `${base}/private/data/adminLog?pageSize=300` + (token ? `&pageToken=${token}` : ''), { headers: { Authorization: 'Bearer owner' } })).json();
+  for (const d of logs.documents || []) kinds.push(d.fields.what.stringValue);
+  token = logs.nextPageToken || '';
+  if (!token) break;
+}
 step('8a. every change was logged', ['grantPremium', 'revokePremium', 'adjustCoins'].every(k => kinds.includes(k)), kinds.join(','));
 
 // ---- phone width: no sideways scrolling on any of the new tabs

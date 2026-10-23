@@ -42,9 +42,9 @@ Random one-on-one **video or text** chat with strangers. A static site (plain HT
 | `js/translate.js`, `js/livetranslate.js`, `css/translate.css` | Live translate: the engine (on-device first, queue, cache, limits) and the chat UI (switches, slim bar, lines under messages) |
 | `css/landing.css`, `css/chat.css` | Landing page and chat screen styles (`styles.css` holds the shared design tokens) |
 | `js/access.js`, `js/fingerprint.js`, `js/cloud.js` | Server-side bans: access check, device fingerprint, Cloud Functions calls |
-| `admin.html`, `js/admin.js`, `js/admin-analytics.js`, `js/admin-charts.js` | **Admin page**: dashboard, Premium members, payments, people lookup, inbox, unban requests, bans, IP whitelist, reports |
+| `admin.html`, `js/admin.js`, `js/admin-analytics.js`, `js/admin-hosts.js`, `js/admin-charts.js` | **Admin page**: dashboard, Premium members, payments, people lookup, inbox, unban requests, bans, IP whitelist, reports |
 | `firestore.rules` | Database security rules: publish with `bash deploy.sh --rules-only` (or paste into the console) |
-| `functions/` | Cloud Functions: payments (`index.js`), bans and admin (`moderation.js`), admin numbers (`analytics.js`, daily counters in `stats.js`), Live translate (`translate.js`, `languages.js`) |
+| `functions/` | Cloud Functions: payments (`index.js`), bans and admin (`moderation.js`), admin numbers (`analytics.js`, daily counters in `stats.js`), live sessions and host payouts (`live.js`), Live translate (`translate.js`, `languages.js`) |
 | `deploy.sh`, `firebase.json`, `.firebaserc` | One-command deploy of rules + functions |
 | `legal.html` | Terms, Privacy, Refunds, Delivery, Contact (needed by Razorpay) |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Installable app |
@@ -129,6 +129,27 @@ bash deploy.sh        # functions, rules (the new `profiles` collection), hostin
 Until the API is enabled the function answers *Translation is unavailable right now* and the app shows a small retry link; browsers that translate on the device keep working. Model and region can be changed with `TRANSLATE_MODEL` / `TRANSLATE_LOCATION` in `functions/.env`.
 
 **Language profile.** For a Google account the preferences are stored in `artifacts/<app>/public/data/profiles/{uid}`: readable and writable only by that account (and only with a Google sign-in), with a strict schema in `firestore.rules`. After signing in the app loads it (what the account holds wins; a missing document is created from the values on the device), and later edits are saved a moment after they are made. Anonymous accounts never write it.
+
+## Live sessions (hosts, gifts, private sessions)
+
+On the **Group rooms** screen, the **Live sessions** tab lists who is live now. Anyone aged 18 or over who is signed in with Google can host: there is no application. It is built on the group rooms, so a session is a small room (up to 8 people on voice, up to 4 on video) where everyone is connected directly to everyone else (no streaming server, nothing recorded). The same safety tools as every other room run in every session: the nudity blur and strikes on video, report, block, and the host can remove a guest.
+
+| | Price | Who gets it |
+|---|---|---|
+| Go live (a public or a private session) | **49 coins**, paid by the host | the platform |
+| Join a **public** session | free | |
+| Join a **private** session (the host sets 1 to 7 guests) | **200 coins** per guest, once per session (re-joining is free) | 70% to the host, 30% to the platform |
+| A gift to the host | the gift's coin price (5 to 50) | 70% to the host (rounded down), the rest to the platform |
+
+A session ends when the host ends it or leaves, after 3 hours, or when the host has been gone for 3 minutes. A host can run 12 sessions a day.
+
+**Payouts.** Each host has an earnings balance (coins). From **500 earned coins** they can ask for a payout and give a UPI ID or bank details; an earned coin is worth **₹0.75**. You pay by hand and record the reference in **Admin → Hosts → Payout requests**; rejecting a payout gives the coins back. Nothing is paid out automatically. Hosts are responsible for their own taxes; take advice on TDS, GST and KYC before paying real money out.
+
+**Admin → Hosts** shows: a usage and margin table (sessions, live hours, people hours, private seats and gifts, your income, what you owe hosts, an *estimated* running cost, and the margin) for today, 7 and 30 days; what is live now with an **End this session** button; every host with their earnings and **Suspend / Reinstate**; and the payout requests. A suspended host's session ends at once and they cannot go live.
+
+**Where the numbers live.** The real prices and shares are in `functions/live.js` (`LIVE_START_FEE`, `PRIVATE_FEE`, `HOST_SHARE_PCT`, `COIN_VALUE_PAISE`, `MIN_PAYOUT_COINS`, `INFRA_PAISE_PER_PARTICIPANT_HOUR`); the browser's copy that only labels the screens is `js/live.js`, and a test keeps the two equal. All money moves on the server, in transactions; the browser never decides a price or a share. Host money is in the private tree (`hosts`, `hostWallet`, `hostLedger`, `payouts`, `livePaid`) that no browser can read.
+
+**Rough running cost** (my estimate from Google's published prices, not from your bill): about ₹1.35 for 8 people on voice for an hour, ₹2 to ₹3 for 4 on video, ₹8 at the very worst if everyone needed the relay all hour. 49 coins is about ₹34 to ₹40.
 
 ## Bots and App Check
 
