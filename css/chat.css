@@ -494,3 +494,4 @@ body.is-premium .react-lock { display: none; }
 .group-form { display: flex; gap: 8px; padding: 8px; border-top: 1px solid var(--border); }
 .group-form input { flex: 1; min-width: 0; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
 @media (max-width: 360px) { .topbar .brand-name { display: none; } }
+@media (max-width: 480px) { #onlineChip .chip-label { display: none; } #onlineChip { padding-inline: 8px; } }

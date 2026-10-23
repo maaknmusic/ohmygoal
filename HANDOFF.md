@@ -1,6 +1,6 @@
 # Handoff notes (project state and what is left)
 
-Anonymous Connect: random video / voice / text chat (WebRTC P2P, Firestore signalling, Firebase Hosting + Functions, Razorpay Premium).
+OhMyGoal: random video / voice / text chat (WebRTC P2P, Firestore signalling, Firebase Hosting + Functions, Razorpay Premium).
 Read `README.md` first (files, deploy, privacy design). Tests: `tests/README.md`.
 
 ## State

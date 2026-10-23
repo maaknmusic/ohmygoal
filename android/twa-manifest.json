@@ -1,8 +1,8 @@
 {
   "packageId": "in.co.webtel.anonconnect",
   "host": "ohmygoal.web.app",
-  "name": "Anonymous Connect",
-  "launcherName": "AnonConnect",
+  "name": "OhMyGoal",
+  "launcherName": "OhMyGoal",
   "display": "standalone",
   "orientation": "default",
   "themeColor": "#d9266c",

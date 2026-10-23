@@ -36,7 +36,7 @@ self.addEventListener('push', event => {
     let d = {};
     try { const j = event.data ? event.data.json() : {}; d = j.data || j.notification || j || {}; } catch { /* not JSON: show a generic one */ }
     const text = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u001F]/g, ' ').trim().slice(0, max) : '');
-    const title = text(d.title, 80) || 'Anonymous Connect';
+    const title = text(d.title, 80) || 'OhMyGoal';
     event.waitUntil(self.registration.showNotification(title, {
         body: text(d.body, 140),
         tag: text(d.tag, 40) || 'friend',

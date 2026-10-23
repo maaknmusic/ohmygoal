@@ -1882,9 +1882,9 @@ el.videoWrap.addEventListener('dblclick', e => {
 
 el.shareBtn.onclick = async () => {
     const url = location.origin + location.pathname.replace(/index\.html$/, '');
-    const text = 'Come chat with me on Anonymous Connect: free random video & text chat, age-checked and private.';
+    const text = 'Come chat with me on OhMyGoal: free random video & text chat, age-checked and private.';
     try {
-        if (navigator.share) { await navigator.share({ title: 'Anonymous Connect', text, url }); return; }
+        if (navigator.share) { await navigator.share({ title: 'OhMyGoal', text, url }); return; }
     } catch (e) { if (e.name === 'AbortError') return; }
     window.open(`https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`, '_blank', 'noopener');
 };
@@ -3591,10 +3591,10 @@ async function refreshOnline() {
         el.onlineCount.textContent = text;
         document.getElementById('onlineLabel').textContent = n === 1 ? 'person online now' : 'people online now';
         el.onlineChipCount.textContent = text;
-        // "1 online" is just you and makes a new site look empty: only show the count once it means something.
-        const show = n >= 3;
-        el.onlineChip.classList.toggle('hidden', !show);
-        el.onlineCount.closest('.online-pill')?.classList.toggle('hidden', !show);
+        // The top bar always shows how many people are online. The big pill on the start page waits until the number means something.
+        el.onlineChip.classList.remove('hidden');
+        el.onlineChip.title = n === 1 ? 'Just you so far. Share the link to bring friends.' : `${text} people online now`;
+        el.onlineCount.closest('.online-pill')?.classList.toggle('hidden', n < 3);
     } catch (e) {
         console.warn('online count failed', e);
         el.onlineCount.closest('.online-pill')?.classList.add('hidden');

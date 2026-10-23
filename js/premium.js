@@ -114,7 +114,7 @@ export class Premium {
                 order_id: order.orderId,
                 amount: order.amount,
                 currency: order.currency,
-                name: 'Anonymous Connect',
+                name: 'OhMyGoal',
                 description: order.label,
                 prefill: { name: user?.displayName || '', email: user?.email || '' },
                 theme: { color: '#d9266c' },

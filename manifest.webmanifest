@@ -1,6 +1,6 @@
 {
-    "name": "Anonymous Connect",
-    "short_name": "AnonConnect",
+    "name": "OhMyGoal",
+    "short_name": "OhMyGoal",
     "description": "Random video and text chat with people around the world.",
     "start_url": "./",
     "scope": "./",

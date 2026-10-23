@@ -19,7 +19,7 @@ Bubblewrap creates a signing key (`android.keystore`) the first time. **Back it 
 update the app later. (If you use Play App Signing, the key you upload is only an upload key; see step 3.)
 
 ## 2. Create the app in Google Play Console
-New app, "Anonymous Connect", free. Content rating: this is an 18+ app (state that in the questionnaire). Data safety form: the
+New app, "OhMyGoal", free. Content rating: this is an 18+ app (state that in the questionnaire). Data safety form: the
 site's Privacy Policy (`legal.html#privacy`) is the source for the answers. Upload `app-release-bundle.aab` to an internal
 testing track first.
 

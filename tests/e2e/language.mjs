@@ -47,7 +47,7 @@ const setUi = async (p, code) => { await p.selectOption('#uiLang', code); await 
   step('1d. the page language is set (for screen readers and fonts)', (await a.evaluate(() => document.documentElement.lang)) === 'hi');
   step('1e. placeholders and aria-labels are translated too', (await a.getAttribute('#tagInput', 'placeholder')) === 'संगीत, गेमिंग, यात्रा…' && (await a.getAttribute('#menuBtn', 'aria-label')) === 'मेन्यू');
   step('1f. the long landing text is translated', /रैंडम वीडियो और टेक्स्ट चैट/.test(await text(a, '.lp-sub')) && /सुरक्षा कोई ऐड-ऑन नहीं/.test(await a.textContent('#safety')));
-  step('1g. the brand name stays as it is', (await text(a, '.brand-name')) === 'Anonymous Connect');
+  step('1g. the brand name stays as it is', (await text(a, '.brand-name')) === 'OhMyGoal');
   await a.reload();
   await a.waitForSelector('#startBtn');
   await a.waitForTimeout(500);

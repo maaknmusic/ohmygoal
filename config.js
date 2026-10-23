@@ -46,7 +46,7 @@ window.APP_CONFIG = {
     // Shown on legal.html (Terms, Privacy, Refunds, Delivery, Contact). Razorpay requires these
     // details on your website before it activates live payments.
     business: {
-        name: 'Anonymous Connect',
+        name: 'OhMyGoal',
         email: '',      // support email, e.g. 'support@yourdomain.com'
         phone: '',
         address: '',    // city, state, country

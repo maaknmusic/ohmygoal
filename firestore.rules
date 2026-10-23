@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// Security rules for Anonymous Connect.
+// Security rules for OhMyGoal.
 // Random-chat messages never touch the database (they go peer-to-peer over a data channel).
 // Firestore holds short-lived matchmaking + WebRTC signaling data, presence, reports,
 // friendships (+ friend messages) and Premium entitlements (written only by Cloud Functions).

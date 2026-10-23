@@ -1,4 +1,4 @@
-# Anonymous Connect
+# OhMyGoal
 
 Random one-on-one **video or text** chat with strangers. A static site (plain HTML, CSS and JavaScript modules, no build step) on Firebase.
 

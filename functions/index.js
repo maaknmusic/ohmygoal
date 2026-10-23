@@ -1,5 +1,5 @@
 // =====================================================================
-// Premium payments (Razorpay) for Anonymous Connect.
+// Premium payments (Razorpay) for OhMyGoal.
 //
 // Premium status lives in artifacts/{appId}/public/data/entitlements/{uid}
 // and is written ONLY here (Admin SDK). Firestore rules deny client writes,
@@ -234,7 +234,7 @@ async function createTipOrder(request) {
     });
     if (order.amount !== amount || order.currency !== CURRENCY) throw new HttpsError('internal', 'Unexpected order from the payment provider.');
     await orderRef(order.id).set({ uid, kind: 'tip', days: 0, amount, currency: CURRENCY, status: 'created', createdAt: Date.now() });
-    return { orderId: order.id, amount, currency: CURRENCY, plan: 'tip', label: 'Tip for Anonymous Connect', keyId: RAZORPAY_KEY_ID.value() };
+    return { orderId: order.id, amount, currency: CURRENCY, plan: 'tip', label: 'Tip for OhMyGoal', keyId: RAZORPAY_KEY_ID.value() };
 }
 
 export const verifyPayment = onCall({ secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET] }, async request => {
