@@ -100,7 +100,7 @@ function showSignIn(message) {
 }
 
 let data = null;
-let tab = ['requests', 'bans', 'whitelist', 'reports'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'requests';
+let tab = ['inbox', 'requests', 'bans', 'whitelist', 'reports'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'inbox';
 
 async function load() {
     try {
@@ -118,6 +118,7 @@ async function load() {
     $('meEmail').textContent = data.me.email;
     $('meIp').textContent = data.me.ip || 'unknown';
     show('panel');
+    announceNew();
     render();
 }
 
@@ -129,6 +130,7 @@ function render() {
     $('countReports').textContent = data.reports.length;
     document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
     document.querySelectorAll('[data-view]').forEach(s => s.classList.toggle('hidden', s.dataset.view !== tab));
+    renderInbox();
     renderRequests();
     renderBans();
     renderWhitelist();
@@ -246,7 +248,11 @@ $('whitelistForm').onsubmit = e => {
 
 // ---------------- reports ----------------
 function renderReports() {
-    $('reportList').replaceChildren(...(data.reports.length ? data.reports.map(r => {
+    $('reportList').replaceChildren(...(data.reports.length ? data.reports.map(reportItem) : [empty('No reports.')]));
+}
+
+function reportItem(r) {
+    {
         const item = h('div', 'item');
         const head = h('div', 'item-head');
         head.append(h('span', 'pill ' + (r.reason === 'minor' || r.reason === 'sexual' || r.reason === 'auto-nudity' ? 'all' : 'video'), reasonText(r.reason)), h('b', '', when(r.ts)));
@@ -263,8 +269,90 @@ function renderReports() {
         );
         item.appendChild(actions);
         return item;
-    }) : [empty('No reports.')]));
+    }
 }
+
+// ---------------- inbox: unban requests and reports in one list, newest first, with unread marks ----------------
+const READ_KEY = 'ac.adminRead';
+const readSet = (() => { try { return new Set(JSON.parse(localStorage.getItem(READ_KEY) || '[]')); } catch { return new Set(); } })();
+const saveRead = () => { try { localStorage.setItem(READ_KEY, JSON.stringify([...readSet].slice(-3000))); } catch { /* private window */ } };
+let inboxFilter = 'unread';
+let selected = '';
+let known = null;       // keys seen in the last refresh, to tell what is new
+
+function inboxItems() {
+    const out = [];
+    for (const r of data.requests) out.push({ key: 'a:' + r.id, kind: 'appeal', ts: r.createdAt || 0, open: r.status === 'open', r });
+    for (const r of data.reports) out.push({ key: 'r:' + r.id, kind: 'report', ts: r.ts || 0, open: true, r });
+    return out.sort((a, b) => b.ts - a.ts);
+}
+const isUnread = it => it.open && !readSet.has(it.key);
+const ago = ms => { const s = Math.max(0, (Date.now() - ms) / 1000); return s < 60 ? 'now' : s < 3600 ? `${Math.floor(s / 60)} min` : s < 86400 ? `${Math.floor(s / 3600)} h` : `${Math.floor(s / 86400)} d`; };
+
+function renderInbox() {
+    const items = inboxItems();
+    const unread = items.filter(isUnread).length;
+    $('countInbox').textContent = unread;
+    document.title = (unread ? `(${unread}) ` : '') + 'Admin';
+    document.querySelectorAll('#inboxFilters button').forEach(b => b.classList.toggle('active', b.dataset.f === inboxFilter));
+    const shown = items.filter(it => inboxFilter === 'all' || (inboxFilter === 'unread' ? isUnread(it) : it.kind === inboxFilter));
+    $('inboxList').replaceChildren(...(shown.length ? shown.map(it => {
+        const row = h('button', 'inbox-row' + (isUnread(it) ? ' unread' : '') + (it.key === selected ? ' sel' : ''));
+        row.type = 'button';
+        const main = h('span', '');
+        const title = it.kind === 'appeal' ? 'Unban request' : reasonText(it.r.reason);
+        const preview = it.kind === 'appeal' ? String(it.r.message || '').slice(0, 90) : `About ${short(it.r.reported)}${it.r.evidence ? ': ' + String(it.r.evidence).slice(0, 60) : ''}`;
+        const t = h('span', 't');
+        t.append(h('span', 'k ' + it.kind, it.kind === 'appeal' ? 'Appeal' : 'Report'), document.createTextNode(title));
+        main.append(t, h('span', 'p', preview));
+        row.append(h('span', 'dot'), main, h('span', 'w', ago(it.ts)));
+        row.onclick = () => openInbox(it.key);
+        return row;
+    }) : [empty(inboxFilter === 'unread' ? 'Nothing new. 🎉' : 'Nothing here.')]));
+    const cur = items.find(it => it.key === selected);
+    if (cur) $('inboxDetail').replaceChildren(cur.kind === 'appeal' ? requestItem(cur.r) : reportItem(cur.r));
+    else $('inboxDetail').replaceChildren(h('p', 'help', 'Pick a message on the left. New unban requests and reports appear here by themselves.'));
+}
+function openInbox(key) {
+    selected = key;
+    readSet.add(key);
+    saveRead();
+    renderInbox();
+    $('inboxDetail').scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+}
+document.querySelectorAll('#inboxFilters button').forEach(b => (b.onclick = () => { inboxFilter = b.dataset.f; renderInbox(); }));
+$('markAllRead').onclick = () => { inboxItems().forEach(it => readSet.add(it.key)); saveRead(); renderInbox(); };
+
+// A soft chime and a toast when something new arrives while this page is open.
+let audio = null;
+function chime() {
+    try {
+        audio ||= new AudioContext();
+        const o = audio.createOscillator(), g = audio.createGain();
+        o.frequency.value = 880; g.gain.setValueAtTime(0.0001, audio.currentTime); g.gain.exponentialRampToValueAtTime(0.15, audio.currentTime + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.4);
+        o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + 0.45);
+    } catch { /* no audio */ }
+}
+function announceNew() {
+    const keys = new Set(inboxItems().map(it => it.key));
+    if (known) {
+        const fresh = inboxItems().filter(it => !known.has(it.key) && it.open);
+        if (fresh.length) {
+            const a = fresh.filter(it => it.kind === 'appeal').length, r = fresh.length - a;
+            toast(`New: ${[a ? `${a} unban request${a > 1 ? 's' : ''}` : '', r ? `${r} report${r > 1 ? 's' : ''}` : ''].filter(Boolean).join(' and ')}`);
+            chime();
+        }
+    }
+    known = keys;
+}
+async function refreshQuietly() {
+    if (!data || document.visibilityState === 'hidden') return;
+    try { data = await call('overview'); } catch { return; }
+    announceNew();
+    render();
+}
+setInterval(refreshQuietly, 20000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshQuietly(); });
 
 // ---------------- wiring ----------------
 document.querySelectorAll('#tabs button').forEach(b => (b.onclick = () => {

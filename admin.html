@@ -45,7 +45,26 @@
         .help { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
         .filter { display: flex; gap: 8px; margin: 12px 0 0; }
         .filter .input { padding: 9px 12px; }
-    </style>
+    
+        .inbox-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin: 12px 0; }
+        .inbox-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+        .inbox-filters button { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-weight: 600; cursor: pointer; }
+        .inbox-filters button.active { background: var(--primary-soft, rgba(217,38,108,.15)); color: var(--text); border-color: var(--primary, #d9266c); }
+        .inbox { display: grid; grid-template-columns: minmax(260px, 360px) 1fr; gap: 14px; align-items: start; }
+        @media (max-width: 800px) { .inbox { grid-template-columns: 1fr; } }
+        .inbox-list { display: grid; gap: 6px; max-height: 70vh; overflow-y: auto; }
+        .inbox-row { display: grid; grid-template-columns: 12px 1fr auto; gap: 8px; align-items: start; text-align: left; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-2); color: var(--text); cursor: pointer; }
+        .inbox-row:hover { border-color: var(--primary, #d9266c); }
+        .inbox-row.sel { border-color: var(--primary, #d9266c); box-shadow: 0 0 0 2px rgba(217,38,108,.2); }
+        .inbox-row .dot { width: 9px; height: 9px; border-radius: 50%; margin-top: 6px; background: transparent; }
+        .inbox-row.unread .dot { background: var(--primary, #d9266c); }
+        .inbox-row.unread .t { font-weight: 800; }
+        .inbox-row .t { font-size: 14px; }
+        .inbox-row .p { display: block; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+        .inbox-row .w { font-size: 11px; color: var(--muted); white-space: nowrap; }
+        .inbox-row .k { display: inline-block; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 999px; margin-right: 6px; background: rgba(120,120,160,.2); }
+        .inbox-row .k.appeal { background: rgba(217,38,108,.2); }
+</style>
 </head>
 <body>
     <header class="topbar">
@@ -76,13 +95,30 @@
             </div>
 
             <nav class="tabs" id="tabs">
+                <button data-tab="inbox">Inbox<span class="count" id="countInbox">0</span></button>
                 <button data-tab="requests">Unban requests<span class="count" id="countRequests">0</span></button>
                 <button data-tab="bans">Active bans<span class="count" id="countBans">0</span></button>
                 <button data-tab="whitelist">IP whitelist<span class="count" id="countWhitelist">0</span></button>
                 <button data-tab="reports">Reports<span class="count" id="countReports">0</span></button>
             </nav>
 
-            <section data-view="requests">
+            <section data-view="inbox" class="hidden">
+                <div class="inbox-bar">
+                    <div class="inbox-filters" id="inboxFilters" role="group" aria-label="Filter">
+                        <button type="button" data-f="unread" class="active">Unread</button>
+                        <button type="button" data-f="all">All</button>
+                        <button type="button" data-f="appeal">Unban requests</button>
+                        <button type="button" data-f="report">Reports</button>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" id="markAllRead">Mark all read</button>
+                </div>
+                <div class="inbox">
+                    <div class="inbox-list" id="inboxList"></div>
+                    <div class="inbox-detail" id="inboxDetail"><p class="help">Pick a message on the left. New unban requests and reports appear here by themselves.</p></div>
+                </div>
+            </section>
+
+            <section data-view="requests" class="hidden">
                 <div class="filter">
                     <select id="requestFilter" class="input" style="max-width: 200px">
                         <option value="open">Open</option>
