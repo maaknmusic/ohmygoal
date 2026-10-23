@@ -19,7 +19,7 @@ import { defineString } from 'firebase-functions/params';
 import { getMessaging } from 'firebase-admin/messaging';
 import { db, publicCol, publicDoc, privateDoc, privateCol } from './common.js';
 
-const PUSH_MODE = defineString('PUSH_MODE', { default: '' });
+const PUSH_MODE = defineString('PUSH_MODE', { default: 'live' });
 
 const MIN = 60000;
 export const MAX_TOKENS = 5;                 // devices per account
