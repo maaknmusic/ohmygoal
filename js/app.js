@@ -18,6 +18,7 @@ import { mediaErrorText, matchFailure, connectionLostCopy, CAMERA_UNAVAILABLE } 
 import { THEMES, OPEN, themeId, themeById, isBusy, nextBusy, featured, scheduleText } from './rooms.js';
 import { sanitizeProgress, recordChat, levelFor, streakNow, progressLine } from './progress.js';
 import { createI18n, UI_LANGS, sanitizeUiLang, guessUiLang } from './i18n.js';
+import { STICKERS, GIFTS, parseSticker, parseGift, stickerById, giftById, stickerURL } from './stickers.js';
 import { REVEAL_AFTER_MS, createReveal, buildCard, sanitizeContact } from './reveal.js';
 import { pushSupported, pushPermission, enablePush, disablePush, announceOnline } from './push.js';
 import { REACTIONS, reactionById, parseReaction, takeBudget, spriteURL, MAX_BURST, HOLD_MAX, SEND_CAP, RECEIVE_CAP } from './reactions.js';
@@ -85,6 +86,7 @@ const ICONS = {
     chevronLeft: '<path d="m15 18-6-6 6-6"/>',
     lock: '<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
     bell: '<path d="M10.27 21a2 2 0 0 0 3.46 0"/><path d="M3.26 15.33A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.67C19.41 13.96 18 12.5 18 8A6 6 0 0 0 6 8c0 4.5-1.41 5.96-2.74 7.33"/>',
+    sticker: '<path d="M15.5 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z"/><path d="M15 3v6h6"/><path d="M10 16s.8 1 2 1 2-1 2-1"/><path d="M8 13h.01"/><path d="M16 13h.01"/>',
     languages: '<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>',
 };
 function setIcon(el, name) {
@@ -108,7 +110,7 @@ const el = {
     avatar: $('avatar'), partnerName: $('partnerName'), partnerSub: $('partnerSub'), statusDot: $('statusDot'),
     reportBtn: $('reportBtn'), blockBtn: $('blockBtn'),
     messages: $('messages'), piiWarn: $('piiWarn'), msgInput: $('msgInput'), sendBtn: $('sendBtn'),
-    nextBtn: $('nextBtn'), emojiBtn: $('emojiBtn'), emojiPop: $('emojiPop'),
+    nextBtn: $('nextBtn'), emojiBtn: $('emojiBtn'), emojiPop: $('emojiPop'), stickerBtn: $('stickerBtn'), stickerPop: $('stickerPop'),
     reportModal: $('reportModal'), reportCancel: $('reportCancel'), reportSubmit: $('reportSubmit'),
     toasts: $('toasts'),
     genderSelect: $('genderSelect'), genderFilter: $('genderFilter'), countryFilter: $('countryFilter'),
@@ -724,11 +726,12 @@ function setPhase(phase, info = {}) {
     el.endLikeBtn.classList.toggle('hidden', !(phase === 'ended' && info.report && S.last && !S.last.liked && S.transport?.kind === 'firebase'));
     el.gamesBtn.disabled = !live;
     el.gamesBtnText.disabled = !live;
-    if (!live) { el.reactBar.classList.add('hidden'); el.reactBtn.classList.remove('on'); stopReactions(); hideIcebreakers(); }
+    if (!live) { el.stickerPop.classList.add('hidden'); el.reactBar.classList.add('hidden'); el.reactBtn.classList.remove('on'); stopReactions(); hideIcebreakers(); }
     el.msgInput.disabled = !live;
     lt?.refresh(); // Live translate button and bar follow the phase
     el.sendBtn.disabled = !live;
     el.emojiBtn.disabled = !live;
+    el.stickerBtn.disabled = !live;
     el.reportBtn.disabled = !(live || phase === 'connecting' || (phase === 'ended' && info.report));
     el.blockBtn.disabled = !(live || phase === 'connecting');
     el.addFriendBtn.disabled = !live || !!S.session?.friend;
@@ -1240,6 +1243,21 @@ function onPeerData(sess, msg) {
         case 'react':
             receiveReaction(sess, msg);
             break;
+        case 'sticker': {
+            const s = parseSticker(msg);
+            if (s) { hideTyping(); showSticker('them', s.id); SOUND.message(); }
+            break;
+        }
+        case 'gift': {
+            const g = parseGift(msg);
+            if (!g || sess.giftsSeen >= 20) break; // an animation storm is not a gift storm
+            sess.giftsSeen = (sess.giftsSeen || 0) + 1;
+            hideTyping();
+            showSticker('them', g.id, `${sess.partner?.nick || 'Stranger'} sent you a ${giftById(g.id).label}`);
+            floatSticker(g.id);
+            SOUND.match();
+            break;
+        }
         case 'loc':
             receiveCell(sess, msg);
             break;
@@ -1981,6 +1999,138 @@ function showRevealCard(sess, c) {
     scrollMessages();
 }
 
+// ---- Stickers and gifts (js/stickers.js, functions/wallet.js) ----
+const walletState = { coins: null };
+function showSticker(who, id, caption = '') {
+    const wrap = h('div', 'msg ' + who + ' sticker-msg');
+    const img = new Image();
+    img.src = stickerURL(id);
+    img.alt = (stickerById(id) || giftById(id))?.label || '';
+    img.draggable = false;
+    img.className = 'sticker-img';
+    wrap.appendChild(img);
+    if (caption) wrap.appendChild(h('div', 'meta', caption));
+    el.messages.insertBefore(wrap, typingNode?.isConnected ? typingNode : null);
+    scrollMessages();
+}
+function floatSticker(id) {
+    if (S.mode === 'text') return;
+    const node = new Image();
+    node.className = 'float-react';
+    node.src = stickerURL(id);
+    node.alt = '';
+    node.style.width = node.style.height = '96px';
+    node.style.left = `${30 + Math.random() * 30}%`;
+    node.style.setProperty('--dx', `${Math.round(Math.random() * 60 - 30)}px`);
+    node.style.setProperty('--rot', `${Math.round(Math.random() * 20 - 10)}deg`);
+    node.style.setProperty('--dur', '3.2s');
+    el.reactLayer.appendChild(node);
+    node.addEventListener('animationend', () => node.remove());
+}
+function sendSticker(id) {
+    if (S.phase !== 'connected' || !stickerById(id)) return;
+    const now = Date.now();
+    S.msgTimes = S.msgTimes.filter(t => now - t < 4000);
+    if (S.msgTimes.length >= 6) { toast('Slow down a little 🙂', true); return; }
+    S.msgTimes.push(now);
+    sendData({ t: 'sticker', id });
+    showSticker('me', id);
+    el.stickerPop.classList.add('hidden');
+}
+const coinsOnline = () => S.transport?.kind === 'firebase';
+async function refreshWallet() {
+    if (!coinsOnline() || !friends?.signedIn) { walletState.coins = null; renderCoins(); return; }
+    try {
+        const w = (await (await callable(S.transport, 'getWallet', PREMIUM_CFG.functionsRegion))()).data;
+        walletState.coins = w.coins;
+        walletState.daily = w.dailyAvailable;
+    } catch { walletState.coins = null; }
+    renderCoins();
+}
+function renderCoins() {
+    const chip = $('coinChip');
+    chip.classList.toggle('hidden', walletState.coins === null);
+    chip.textContent = walletState.coins === null ? '' : `${walletState.coins} coins`;
+    $('coinBalance').textContent = String(walletState.coins ?? 0);
+    $('dailyCoinsBtn').disabled = walletState.daily === false;
+    $('dailyCoinsBtn').textContent = walletState.daily === false ? 'Come back tomorrow for more free coins' : 'Claim today’s free coins';
+}
+let stickerTab = 'stickers';
+function renderStickerPop() {
+    $('tabStickers').setAttribute('aria-selected', String(stickerTab === 'stickers'));
+    $('tabGifts').setAttribute('aria-selected', String(stickerTab === 'gifts'));
+    $('giftFoot').classList.toggle('hidden', stickerTab !== 'gifts');
+    const items = stickerTab === 'stickers' ? STICKERS : GIFTS;
+    $('stickerGrid').replaceChildren(...items.map(it => {
+        const b = h('button', 'sticker-item');
+        b.type = 'button';
+        b.title = it.label + (it.coins ? ` · ${it.coins} coins` : '');
+        b.setAttribute('aria-label', b.title);
+        const img = new Image(); img.src = stickerURL(it.id); img.alt = ''; img.draggable = false;
+        b.appendChild(img);
+        if (it.coins) b.appendChild(h('small', '', String(it.coins)));
+        b.onclick = () => (it.coins ? sendGiftNow(it.id) : sendSticker(it.id));
+        return b;
+    }));
+}
+async function sendGiftNow(id) {
+    const g = giftById(id);
+    const sess = S.session;
+    if (!g || !sess || S.phase !== 'connected' || sess.friend) return;
+    if (!coinsOnline()) { toast('Gifts are available on the online version of the site.', true); return; }
+    if (!friends?.signedIn && !(await signInFlow())) return;
+    if (walletState.coins !== null && walletState.coins < g.coins) { openSheet($('coinSheet')); renderCoins(); toast('You need more coins for that gift.', true); return; }
+    try {
+        const r = (await (await callable(S.transport, 'sendGift', PREMIUM_CFG.functionsRegion))({ roomId: sess.roomId, gift: id })).data;
+        walletState.coins = r.coins;
+        renderCoins();
+        if (sess !== S.session) return;
+        sendData({ t: 'gift', id });
+        showSticker('me', id, `You sent a ${g.label}`);
+        floatSticker(id);
+        SOUND.match();
+        el.stickerPop.classList.add('hidden');
+    } catch (e) {
+        if (/failed-precondition/.test(e.code || '') && /coins/i.test(e.message || '')) { openSheet($('coinSheet')); renderCoins(); toast('You need more coins for that gift.', true); }
+        else toast({ 'functions/resource-exhausted': 'That’s a lot of gifts for one hour. Try again later.', 'functions/permission-denied': 'Couldn’t send the gift in this chat.' }[e.code] || 'Couldn’t send the gift. Try again.', true);
+    }
+}
+el.stickerBtn.onclick = e => {
+    e.stopPropagation();
+    el.emojiPop.classList.add('hidden');
+    const open = el.stickerPop.classList.toggle('hidden') === false;
+    if (open) { renderStickerPop(); refreshWallet(); }
+};
+$('tabStickers').onclick = () => { stickerTab = 'stickers'; renderStickerPop(); };
+$('tabGifts').onclick = () => { stickerTab = 'gifts'; renderStickerPop(); refreshWallet(); };
+document.addEventListener('click', e => { if (!el.stickerPop.contains(e.target) && e.target !== el.stickerBtn && !el.stickerBtn.contains(e.target)) el.stickerPop.classList.add('hidden'); });
+$('getCoinsBtn').onclick = async () => {
+    if (!coinsOnline()) { toast('Coins are available on the online version of the site.', true); return; }
+    if (!friends?.signedIn && !(await signInFlow())) return;
+    await refreshWallet();
+    const packs = [['coins60', 60, '₹49'], ['coins200', 200, '₹149'], ['coins500', 500, '₹349']];
+    $('coinPacks').replaceChildren(...packs.map(([id, n, price]) => {
+        const b = h('button', 'btn btn-primary coin-pack', `${n} coins · ${price}`);
+        b.type = 'button';
+        b.onclick = async () => {
+            b.disabled = true;
+            try { walletState.coins = await premium.buyCoins(id); renderCoins(); toast(`${n} coins added.`); SOUND.match(); }
+            catch (e) { if (e.code !== 'cancelled') toast(e.message || 'The payment could not be completed.', true); }
+            finally { b.disabled = false; }
+        };
+        return b;
+    }));
+    openSheet($('coinSheet'));
+};
+$('dailyCoinsBtn').onclick = async () => {
+    try {
+        const r = (await (await callable(S.transport, 'claimDaily', PREMIUM_CFG.functionsRegion))()).data;
+        walletState.coins = r.coins; walletState.daily = false;
+        renderCoins();
+        toast(r.gained ? `+${r.gained} free coins!` : 'You already claimed today’s coins.');
+    } catch { toast('Couldn’t claim coins right now.', true); }
+};
+
 /** Both of you sent a good vibe: offer to stay in touch (friends can chat and call again later). */
 function maybeMutual(sess) {
     if (!sess || sess !== S.session || sess.friend || !sess.liked || !sess.likeShown || sess.mutualShown) return;
@@ -2081,7 +2231,7 @@ document.addEventListener('keydown', e => {
     if (el.chat.classList.contains('hidden') || anySheetOpen() || e.repeat) return;
     if (e.key === 'Escape') {
         // Whatever is open closes first; only a bare Esc means "next".
-        const popovers = [el.emojiPop, el.reactBar, el.fxPanel];
+        const popovers = [el.emojiPop, el.stickerPop, el.reactBar, el.fxPanel];
         const open = popovers.find(p => !p.classList.contains('hidden'));
         if (open) { open.classList.add('hidden'); el.reactBtn.classList.toggle('on', !el.reactBar.classList.contains('hidden')); e.preventDefault(); return; }
         if (!el.drawer.classList.contains('hidden')) { el.drawer.classList.add('hidden'); return; }

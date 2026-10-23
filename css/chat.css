@@ -437,3 +437,20 @@ body.is-premium .react-lock { display: none; }
 .profile-card .where, .profile-card .speaks, .profile-card .hint { font-size: 12px; color: var(--muted); }
 .profile-card .bio { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
 .profile-card .contact { font-weight: 700; font-size: 14px; overflow-wrap: anywhere; user-select: all; }
+
+/* Stickers and gifts */
+.sticker-pop { position: absolute; left: 8px; right: 8px; bottom: 64px; z-index: 12; max-width: 380px; padding: 8px; border-radius: var(--r-lg); background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow-lg, 0 12px 40px rgba(0,0,0,.3)); }
+.sticker-tabs { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.sticker-tabs button { padding: 6px 12px; border-radius: 999px; border: 0; background: transparent; color: var(--muted); font-weight: 700; }
+.sticker-tabs button[aria-selected="true"] { background: var(--primary-soft); color: var(--primary-text); }
+.coin-chip { margin-left: auto; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--gold-soft); color: var(--gold-text); }
+.sticker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.sticker-item { position: relative; border: 0; background: transparent; border-radius: var(--r-md); padding: 4px; }
+.sticker-item:hover { background: var(--panel-2); }
+.sticker-item img { width: 100%; aspect-ratio: 1; display: block; pointer-events: none; }
+.sticker-item small { position: absolute; right: 4px; bottom: 4px; font-size: 11px; font-weight: 800; padding: 1px 6px; border-radius: 999px; background: var(--gold-soft); color: var(--gold-text); }
+.gift-foot { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.sticker-msg { max-width: 60%; }
+.sticker-img { width: 120px; height: 120px; display: block; -webkit-user-select: none; user-select: none; }
+.coin-packs { display: grid; gap: 8px; margin: 12px 0; }
+@media (max-width: 480px) { .sticker-pop { bottom: 58px; } }

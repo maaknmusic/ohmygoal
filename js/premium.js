@@ -97,12 +97,15 @@ export class Premium {
     /** Leave a voluntary tip (whole rupees; the server checks the range). It never changes Premium. */
     tip(rupees) { return this.buy('tip', { tip: rupees }); }
 
-    async buy(planId, { tip = null } = {}) {
+    /** Buy a coin pack ('coins60' ...). Resolves to the new balance. */
+    buyCoins(packId) { return this.buy(packId, { coins: packId }); }
+
+    async buy(planId, { tip = null, coins = null } = {}) {
         if (tip === null && !this.friends.signedIn) throw Object.assign(new Error('Sign in with Google first'), { code: 'signin' });
         const [createOrder, verifyPayment, Razorpay] = await Promise.all([
             this.callable('createOrder'), this.callable('verifyPayment'), this.loadCheckout(),
         ]);
-        const { data: order } = await createOrder(tip === null ? { plan: planId } : { tip });
+        const { data: order } = await createOrder(coins ? { coins } : tip === null ? { plan: planId } : { tip });
         const user = this.auth.currentUser;
         const response = await new Promise((resolve, reject) => {
             let lastError = null;
@@ -139,6 +142,7 @@ export class Premium {
             if (wait) await new Promise(r => setTimeout(r, wait));
             try {
                 const { data } = await verifyPayment(payload);
+                if (data.coins !== undefined) return data.coins;
                 if (data.tip) return null; // a tip changes nothing about Premium
                 this.setUntil(Math.max(this.premiumUntil, data.premiumUntil || 0));
                 return data.premiumUntil;

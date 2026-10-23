@@ -917,8 +917,18 @@
                 <input id="msgInput" class="input" maxlength="500" placeholder="Type a message…" autocomplete="off" aria-label="Message" disabled>
                 <button id="gamesBtnText" class="icon-btn composer-games" title="Play a game" aria-label="Play a game" disabled><i class="icon" data-icon="gamepad"></i></button>
                 <button id="emojiBtn" class="icon-btn" title="Emoji" aria-label="Emoji" disabled><i class="icon" data-icon="smile"></i></button>
+                <button id="stickerBtn" class="icon-btn" title="Stickers and gifts" aria-label="Stickers and gifts" disabled><i class="icon" data-icon="sticker"></i></button>
                 <button id="sendBtn" class="icon-btn" title="Send" aria-label="Send" disabled><i class="icon" data-icon="send"></i></button>
                 <div class="emoji-pop hidden" id="emojiPop"></div>
+                <div class="sticker-pop hidden" id="stickerPop" role="dialog" aria-label="Stickers and gifts">
+                    <div class="sticker-tabs" role="tablist">
+                        <button type="button" role="tab" id="tabStickers" aria-selected="true">Stickers</button>
+                        <button type="button" role="tab" id="tabGifts" aria-selected="false">Gifts</button>
+                        <span class="coin-chip hidden" id="coinChip" title="Your coins"></span>
+                    </div>
+                    <div class="sticker-grid" id="stickerGrid"></div>
+                    <div class="gift-foot hidden" id="giftFoot"><button type="button" class="btn btn-ghost btn-sm" id="getCoinsBtn">Get coins</button><span class="hint">Gifts are paid with coins. Free coins every day.</span></div>
+                </div>
             </div>
             <div class="kbd"><b>Enter</b> send · <b>Esc</b> next (press twice) · <b>Ctrl+M</b> mute</div>
         </section>
@@ -1117,6 +1127,19 @@
     </div>
 
     <!-- Report -->
+    <div id="coinSheet" class="sheet-bg hidden" role="dialog" aria-modal="true" aria-labelledby="coinTitle">
+        <div class="sheet">
+            <div class="sheet-grab"></div>
+            <div class="sheet-head"><h3 id="coinTitle">Coins</h3><button class="icon-btn" data-sheet-close aria-label="Close"><i class="icon" data-icon="x"></i></button></div>
+            <div class="sheet-body">
+                <p>Coins buy gifts for the people you chat with. They never unlock safety tools, and gifts can’t be cashed out or sold. <b id="coinBalance">0</b> coins now.</p>
+                <button type="button" class="btn btn-ghost" id="dailyCoinsBtn">Claim today’s free coins</button>
+                <div class="coin-packs" id="coinPacks"></div>
+                <p class="hint">One-time payment by Razorpay (UPI, cards, netbanking). Coins need a Google sign-in so they stay with you. Purchases are non-refundable once spent.</p>
+            </div>
+        </div>
+    </div>
+
     <div id="revealSheet" class="sheet-bg hidden" role="dialog" aria-modal="true" aria-labelledby="revealTitle">
         <div class="sheet">
             <div class="sheet-grab"></div>

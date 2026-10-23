@@ -14,6 +14,8 @@ import { logger } from 'firebase-functions/v2';
 import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret, defineString } from 'firebase-functions/params';
 import { db, APP_ID } from './common.js';
+import { COIN_PACKS } from './gifts.js';
+import { addCoinsTx, walletDoc } from './wallet.js';
 
 // Bans, access passes, unban requests and the admin API.
 export { checkAccess, reportViolation, requestUnban, admin } from './moderation.js';
@@ -23,6 +25,8 @@ export { likeUser } from './likes.js';
 export { turnCredentials } from './turn.js';
 // Friend notifications (web push / Android).
 export { registerPush, unregisterPush, announceOnline, onFriendshipWritten, onFriendMessage } from './push.js';
+// Coins and gifts.
+export { getWallet, claimDaily, sendGift } from './wallet.js';
 // Live translate (Premium): Gemini on Vertex AI. See the header of translate.js for setup, quotas and cost.
 export { translateText } from './translate.js';
 
@@ -124,6 +128,16 @@ async function grantOrder(orderId, paymentId) {
             if (order.status !== 'paid') t.update(orderRef(orderId), { status: 'paid', paymentId, paidAt: Date.now() });
             return { uid: order.uid, premiumUntil: 0, alreadyGranted: order.status === 'paid', tip: true };
         }
+        if (order.kind === 'coins') {
+            // Coins are added exactly once per paid order.
+            const wSnap = await t.get(walletDoc(order.uid));
+            if (order.status !== 'paid') {
+                addCoinsTx(t, order.uid, wSnap.data()?.coins, order.coins);
+                t.update(orderRef(orderId), { status: 'paid', paymentId, paidAt: Date.now() });
+            }
+            const after = Math.min(100000, (Number.isInteger(wSnap.data()?.coins) ? wSnap.data().coins : 0) + (order.status === 'paid' ? 0 : order.coins));
+            return { uid: order.uid, premiumUntil: 0, alreadyGranted: order.status === 'paid', coins: after };
+        }
         const eRef = entitlementRef(order.uid);
         const eSnap = await t.get(eRef);
         if (order.status === 'paid') {
@@ -159,6 +173,7 @@ async function confirmCaptured(paymentId, orderId, order) {
 
 export const createOrder = onCall({ secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET] }, async request => {
     if (request.data?.tip !== undefined) return createTipOrder(request);
+    if (request.data?.coins !== undefined) return createCoinOrder(request);
     const uid = requireGoogleUser(request);
     const planId = request.data?.plan;
     const plan = Object.hasOwn(PLANS, planId) ? PLANS[planId] : null;
@@ -185,6 +200,22 @@ export const createOrder = onCall({ secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SECR
         keyId: RAZORPAY_KEY_ID.value(),
     };
 });
+
+/** A coin pack order: the pack id picks the price here, never the browser. Coins need a Google account (they must survive a new phone). */
+async function createCoinOrder(request) {
+    const uid = requireGoogleUser(request);
+    const id = request.data.coins;
+    const pack = typeof id === 'string' && Object.hasOwn(COIN_PACKS, id) ? COIN_PACKS[id] : null;
+    if (!pack) throw new HttpsError('invalid-argument', 'Unknown coin pack.');
+    await takeOrderSlot(uid);
+    const order = await razorpay('/v1/orders', {
+        method: 'POST',
+        body: { amount: pack.amount, currency: CURRENCY, receipt: `${id}-${Date.now()}`.slice(0, 40), notes: { uid, kind: 'coins', pack: id, appId: APP_ID.value() } },
+    });
+    if (order.amount !== pack.amount || order.currency !== CURRENCY) throw new HttpsError('internal', 'Unexpected order from the payment provider.');
+    await orderRef(order.id).set({ uid, kind: 'coins', coins: pack.coins, days: 0, amount: pack.amount, currency: CURRENCY, status: 'created', createdAt: Date.now() });
+    return { orderId: order.id, amount: pack.amount, currency: CURRENCY, plan: id, label: pack.label, keyId: RAZORPAY_KEY_ID.value() };
+}
 
 /** A tip order: whole rupees between the limits, no Premium. The amount sent by the browser is only a request; it is validated here. */
 async function createTipOrder(request) {
@@ -224,7 +255,7 @@ export const verifyPayment = onCall({ secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SE
     // 3. The money must actually have been captured.
     if (oSnap.data().status !== 'paid') await confirmCaptured(paymentId, orderId, oSnap.data());
     const result = await grantOrder(orderId, paymentId);
-    return { premiumUntil: result.premiumUntil, alreadyGranted: result.alreadyGranted, tip: result.tip === true };
+    return { premiumUntil: result.premiumUntil, alreadyGranted: result.alreadyGranted, tip: result.tip === true, ...(result.coins !== undefined ? { coins: result.coins } : {}) };
 });
 
 /**
