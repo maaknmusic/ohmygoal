@@ -163,6 +163,12 @@
                     </button>
                     <div id="prefsChips" class="lp-chips" aria-live="polite"></div>
 
+                    <button type="button" id="roomBtn" class="lp-prefs" data-sheet-open="roomSheet" aria-haspopup="dialog">
+                        <svg class="lp-i lp-prefs-ico" aria-hidden="true"><use href="#lp-i-users"/></svg>
+                        <span class="lp-prefs-main"><b>Tonight’s rooms</b><span id="roomSummary" class="lp-prefs-sum">Open chat</span></span>
+                        <svg class="lp-i lp-chev" aria-hidden="true"><use href="#lp-i-chev"/></svg>
+                    </button>
+
                     <label class="lp-consent">
                         <input type="checkbox" id="ageCheck">
                         <span class="lp-consent-text">I confirm I am 18+ and accept the <a href="legal.html#terms" target="_blank" rel="noopener">rules</a></span>
@@ -170,6 +176,12 @@
 
                     <div class="lp-start-wrap">
                         <button type="button" id="startBtn" class="lp-start" disabled>Start chatting</button>
+                    </div>
+                    <div id="progressBox" class="lp-progress" aria-live="polite">
+                        <img data-sprite="fire" alt="" width="28" height="28">
+                        <span class="lp-progress-main"><span id="progressLine">Chat for a minute to start a streak.</span>
+                            <span class="lp-level"><b id="levelName">Newcomer</b><span class="lp-level-bar" role="img" aria-label="Progress to the next level"><i id="levelFill"></i></span></span>
+                        </span>
                     </div>
                     <div id="ageStatus" class="lp-age" role="status" aria-live="polite"></div>
 
@@ -655,6 +667,20 @@
     </footer>
 
     <!-- ===================== PREFERENCES SHEET ===================== -->
+    <div class="sheet-bg hidden" id="roomSheet" role="dialog" aria-modal="true" aria-labelledby="roomTitle">
+        <div class="sheet">
+            <div class="sheet-grab"></div>
+            <div class="sheet-head">
+                <h3 id="roomTitle">Tonight’s rooms</h3>
+                <button type="button" class="icon-btn" data-sheet-close aria-label="Close rooms"><svg class="lp-i" aria-hidden="true"><use href="#lp-i-x"/></svg></button>
+            </div>
+            <div class="sheet-body">
+                <p class="hint">Pick a room and you’ll only meet people who picked the same one, so there’s something to talk about from the first hello. Times are Indian Standard Time; every room can be joined at any time.</p>
+                <div id="roomList" class="room-list" role="radiogroup" aria-label="Room"></div>
+            </div>
+        </div>
+    </div>
+
     <div class="sheet-bg hidden" id="prefsSheet" role="dialog" aria-modal="true" aria-labelledby="prefsTitle">
         <div class="sheet">
             <div class="sheet-grab"></div>

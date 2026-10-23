@@ -15,6 +15,8 @@ import { callable } from './cloud.js';
 import { initLanding } from './landing.js';
 import { TIERS, createAdaptive, qualityNote, readSample } from './adaptive.js';
 import { mediaErrorText, matchFailure, connectionLostCopy, CAMERA_UNAVAILABLE } from './failures.js';
+import { THEMES, OPEN, themeId, themeById, isBusy, nextBusy, featured, scheduleText } from './rooms.js';
+import { sanitizeProgress, recordChat, levelFor, streakNow, progressLine } from './progress.js';
 import { REACTIONS, reactionById, parseReaction, takeBudget, spriteURL, MAX_BURST, HOLD_MAX, SEND_CAP, RECEIVE_CAP } from './reactions.js';
 import { LANGS, sanitizeLang, langNative, langLabel, guessLang } from './languages.js';
 import { createEngine, createDeviceProvider, parseChatMessage } from './translate.js';
@@ -122,6 +124,8 @@ const el = {
     shieldSkip: $('shieldSkip'), shieldReport: $('shieldReport'), fxBtn: $('fxBtn'), fxPanel: $('fxPanel'), fxClose: $('fxClose'), fxStatus: $('fxStatus'),
     round: $('round'), roundFill: $('roundFill'), roundTime: $('roundTime'), roundNote: $('roundNote'), extendBtn: $('extendBtn'),
     partnerAge: $('partnerAge'), reportEvidence: $('reportEvidence'),
+    roomBtn: $('roomBtn'), roomSummary: $('roomSummary'), roomSheet: $('roomSheet'), roomList: $('roomList'),
+    progressLine: $('progressLine'), levelName: $('levelName'), levelFill: $('levelFill'),
     hideIpBtn: $('hideIpBtn'), hideIpLabel: $('hideIpLabel'), shieldShow: $('shieldShow'), reportWho: $('reportWho'),
     exitBtn: $('exitBtn'), shareBtn: $('shareBtn'), themeLabel: $('themeLabel'), soundLabel: $('soundLabel'), accentGrid: $('accentGrid'), menuSheet: $('menuSheet'),
     overlayChips: $('overlayChips'), overlayTip: $('overlayTip'), endPauseBtn: $('endPauseBtn'), endReportBtn: $('endReportBtn'),
@@ -181,6 +185,8 @@ const S = {
     blocked: new Set(store.get('blocked', [])),
     sound: store.get('sound', true),
     gender: store.get('gender', 'x'),
+    theme: themeId(store.get('theme', '')), // the room picked on the start screen ('' = open chat)
+    progress: sanitizeProgress(store.get('progress', null)),
     lang: sanitizeLang(store.get('lang', '')), // '' until the person picks one: the browser's language is only a suggestion
     genderFilter: store.get('genderFilter', 'any'),
     countryFilter: store.get('countryFilter', 'any'),
@@ -840,7 +846,15 @@ async function startSearch(note) {
     }
     const filtered = S.genderFilter !== 'any' || S.countryFilter !== 'any';
     const slowHint = setTimeout(() => {
-        if (S.searchAbort === ac && filtered) sys('Still looking… your filters may be limiting matches. Try “Everyone” or “Anywhere” for faster chats.');
+        if (S.searchAbort !== ac) return;
+        if (S.theme) {
+            // A themed room can be quiet: offer the way out right in the chat.
+            const note = sys(`Still looking in ${themeById(S.theme).name}… it may be quiet right now.`);
+            const b = h('button', 'btn btn-ghost btn-sm', 'Switch to open chat');
+            b.type = 'button';
+            b.onclick = () => { setTheme(''); startSearch(); };
+            note.append(' ', b);
+        } else if (filtered) sys('Still looking… your filters may be limiting matches. Try “Everyone” or “Anywhere” for faster chats.');
     }, 25000);
     ac.signal.addEventListener('abort', () => clearTimeout(slowHint));
     let match;
@@ -851,6 +865,12 @@ async function startSearch(note) {
         try {
             return await search(profile);
         } catch (e) {
+            // Rooms need the newest database rules: until they are deployed, search open chat instead of failing.
+            if (e?.code === 'permission-denied' && profile.theme) {
+                console.warn('rooms refused; searching open chat', e);
+                sys('Rooms aren’t available right now, so you’re searching open chat.');
+                return search({ ...profile, theme: '' });
+            }
             // The database refused Premium options (pass expired, clock skew...): search as a free user.
             if (e?.code !== 'permission-denied' || !(profile.premium || profile.genderFilter !== 'any' || profile.countryFilter !== 'any')) throw e;
             console.warn('premium search refused; retrying without premium options', e);
@@ -1133,6 +1153,7 @@ function renderMatchCard(p, shared) {
         card.appendChild(speaks);
     }
     if (p.adult) card.appendChild(h('div', 'age-line', '✓ 18+ checked on their device'));
+    if (S.theme && !S.session?.friend) card.appendChild(h('div', 'room-line', `Room: ${themeById(S.theme).name}`));
     if (shared.length) {
         const chips = h('div', 'shared-chips');
         chips.append(...shared.map(t => h('span', '', '#' + t)));
@@ -1212,6 +1233,7 @@ function onPeerData(sess, msg) {
             sess.likeShown = true;
             sys(`💜 ${sess.partner?.nick || 'Stranger'} sent you a good vibe.`, 'good');
             SOUND.match();
+            maybeMutual(sess);
             break;
         case 'game':
             sess.games?.receive(msg);
@@ -1298,6 +1320,7 @@ function endSession({ notify }) {
     try { sess.dc?.close(); } catch { /* ignore */ }
     try { sess.pc.close(); } catch { /* ignore */ }
     sess.bus.close();
+    if (sess.opened && sess.startedAt) noteChatLength((Date.now() - sess.startedAt) / 1000);
     if (!sess.friend) S.last = { partnerId: sess.partnerId, roomId: sess.roomId, at: Date.now(), nick: sess.partner?.nick };
     S.session = null;
     el.remoteVideo.srcObject = null;
@@ -1841,7 +1864,7 @@ async function sendLike(t) {
             await fn({ roomId: t.roomId });
         }
         t.liked = true;
-        if (t === S.session) sendData({ t: 'like' });
+        if (t === S.session) { sendData({ t: 'like' }); maybeMutual(t); }
         const who = t.partner?.nick || t.nick;
         toast(`💜 Good vibe sent${who ? ` to ${who}` : ''}.`);
         el.likeBtn.classList.add('on');
@@ -1863,6 +1886,24 @@ async function sendLike(t) {
     } finally {
         t.liking = false;
     }
+}
+/** Both of you sent a good vibe: offer to stay in touch (friends can chat and call again later). */
+function maybeMutual(sess) {
+    if (!sess || sess !== S.session || sess.friend || !sess.liked || !sess.likeShown || sess.mutualShown) return;
+    sess.mutualShown = true;
+    const card = h('div', 'alert-card mutual-card');
+    card.append(h('b', '', 'You both sent good vibes. '), document.createTextNode('Add them as a friend to chat or call again later.'));
+    const row = h('div', 'row');
+    const add = h('button', 'btn btn-primary btn-sm', 'Add friend');
+    add.type = 'button';
+    add.onclick = () => { el.addFriendBtn.click(); card.remove(); };
+    const no = h('button', 'btn btn-ghost btn-sm', 'Not now');
+    no.type = 'button';
+    no.onclick = () => card.remove();
+    row.append(add, no);
+    card.appendChild(row);
+    el.messages.insertBefore(card, typingNode?.isConnected ? typingNode : null);
+    scrollMessages();
 }
 el.likeBtn.onclick = () => sendLike(S.session);
 el.endLikeBtn.onclick = () => sendLike(S.last);
@@ -2398,6 +2439,61 @@ function setMode(mode) {
 }
 document.querySelectorAll('.seg').forEach(b => (b.onclick = () => setMode(b.dataset.mode)));
 
+// =====================================================================
+// Rooms (themed chats) and streaks / levels on the start screen
+// =====================================================================
+function setTheme(id) {
+    S.theme = themeId(id);
+    store.set('theme', S.theme);
+    renderRooms();
+}
+function renderRooms() {
+    const now = Date.now();
+    const busy = t => isBusy(t, now);
+    const cur = themeById(S.theme);
+    el.roomSummary.textContent = S.theme ? `${cur.name}${busy(cur) ? ' · busy now' : ''}` : (() => {
+        const f = featured(now);
+        return f?.busy ? `Open chat · ${f.theme.name} is busy now` : 'Open chat';
+    })();
+    el.roomBtn.classList.toggle('on', Boolean(S.theme));
+    el.roomList.replaceChildren(...[OPEN, ...THEMES].map(t => {
+        const b = h('button', 'room-opt' + (t.id === S.theme ? ' on' : ''));
+        b.type = 'button';
+        b.setAttribute('role', 'radio');
+        b.setAttribute('aria-checked', String(t.id === S.theme));
+        const main = h('span', 'room-main');
+        main.append(h('b', '', t.name), h('span', '', t.blurb));
+        const when = t.windows ? h('small', '', scheduleText(t)) : null;
+        if (when) main.appendChild(when);
+        b.appendChild(main);
+        if (t.windows) b.appendChild(h('span', 'room-tag' + (busy(t) ? ' busy' : ''), busy(t) ? 'Busy now' : 'Join anytime'));
+        b.onclick = () => { setTheme(t.id); closeSheet(el.roomSheet); };
+        return b;
+    }));
+}
+function renderProgress() {
+    const now = Date.now();
+    const lv = levelFor(S.progress.xp);
+    el.progressLine.textContent = progressLine(S.progress, now);
+    el.levelName.textContent = `Level ${lv.index + 1} · ${lv.level.name}`;
+    el.levelFill.style.width = `${Math.round(lv.fraction * 100)}%`;
+}
+/** A chat of this many seconds just ended. Under a minute counts for nothing (see progress.js). */
+function noteChatLength(seconds) {
+    const r = recordChat(S.progress, seconds, Date.now());
+    if (!r.gained && !r.events.length) return;
+    S.progress = r.progress;
+    store.set('progress', S.progress);
+    renderProgress();
+    for (const e of r.events) {
+        if (e.type === 'streak' && e.value > 1) toast(`${e.value}-day streak! Come back tomorrow to keep it going.`);
+        else if (e.type === 'level') toast(`Level up: you’re now ${e.value.name}.`);
+    }
+}
+renderRooms();
+renderProgress();
+setInterval(() => { renderRooms(); renderProgress(); }, 60000); // "busy now" and "streak at risk" follow the clock
+
 function renderTags() {
     el.tags.querySelectorAll('.tag').forEach(t => t.remove());
     S.interests.forEach((tag, i) => {
@@ -2448,7 +2544,7 @@ el.tags.onclick = () => el.tagInput.focus();
 function myProfile() {
     const pro = isPremium();
     return {
-        gender: S.gender, country: S.country, premium: pro,
+        gender: S.gender, country: S.country, premium: pro, theme: S.theme,
         genderFilter: pro ? S.genderFilter : 'any', countryFilter: pro ? S.countryFilter : 'any',
     };
 }

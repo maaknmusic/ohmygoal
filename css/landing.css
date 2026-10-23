@@ -805,3 +805,22 @@
     #welcome .lp-gate-chip--b { opacity: 1; }
     #welcome .lp-start::before { display: none; }
 }
+
+/* Rooms + streaks on the start card */
+#welcome .lp-progress { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 8px 12px; border-radius: 14px; background: var(--lp-card-2); border: 1px solid var(--border); font-size: 13px; color: var(--muted); }
+#welcome .lp-progress img { flex: none; width: 28px; height: 28px; }
+#welcome .lp-progress-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+#welcome .lp-level { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text); }
+#welcome .lp-level-bar { flex: 1; max-width: 140px; height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--primary) 16%, transparent); overflow: hidden; }
+#welcome .lp-level-bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--lp-grad, var(--primary)); transition: width 0.4s var(--ease); }
+#roomBtn.on .lp-prefs-ico { background: var(--primary); color: var(--on-primary, #fff); }
+.room-list { display: grid; gap: 8px; margin-top: 10px; }
+.room-opt { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 12px 14px; border-radius: var(--r-md); border: 1px solid var(--border); background: var(--panel); color: var(--text); }
+.room-opt:hover { background: var(--panel-2); }
+.room-opt.on { border-color: var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent); }
+.room-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.room-main b { font-size: 15px; }
+.room-main span { font-size: 13px; color: var(--muted); }
+.room-main small { font-size: 12px; color: var(--faint); }
+.room-tag { flex: none; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; color: var(--muted); background: var(--panel-2); }
+.room-tag.busy { color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); }

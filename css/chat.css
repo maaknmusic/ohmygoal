@@ -420,3 +420,7 @@ body.is-premium .react-lock { display: none; }
 .report-evidence { padding: 8px 10px; border-radius: var(--r-md); background: var(--panel-2); border: 1px solid var(--border); font-size: 13px; color: var(--text); overflow-wrap: anywhere; }
 .flag-card { border-color: color-mix(in srgb, var(--danger) 45%, transparent); background: color-mix(in srgb, var(--danger) 8%, var(--panel)); }
 .flag-card b { color: var(--danger); }
+
+.match-card .room-line { margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--primary-text); }
+.mutual-card { border-color: color-mix(in srgb, var(--primary) 45%, transparent); background: color-mix(in srgb, var(--primary) 8%, var(--panel)); }
+.mutual-card b { color: var(--primary-text); }

@@ -5,6 +5,8 @@
 // Chat itself goes over a WebRTC data channel and is never stored.
 // =====================================================================
 
+import { themeId } from './rooms.js';
+
 const QUEUE_STALE_MS = 30000;
 const PRESENCE_BEAT_MS = 30000;
 const PRESENCE_WINDOW_MS = 75000;
@@ -15,7 +17,9 @@ const PRESENCE_WINDOW_MS = 75000;
  */
 export function compatible(me = {}, them = {}) {
     const ok = (filter, value) => !filter || filter === 'any' || filter === value;
-    return ok(me.genderFilter, them.gender) && ok(them.genderFilter, me.gender)
+    // A themed room (Cricket night, Study hour...) only matches people in the same room; open chat only matches open chat.
+    return (me.theme || '') === (them.theme || '')
+        && ok(me.genderFilter, them.gender) && ok(them.genderFilter, me.gender)
         && ok(me.countryFilter, them.country) && ok(them.countryFilter, me.country);
 }
 
@@ -25,6 +29,7 @@ const profileFields = p => ({
     genderFilter: p?.genderFilter || 'any',
     countryFilter: p?.countryFilter || 'any',
     premium: p?.premium === true,
+    ...(themeId(p?.theme) ? { theme: themeId(p.theme) } : {}), // left out for open chat, so rules from before rooms still accept the entry
 });
 
 export async function createFirebaseTransport({ firebaseConfig, appId, initialAuthToken, emulators }) {

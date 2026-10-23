@@ -87,7 +87,7 @@ service cloud.firestore {
       // ---------------- Matchmaking queue ----------------
       function validQueue(d) {
         return d.keys().hasOnly(['mode', 'interests', 'blocked', 'gender', 'country', 'genderFilter',
-                                 'countryFilter', 'premium', 'ts', 'roomId'])
+                                 'countryFilter', 'premium', 'theme', 'ts', 'roomId'])
           && d.mode in ['video', 'voice', 'text']
           && d.get('interests', []) is list && d.get('interests', []).size() <= 5
           && d.get('interests', []).join(',').size() <= 140
@@ -98,6 +98,7 @@ service cloud.firestore {
           && d.get('genderFilter', 'any') in ['any', 'male', 'female']
           && d.get('countryFilter', 'any') is string && d.get('countryFilter', 'any').size() <= 3
           && d.get('premium', false) is bool
+          && d.get('theme', '') in ['', 'study', 'cricket', 'music', 'latenight', 'gaming', 'chill']
           && d.get('roomId', null) == null
           && recentTs(d.ts);
       }
@@ -112,6 +113,7 @@ service cloud.firestore {
         let mine = get(/databases/$(database)/documents/artifacts/anon-connect/public/data/queue/$(request.auth.uid)).data;
         let theirs = resource.data;
         return mine.mode == theirs.mode
+          && mine.get('theme', '') == theirs.get('theme', '')
           && !(request.auth.uid in theirs.get('blocked', []))
           && !(uid in mine.get('blocked', []))
           && theirs.get('genderFilter', 'any') in ['any', mine.get('gender', 'x')]
