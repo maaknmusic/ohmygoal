@@ -9,6 +9,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { FieldValue } from 'firebase-admin/firestore';
 import { db, publicDoc, privateDoc } from './common.js';
+import { bump } from './stats.js';
 import { GIFTS, DAILY_COINS, DAILY_COINS_PREMIUM, GIFT_HOURLY_CAP, MAX_COINS } from './gifts.js';
 
 const HOUR = 3600000;
@@ -65,7 +66,7 @@ export const sendGift = onCall(async request => {
     if (!Number.isFinite(created) || Date.now() - created > 2 * HOUR) throw new HttpsError('failed-precondition', 'That chat ended too long ago.');
 
     const now = Date.now();
-    return db.runTransaction(async t => {
+    const result = await db.runTransaction(async t => {
         const w = (await t.get(walletRef(uid))).data() || {};
         const coins = Number.isInteger(w.coins) ? w.coins : 0;
         const sent = (Array.isArray(w.sent) ? w.sent : []).filter(x => typeof x === 'number' && x > now - HOUR);
@@ -75,6 +76,8 @@ export const sendGift = onCall(async request => {
         t.set(privateDoc(`giftLog/${roomId}_${uid}_${now}`), { uid, roomId, gift, price, at: now });
         return { coins: coins - price };
     });
+    await bump('gifts'); await bump('coinsSpent', price);
+    return result;
 });
 
 /** Adds coins to a wallet (called when a coin-pack order is paid). Capped so a wallet can't grow without limit. */

@@ -18,8 +18,9 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { Timestamp } from 'firebase-admin/firestore';
 import { db, publicDoc, privateDoc, privateCol, publicCol } from './common.js';
+import { markActive } from './stats.js';
 
-const ADMIN_EMAILS = defineSecret('ADMIN_EMAILS'); // comma-separated Google emails
+export const ADMIN_EMAILS = defineSecret('ADMIN_EMAILS'); // comma-separated Google emails
 
 const MIN = 60000;
 const HOUR = 60 * MIN;
@@ -204,7 +205,9 @@ async function refreshAccess(id) {
 // ---------------- public callables ----------------
 
 export const checkAccess = onCall(async request => {
-    const status = await refreshAccess(identity(request));
+    const who = identity(request);
+    const status = await refreshAccess(who);
+    if (status?.allowed) await markActive(who.uid);
     // A little housekeeping on a small share of visits, so cleanup never depends on the admin page being opened.
     if (Math.random() < 0.03) await sweepOldRecords().catch(e => logger.warn('sweep failed', { message: e.message }));
     return status;
@@ -268,7 +271,7 @@ export const requestUnban = onCall(async request => {
 
 // ---------------- admin ----------------
 
-function requireAdmin(request) {
+export function requireAdmin(request) {
     const t = request.auth?.token;
     const allowed = ADMIN_EMAILS.value().split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
     if (!t || t.firebase?.sign_in_provider !== 'google.com' || !t.email_verified || !allowed.includes(String(t.email).toLowerCase())) {

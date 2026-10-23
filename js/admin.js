@@ -1,10 +1,12 @@
 // =====================================================================
-// Admin page: unban requests, active bans, the IP whitelist and reports.
-// Everything goes through the `admin` Cloud Function (functions/moderation.js),
-// which only answers Google accounts listed in the ADMIN_EMAILS secret.
+// Admin page: dashboard, Premium members, payments, people, inbox, unban requests, bans, the IP whitelist and reports.
+// Moderation goes through the `admin` Cloud Function (functions/moderation.js) and the numbers through `adminAnalytics`
+// (functions/analytics.js); both only answer Google accounts listed in the ADMIN_EMAILS secret.
 // =====================================================================
 const CFG = window.APP_CONFIG || {};
 const V = '11.6.1';
+import { createAnalytics } from './admin-analytics.js';
+
 const [appMod, authMod, fnMod] = await Promise.all([
     import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`),
     import(`https://www.gstatic.com/firebasejs/${V}/firebase-auth.js`),
@@ -19,6 +21,7 @@ if (CFG.emulators) { // local testing only
     fnMod.connectFunctionsEmulator(functions, ...CFG.emulators.functions);
 }
 const adminFn = fnMod.httpsCallable(functions, 'admin');
+const analyticsFn = fnMod.httpsCallable(functions, 'adminAnalytics');
 
 try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem('ac.theme')) || 'dark'; } catch { /* default */ }
 
@@ -99,8 +102,15 @@ function showSignIn(message) {
     show('signin');
 }
 
+const analytics = createAnalytics({
+    $, h, toast, button, empty, kv, when, short, fn: analyticsFn,
+    adminCall: (action, payload) => call(action, payload),
+    openTab: name => { tab = name; history.replaceState(null, '', '#' + name); render(); },
+});
+
 let data = null;
-let tab = ['inbox', 'requests', 'bans', 'whitelist', 'reports'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'inbox';
+const TABS = ['dashboard', 'premium', 'payments', 'people', 'inbox', 'requests', 'bans', 'whitelist', 'reports'];
+let tab = TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'dashboard';
 
 async function load() {
     try {
@@ -135,6 +145,7 @@ function render() {
     renderBans();
     renderWhitelist();
     renderReports();
+    analytics.show(tab);
 }
 
 // ---------------- unban requests ----------------
@@ -360,7 +371,7 @@ document.querySelectorAll('#tabs button').forEach(b => (b.onclick = () => {
     history.replaceState(null, '', '#' + tab);
     render();
 }));
-$('refreshBtn').onclick = async () => { $('refreshBtn').disabled = true; await load(); $('refreshBtn').disabled = false; };
+$('refreshBtn').onclick = async () => { $('refreshBtn').disabled = true; await load(); analytics.refresh(tab); $('refreshBtn').disabled = false; };
 
 $('signInBtn').onclick = async () => {
     const provider = new authMod.GoogleAuthProvider();

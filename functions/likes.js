@@ -14,6 +14,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { FieldValue } from 'firebase-admin/firestore';
 import { db, publicDoc, privateDoc } from './common.js';
+import { bump } from './stats.js';
 
 const MIN = 60000;
 const HOUR = 60 * MIN;
@@ -71,7 +72,7 @@ export const likeUser = onCall(async request => {
     const receivedRef = privateDoc(`likeCounters/received_${target}`);
     const repRef = publicDoc(`reputation/${target}`);
 
-    return db.runTransaction(async t => {
+    const result = await db.runTransaction(async t => {
         const [log, pair, given, received, rep] = await t.getAll(logRef, pairRef, givenRef, receivedRef, repRef);
         if (log.exists) return { ok: true, already: true }; // retry / double tap: count once
         const now = Date.now();
@@ -90,4 +91,6 @@ export const likeUser = onCall(async request => {
         t.set(repRef, { likes: FieldValue.increment(1), updatedAt: now }, { merge: true });
         return { ok: true, likes: (rep.data()?.likes || 0) + 1 };
     });
+    if (result?.ok && !result.already) await bump('likes');
+    return result;
 });
