@@ -18,6 +18,7 @@ import { mediaErrorText, matchFailure, connectionLostCopy, CAMERA_UNAVAILABLE } 
 import { THEMES, OPEN, themeId, themeById, isBusy, nextBusy, featured, scheduleText } from './rooms.js';
 import { sanitizeProgress, recordChat, levelFor, streakNow, progressLine } from './progress.js';
 import { createI18n, UI_LANGS, sanitizeUiLang, guessUiLang } from './i18n.js';
+import { REVEAL_AFTER_MS, createReveal, buildCard, sanitizeContact } from './reveal.js';
 import { REACTIONS, reactionById, parseReaction, takeBudget, spriteURL, MAX_BURST, HOLD_MAX, SEND_CAP, RECEIVE_CAP } from './reactions.js';
 import { LANGS, sanitizeLang, langNative, langLabel, guessLang } from './languages.js';
 import { createEngine, createDeviceProvider, parseChatMessage } from './translate.js';
@@ -124,6 +125,7 @@ const el = {
     shield: $('shield'), shieldTitle: $('shieldTitle'), shieldSub: $('shieldSub'), shieldActions: $('shieldActions'),
     shieldSkip: $('shieldSkip'), shieldReport: $('shieldReport'), fxBtn: $('fxBtn'), fxPanel: $('fxPanel'), fxClose: $('fxClose'), fxStatus: $('fxStatus'),
     round: $('round'), roundFill: $('roundFill'), roundTime: $('roundTime'), roundNote: $('roundNote'), extendBtn: $('extendBtn'),
+    revealSheet: $('revealSheet'), revealBio: $('revealBio'), revealContact: $('revealContact'), revealShare: $('revealShare'), revealCancel: $('revealCancel'),
     partnerAge: $('partnerAge'), reportEvidence: $('reportEvidence'),
     roomBtn: $('roomBtn'), roomSummary: $('roomSummary'), roomSheet: $('roomSheet'), roomList: $('roomList'),
     progressLine: $('progressLine'), levelName: $('levelName'), levelFill: $('levelFill'),
@@ -1098,6 +1100,7 @@ function attachChannel(sess, dc) {
         });
         SOUND.match();
         sess.clockTimer = setInterval(() => renderPartnerSub(sess), 1000);
+        if (!sess.friend) { sess.reveal = createReveal(); sess.revealTimer = setTimeout(() => offerReveal(sess), REVEAL_AFTER_MS); }
         if (S.mode !== 'text') startStats(sess);
         if (S.mode === 'video') applyVideoTier(sess, 0); // a sensible ceiling from the start (about 1.5 Mbit/s)
         if (S.mode === 'video') startAgeRecheck(sess);
@@ -1238,6 +1241,19 @@ function onPeerData(sess, msg) {
         case 'loc':
             receiveCell(sess, msg);
             break;
+        case 'reveal': {
+            // A real client only offers after ten minutes; an earlier "yes" is ignored.
+            if (!sess.reveal || Date.now() - sess.startedAt < REVEAL_AFTER_MS - 5000) break;
+            const what = sess.reveal.onReveal(msg);
+            if (what === 'they-agreed') { offerReveal(sess, true); sendCardIfReady(sess); }
+            else if (what === 'they-declined') sys(`${sess.partner?.nick || 'Stranger'} would rather keep chatting for now.`);
+            break;
+        }
+        case 'card': {
+            const card = sess.reveal?.onCard(msg);
+            if (card) showRevealCard(sess, card);
+            break;
+        }
         case 'like':
             if (sess.likeShown) break; // a notification only: counts come from the database
             sess.likeShown = true;
@@ -1312,6 +1328,7 @@ function endSession({ notify }) {
     if (notify) sess.bus.send('bye');
     clearTimeout(sess.connectTimer);
     clearTimeout(sess.dropTimer);
+    clearTimeout(sess.revealTimer);
     clearInterval(sess.statsTimer);
     clearInterval(sess.clockTimer);
     clearInterval(sess.ageTimer);
@@ -1897,6 +1914,71 @@ async function sendLike(t) {
         t.liking = false;
     }
 }
+// ---- Mutual reveal (see js/reveal.js): after ten minutes either of you can offer to swap profiles; both must say yes. ----
+function offerReveal(sess, theyAsked = false) {
+    if (!sess || sess !== S.session || !sess.reveal || sess.revealOffered) return;
+    const st = sess.reveal.state;
+    if (st.declined || st.me) return;
+    sess.revealOffered = true;
+    const card = h('div', 'alert-card reveal-card');
+    card.append(h('b', '', theyAsked ? `${sess.partner?.nick || 'Stranger'} would like to swap profiles. ` : 'You’ve been chatting for ten minutes. '), document.createTextNode('Swap profiles? Nothing is shared unless you both say yes.'));
+    const row = h('div', 'row');
+    const yes = h('button', 'btn btn-primary btn-sm', 'Share profiles');
+    yes.type = 'button';
+    yes.onclick = () => { sess.revealCard = card; el.revealBio.value = store.get('bio', ''); el.revealContact.value = store.get('contact', ''); openSheet(el.revealSheet); };
+    const no = h('button', 'btn btn-ghost btn-sm', 'Not now');
+    no.type = 'button';
+    no.onclick = () => { card.remove(); if (sess === S.session && sess.reveal.iDecline()) sendData({ t: 'reveal', s: 'no' }); };
+    row.append(yes, no);
+    card.appendChild(row);
+    sess.revealCard = card;
+    el.messages.insertBefore(card, typingNode?.isConnected ? typingNode : null);
+    scrollMessages();
+}
+function sendCardIfReady(sess) {
+    if (!sess.reveal?.shouldSendCard()) return;
+    sendData(buildCard({ nick: S.nick, avatar: S.avatar, country: S.country, lang: S.lang, learn: S.theme === 'langx' ? S.learn : '', interests: S.interests, bio: sess.myBio || '', contact: sess.myContact || '' }));
+}
+el.revealCancel.onclick = () => closeSheet(el.revealSheet);
+el.revealShare.onclick = () => {
+    const sess = S.session;
+    closeSheet(el.revealSheet);
+    if (!sess?.reveal) return;
+    sess.myBio = el.revealBio.value.trim().slice(0, 80);
+    sess.myContact = sanitizeContact(el.revealContact.value);
+    store.set('bio', sess.myBio);
+    store.set('contact', sess.myContact);
+    if (el.revealContact.value.trim() && !sess.myContact) toast('That doesn’t look like a handle, so it wasn’t included. Links aren’t allowed.', true);
+    if (sess.reveal.iAgree()) sendData({ t: 'reveal', s: 'yes' });
+    if (sess.revealCard?.isConnected) {
+        sess.revealCard.replaceChildren(h('b', '', 'Waiting for them… '), document.createTextNode('You’ll both see each other’s profile if they say yes.'));
+    }
+    sendCardIfReady(sess);
+};
+function showRevealCard(sess, c) {
+    if (sess !== S.session) return;
+    sess.revealCard?.remove();
+    const card = h('div', 'profile-card');
+    const av = h('div', 'avatar');
+    applyAvatar(av, { avatar: c.avatar, nick: c.nick });
+    card.append(av, h('h4', '', c.nick));
+    const where = c.country ? `${flagOf(c.country)} ${countryName(c.country)}` : '';
+    if (where) card.appendChild(h('div', 'where', where));
+    if (c.lang) card.appendChild(h('div', 'speaks', `Speaks ${langNative(c.lang)}`));
+    if (c.bio) card.appendChild(h('p', 'bio', maskProfanity(c.bio)));
+    if (c.interests.length) { const chips = h('div', 'shared-chips'); chips.append(...c.interests.map(t => h('span', '', '#' + t))); card.appendChild(chips); }
+    if (c.contact) card.appendChild(h('div', 'contact', `Reach them: ${c.contact}`));
+    const row = h('div', 'row');
+    const add = h('button', 'btn btn-primary btn-sm', 'Add friend');
+    add.type = 'button';
+    add.onclick = () => el.addFriendBtn.click();
+    row.appendChild(add);
+    card.append(row, h('div', 'hint', 'Shared by them. Be careful with anything that asks for money or codes.'));
+    el.messages.insertBefore(card, typingNode?.isConnected ? typingNode : null);
+    SOUND.match();
+    scrollMessages();
+}
+
 /** Both of you sent a good vibe: offer to stay in touch (friends can chat and call again later). */
 function maybeMutual(sess) {
     if (!sess || sess !== S.session || sess.friend || !sess.liked || !sess.likeShown || sess.mutualShown) return;

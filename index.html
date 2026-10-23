@@ -1114,6 +1114,25 @@
     </div>
 
     <!-- Report -->
+    <div id="revealSheet" class="sheet-bg hidden" role="dialog" aria-modal="true" aria-labelledby="revealTitle">
+        <div class="sheet">
+            <div class="sheet-grab"></div>
+            <div class="sheet-head"><h3 id="revealTitle">Swap profiles</h3><button class="icon-btn" data-sheet-close aria-label="Close"><i class="icon" data-icon="x"></i></button></div>
+            <div class="sheet-body">
+                <p>Nothing is shared unless <b>both</b> of you say yes. They’ll see your name, avatar, country, languages and interests, plus what you write here.</p>
+                <label class="lp-pf-h" for="revealBio">A line about you (optional)</label>
+                <input id="revealBio" class="input" maxlength="80" autocomplete="off" placeholder="Pune. Chai over coffee.">
+                <label class="lp-pf-h" for="revealContact">A handle to reach you (optional)</label>
+                <input id="revealContact" class="input" maxlength="40" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. your Instagram name">
+                <div class="hint">Only share a handle with someone you trust. Never share OTPs, money details or your address.</div>
+            </div>
+            <div class="sheet-foot">
+                <button class="btn btn-ghost" id="revealCancel" type="button">Cancel</button>
+                <button class="btn btn-primary" id="revealShare" type="button">Share if they agree</button>
+            </div>
+        </div>
+    </div>
+
     <div id="reportModal" class="sheet-bg hidden" role="dialog" aria-modal="true" aria-labelledby="reportTitle">
         <div class="sheet">
             <div class="sheet-grab"></div>

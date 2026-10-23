@@ -429,3 +429,11 @@ body.is-premium .react-lock { display: none; }
 .langx-form { display: grid; gap: 6px; margin-top: 14px; padding: 12px; border-radius: var(--r-md); border: 1px dashed var(--border); }
 .langx-form .input { width: 100%; }
 @media (max-width: 480px) { .ui-lang { max-width: 50px; padding: 0; font-size: 11px; } .topbar-actions { gap: 6px; } }
+
+.reveal-card { border-color: color-mix(in srgb, var(--primary) 45%, transparent); background: color-mix(in srgb, var(--primary) 8%, var(--panel)); }
+.reveal-card b { color: var(--primary-text); }
+.profile-card { align-self: stretch; display: grid; justify-items: center; gap: 6px; padding: 14px; border-radius: var(--r-lg); background: var(--panel-2); border: 1px solid var(--border); text-align: center; }
+.profile-card h4 { margin: 0; font-size: 17px; }
+.profile-card .where, .profile-card .speaks, .profile-card .hint { font-size: 12px; color: var(--muted); }
+.profile-card .bio { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
+.profile-card .contact { font-weight: 700; font-size: 14px; overflow-wrap: anywhere; user-select: all; }
