@@ -293,6 +293,41 @@ service cloud.firestore {
         }
       }
 
+      // ---------------- Group rooms ----------------
+      // Rooms and their members are created by the joinGroup function (so the size limit is real). A member keeps their own `ts`
+      // fresh and deletes their own document to leave. Handshake messages go from a member to a member of the same room.
+      match /groups/{gid} {
+        allow read: if request.auth != null;
+        allow write: if false;
+        match /members/{uid} {
+          allow read: if request.auth != null;
+          allow create: if false;
+          allow update: if request.auth != null && request.auth.uid == uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ts'])
+            && recentTs(request.resource.data.ts);
+          allow delete: if request.auth != null && request.auth.uid == uid;
+        }
+        match /signals/{signalId} {
+          function inRoom(u) {
+            return exists(/databases/$(database)/documents/artifacts/anon-connect/public/data/groups/$(gid)/members/$(u));
+          }
+          allow read: if request.auth != null && resource.data.to == request.auth.uid;
+          allow create: if request.auth != null && inRoom(request.auth.uid)
+            && request.resource.data.keys().hasOnly(['from', 'to', 'type', 'data', 'ts'])
+            && request.resource.data.from == request.auth.uid
+            && request.resource.data.to is string && request.resource.data.to.size() <= 128
+            && inRoom(request.resource.data.to)
+            && request.resource.data.type in ['offer', 'answer', 'candidate', 'bye']
+            && request.resource.data.ts is number
+            && (request.resource.data.get('data', null) == null
+                || (request.resource.data.data is map
+                    && request.resource.data.data.keys().hasOnly(['type', 'sdp', 'candidate', 'sdpMid', 'sdpMLineIndex', 'usernameFragment'])
+                    && request.resource.data.data.get('sdp', '') is string && request.resource.data.data.get('sdp', '').size() <= 20000
+                    && request.resource.data.data.get('candidate', '') is string && request.resource.data.data.get('candidate', '').size() <= 2000));
+          allow delete: if request.auth != null && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid);
+        }
+      }
+
       // ---------------- Reports ----------------
       // Write-only for clients; moderators read them in the console / Admin SDK.
       // You can only report someone you were actually in a room with.
@@ -306,7 +341,10 @@ service cloud.firestore {
           && request.resource.data.ts == request.time
           && request.resource.data.reason in ['sexual', 'minor', 'harassment', 'spam', 'other', 'auto-nudity']
           && request.resource.data.roomId is string
-          && get(/databases/$(database)/documents/artifacts/anon-connect/public/data/rooms/$(request.resource.data.roomId)).data.users.hasAll([request.auth.uid, request.resource.data.reported]);
+          && (exists(/databases/$(database)/documents/artifacts/anon-connect/public/data/rooms/$(request.resource.data.roomId))
+              ? get(/databases/$(database)/documents/artifacts/anon-connect/public/data/rooms/$(request.resource.data.roomId)).data.users.hasAll([request.auth.uid, request.resource.data.reported])
+              : (exists(/databases/$(database)/documents/artifacts/anon-connect/public/data/groups/$(request.resource.data.roomId)/members/$(request.auth.uid))
+                 && exists(/databases/$(database)/documents/artifacts/anon-connect/public/data/groups/$(request.resource.data.roomId)/members/$(request.resource.data.reported))));
       }
     }
   }

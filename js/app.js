@@ -19,6 +19,8 @@ import { THEMES, OPEN, themeId, themeById, isBusy, nextBusy, featured, scheduleT
 import { sanitizeProgress, recordChat, levelFor, streakNow, progressLine } from './progress.js';
 import { createI18n, UI_LANGS, sanitizeUiLang, guessUiLang } from './i18n.js';
 import { STICKERS, GIFTS, parseSticker, parseGift, stickerById, giftById, stickerURL } from './stickers.js';
+import { createGroupUi } from './groupui.js';
+import { createLocalGroups, createFirebaseGroups } from './groups.js';
 import { REVEAL_AFTER_MS, createReveal, buildCard, sanitizeContact } from './reveal.js';
 import { pushSupported, pushPermission, enablePush, disablePush, announceOnline } from './push.js';
 import { REACTIONS, reactionById, parseReaction, takeBudget, spriteURL, MAX_BURST, HOLD_MAX, SEND_CAP, RECEIVE_CAP } from './reactions.js';
@@ -130,6 +132,7 @@ const el = {
     shieldSkip: $('shieldSkip'), shieldReport: $('shieldReport'), fxBtn: $('fxBtn'), fxPanel: $('fxPanel'), fxClose: $('fxClose'), fxStatus: $('fxStatus'),
     round: $('round'), roundFill: $('roundFill'), roundTime: $('roundTime'), roundNote: $('roundNote'), extendBtn: $('extendBtn'),
     revealSheet: $('revealSheet'), revealBio: $('revealBio'), revealContact: $('revealContact'), revealShare: $('revealShare'), revealCancel: $('revealCancel'),
+    groupBtn: $('groupBtn'),
     partnerAge: $('partnerAge'), reportEvidence: $('reportEvidence'),
     roomBtn: $('roomBtn'), roomSummary: $('roomSummary'), roomSheet: $('roomSheet'), roomList: $('roomList'),
     progressLine: $('progressLine'), levelName: $('levelName'), levelFill: $('levelFill'),
@@ -2192,7 +2195,7 @@ const reportTarget = () => S.session || S.last || null;
 let reportFor = null; // fixed when the sheet opens, so a new match can never be reported by mistake
 /** opts.evidence: the text of one message the person is reporting. It is shown to them, and sent with the report. */
 function openReport(opts = {}) {
-    const t = reportTarget();
+    const t = opts.target || reportTarget();
     if (!t) { toast('Too late to report this person.', true); return; }
     const evidence = typeof opts.evidence === 'string' ? opts.evidence.trim().slice(0, REPORT_EVIDENCE_MAX) : '';
     reportFor = { partnerId: t.partnerId, roomId: t.roomId, nick: t.partner?.nick || t.nick || 'Stranger', live: t === S.session, evidence };
@@ -2924,6 +2927,41 @@ if (stickyStart) {
     stickyStart.onclick = () => el.startBtn.click();
     sync();
 }
+
+// ---- Group rooms (js/groups.js, js/groupui.js) ----
+const groupUi = createGroupUi({
+    toast, getGuard, threshold: SAFETY.blurThreshold, selfThreshold: SAFETY.selfThreshold,
+    applyAvatar: (node, p) => applyAvatar(node, p),
+    nick: () => S.nick, avatar: () => S.avatar, selfId: () => S.transport.uid,
+    nickOf: v => sanitizeHandle(v) || 'Guest', avatarOf: v => sanitizeAvatar(v),
+    cleanText: t => maskProfanity(maskContact(String(t))),
+    iceConfig: () => iceConfig(),
+    chime: () => SOUND.message(),
+    mediaError: (e, m) => mediaErrorText(e, m),
+    makeBackend: () => (S.transport.kind === 'firebase' ? createFirebaseGroups(S.transport, { callable, region: PREMIUM_CFG.functionsRegion }) : createLocalGroups(S.transport.uid)),
+    block: id => { S.blocked.add(id); store.set('blocked', [...S.blocked].slice(-200)); },
+    reportPerson: target => openReport({ target }),
+    selfViolation: async () => {
+        const res = access ? await access.report('nudity-strike').catch(() => null) : null;
+        if (res && !res.allowed) { applyAccess(res); return; }
+        toast('Your camera was turned off: nudity detected.', true);
+    },
+    onClose: () => { el.welcome.classList.remove('hidden'); },
+});
+el.groupBtn.onclick = async () => {
+    if (!el.ageCheck.checked) { toast('Please confirm you are 18+ to continue.', true); el.ageCheck.focus(); return; }
+    if (access) {
+        const st = await access.fresh().catch(e => (console.warn('access check failed', e), null));
+        if (st && applyAccess(st)) return;
+    }
+    if (!ageVerified()) { toast('Verify your age first: press “Start chatting” once.', true); return; }
+    S.nick = sanitizeHandle(el.nickInput.value) || S.nick || generateHandle();
+    el.nickInput.value = S.nick;
+    store.set('nick', S.nick);
+    stopMedia();
+    el.welcome.classList.add('hidden');
+    groupUi.open();
+};
 
 el.leaveBtn.onclick = () => {
     S.searchAbort?.abort();

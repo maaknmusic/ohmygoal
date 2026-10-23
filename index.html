@@ -170,6 +170,12 @@
                         <svg class="lp-i lp-chev" aria-hidden="true"><use href="#lp-i-chev"/></svg>
                     </button>
 
+                    <button type="button" id="groupBtn" class="lp-prefs">
+                        <svg class="lp-i lp-prefs-ico" aria-hidden="true"><use href="#lp-i-users"/></svg>
+                        <span class="lp-prefs-main"><b>Group rooms</b><span class="lp-prefs-sum">Up to 8 people on voice · 4 on video</span></span>
+                        <svg class="lp-i lp-chev" aria-hidden="true"><use href="#lp-i-chev"/></svg>
+                    </button>
+
                     <label class="lp-consent">
                         <input type="checkbox" id="ageCheck">
                         <span class="lp-consent-text">I confirm I am 18+ and accept the <a href="legal.html#terms" target="_blank" rel="noopener">rules</a></span>
@@ -442,19 +448,19 @@
     <section class="lp-sec" id="rooms" aria-labelledby="roomsTitle">
         <div class="lp-wrap">
             <header class="lp-head reveal">
-                <span class="lp-eyebrow">Topic rooms <span class="lp-soon lp-soon--inline">Coming soon</span></span>
-                <h2 id="roomsTitle" class="lp-h2">Prefer a crowd? Rooms are on the way.</h2>
-                <p class="lp-lede">Public group-text rooms built around what people love, with the same report, block and safety tools as a one-on-one chat. We're still building them, so none are open yet.</p>
+                <span class="lp-eyebrow">Group rooms <span class="lp-soon lp-soon--inline">Beta</span></span>
+                <h2 id="roomsTitle" class="lp-h2">Prefer a crowd? Group rooms are open.</h2>
+                <p class="lp-lede">Talk with up to 8 people about something you all like: voice rooms hold 8, video rooms hold 4, and there is a chat in every room. Same report, block and safety tools as a one-on-one chat. Tap “Group rooms” on the start card to join one.</p>
             </header>
             <ul class="lp-rooms">
-                <li class="lp-room reveal" style="--d:0"><span class="lp-room-e">🏏</span><b>Cricket</b><span>Match-day banter and hot takes</span><em>Coming soon</em></li>
-                <li class="lp-room reveal" style="--d:1"><span class="lp-room-e">🎬</span><b>Bollywood</b><span>Songs, films and fan wars</span><em>Coming soon</em></li>
-                <li class="lp-room reveal" style="--d:2"><span class="lp-room-e">🌙</span><b>Late night</b><span>For the night owls</span><em>Coming soon</em></li>
-                <li class="lp-room reveal" style="--d:3"><span class="lp-room-e">💻</span><b>Coding</b><span>Bugs, side projects, chai breaks</span><em>Coming soon</em></li>
-                <li class="lp-room reveal" style="--d:0"><span class="lp-room-e">🎵</span><b>Music</b><span>What's on your playlist?</span><em>Coming soon</em></li>
-                <li class="lp-room reveal" style="--d:1"><span class="lp-room-e">📚</span><b>Study</b><span>Quiet company while you grind</span><em>Coming soon</em></li>
-                <li class="lp-room reveal" style="--d:2"><span class="lp-room-e">🎮</span><b>Gaming</b><span>Squads, strategies, scores</span><em>Coming soon</em></li>
-                <li class="lp-room reveal" style="--d:3"><span class="lp-room-e">🇮🇳</span><b>Hindi</b><span>Hindi mein baat-cheet</span><em>Coming soon</em></li>
+                <li class="lp-room reveal" style="--d:0"><span class="lp-room-e">🏏</span><b>Cricket</b><span>Match-day banter and hot takes</span><em>Open</em></li>
+                <li class="lp-room reveal" style="--d:1"><span class="lp-room-e">🎬</span><b>Bollywood</b><span>Songs, films and fan wars</span><em>Open</em></li>
+                <li class="lp-room reveal" style="--d:2"><span class="lp-room-e">🌙</span><b>Late night</b><span>For the night owls</span><em>Open</em></li>
+                <li class="lp-room reveal" style="--d:3"><span class="lp-room-e">💻</span><b>Coding</b><span>Bugs, side projects, chai breaks</span><em>Open</em></li>
+                <li class="lp-room reveal" style="--d:0"><span class="lp-room-e">🎵</span><b>Music</b><span>What's on your playlist?</span><em>Open</em></li>
+                <li class="lp-room reveal" style="--d:1"><span class="lp-room-e">📚</span><b>Study</b><span>Quiet company while you grind</span><em>Open</em></li>
+                <li class="lp-room reveal" style="--d:2"><span class="lp-room-e">🎮</span><b>Gaming</b><span>Squads, strategies, scores</span><em>Open</em></li>
+                <li class="lp-room reveal" style="--d:3"><span class="lp-room-e">🇮🇳</span><b>Hindi</b><span>Hindi mein baat-cheet</span><em>Open</em></li>
             </ul>
             <p class="lp-note reveal">Missing a room you'd use? <a href="legal.html#contact">Tell us</a>.</p>
         </div>
@@ -629,8 +635,8 @@
                     <p>Yes. It works in a modern browser on Android, iPhone and desktop, and you can pin it to your home screen. Video needs a camera and a steady connection. Text chat is lighter if your data is low.</p>
                 </details>
                 <details name="lp-faq">
-                    <summary>When do voice mode and rooms arrive?</summary>
-                    <p>We're working on both. They're marked “coming soon” until they're ready, and we won't promise dates we can't keep.</p>
+                    <summary>Are there group rooms?</summary>
+                    <p>Group rooms are open as a beta: voice rooms for up to 8 people and video rooms for up to 4. Tell us what you'd like to see next.</p>
                 </details>
             </div>
         </div>
@@ -819,6 +825,33 @@
     </main>
 
     <!-- ===================== CHAT ===================== -->
+    <main id="groups" class="groups hidden" aria-label="Group rooms">
+        <div class="groups-head">
+            <button type="button" id="groupBack" class="btn btn-ghost btn-sm">Back</button>
+            <h2>Group rooms <span class="lp-soon lp-soon--inline">Beta</span></h2>
+        </div>
+        <section id="groupLobby">
+            <p class="hint">Talk with up to 8 people about something you all like. You’re connected directly to each person (nothing is recorded), and you can report or block anyone from their tile.</p>
+            <div class="segmented" role="group" aria-label="Room type">
+                <button type="button" class="seg active" data-gmode="voice" aria-pressed="true"><i class="icon" data-icon="mic"></i>Voice · up to 8</button>
+                <button type="button" class="seg" data-gmode="video" aria-pressed="false"><i class="icon" data-icon="video"></i>Video · up to 4</button>
+            </div>
+            <div id="groupTopics" class="group-topics"></div>
+        </section>
+        <section id="groupRoom" class="hidden">
+            <div class="group-bar"><b id="groupTitle"></b><span id="groupCount"></span><button type="button" id="groupLeave" class="btn btn-danger btn-sm">Leave</button></div>
+            <div id="groupGrid" class="group-grid"></div>
+            <div class="group-controls">
+                <button type="button" id="gMic" class="icon-btn" title="Mute microphone" aria-label="Mute microphone" aria-pressed="false"><i class="icon" data-icon="mic"></i></button>
+                <button type="button" id="gCam" class="icon-btn hidden" title="Turn camera off" aria-label="Turn camera off" aria-pressed="false"><i class="icon" data-icon="video"></i></button>
+            </div>
+            <div class="group-chat">
+                <div id="groupMessages" class="group-messages" aria-live="polite"></div>
+                <form id="groupForm" class="group-form"><input id="groupInput" maxlength="300" autocomplete="off" placeholder="Message the room…" aria-label="Message the room"><button class="btn btn-primary btn-sm" type="submit">Send</button></form>
+            </div>
+        </section>
+    </main>
+
     <main id="chat" class="hidden" data-phase="idle">
         <header class="chat-head" id="chatHead">
             <button id="exitBtn" class="icon-btn exit-btn" title="Leave chat" aria-label="Leave chat"><i class="icon" data-icon="chevronLeft"></i></button>

@@ -25,6 +25,8 @@ export { likeUser } from './likes.js';
 export { turnCredentials } from './turn.js';
 // Friend notifications (web push / Android).
 export { registerPush, unregisterPush, announceOnline, onFriendshipWritten, onFriendMessage } from './push.js';
+// Group rooms.
+export { joinGroup } from './groups.js';
 // Coins and gifts.
 export { getWallet, claimDaily, sendGift } from './wallet.js';
 // Live translate (Premium): Gemini on Vertex AI. See the header of translate.js for setup, quotas and cost.
