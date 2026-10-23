@@ -6,6 +6,7 @@
 // =====================================================================
 
 import { themeId } from './rooms.js';
+import { sanitizeLang } from './languages.js';
 
 const QUEUE_STALE_MS = 30000;
 const PRESENCE_BEAT_MS = 30000;
@@ -15,10 +16,22 @@ const PRESENCE_WINDOW_MS = 75000;
  * Both people's filters must accept each other.
  * profile = { gender: 'male'|'female'|'x', country: 'IN'|'', genderFilter: 'any'|'male'|'female', countryFilter: 'any'|'IN'|... }
  */
+/**
+ * How well two people fit for a language exchange: 2 = each speaks what the other is learning, 1 = they are learning the same
+ * language (and neither speaks it), 0 = no fit. Someone who only teaches is not a fit: an exchange has to give both something.
+ */
+export function exchangeScore(me = {}, them = {}) {
+    if (!me.lang || !me.learn || !them.lang || !them.learn) return 0;
+    if (me.lang === them.learn && me.learn === them.lang) return 2;
+    if (me.learn === them.learn && me.lang !== me.learn && them.lang !== them.learn) return 1;
+    return 0;
+}
+
 export function compatible(me = {}, them = {}) {
     const ok = (filter, value) => !filter || filter === 'any' || filter === value;
     // A themed room (Cricket night, Study hour...) only matches people in the same room; open chat only matches open chat.
     return (me.theme || '') === (them.theme || '')
+        && ((me.theme || '') !== 'langx' || exchangeScore(me, them) > 0)
         && ok(me.genderFilter, them.gender) && ok(them.genderFilter, me.gender)
         && ok(me.countryFilter, them.country) && ok(them.countryFilter, me.country);
 }
@@ -30,6 +43,7 @@ const profileFields = p => ({
     countryFilter: p?.countryFilter || 'any',
     premium: p?.premium === true,
     ...(themeId(p?.theme) ? { theme: themeId(p.theme) } : {}), // left out for open chat, so rules from before rooms still accept the entry
+    ...(themeId(p?.theme) === 'langx' ? { ...(sanitizeLang(p?.lang) ? { lang: sanitizeLang(p.lang) } : {}), ...(sanitizeLang(p?.learn) ? { learn: sanitizeLang(p.learn) } : {}) } : {}),
 });
 
 export async function createFirebaseTransport({ firebaseConfig, appId, initialAuthToken, emulators }) {
@@ -108,8 +122,9 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
                     && !blocked.includes(d.id) && !(x.blocked || []).includes(me())
                     && compatible(profile, x);
             })
-            // Premium (priority) entries are matched first, then shared interests, then longest waiting.
+            // Premium (priority) entries are matched first, then the best language fit, then shared interests, then longest waiting.
             .sort((a, b) => (b.data().premium === true ? 1 : 0) - (a.data().premium === true ? 1 : 0)
+                || exchangeScore(profile, b.data()) - exchangeScore(profile, a.data())
                 || shared(b.data()) - shared(a.data()) || a.data().ts - b.data().ts);
 
         const queueRef = myQueueRef();

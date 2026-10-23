@@ -56,7 +56,7 @@ test('nextBusy finds the next start, and never one in the past', () => {
     assert.equal(nextBusy(cricket, SUN(23, 59)), ist(2026, 10, 28, 19, 0)); // Sunday night -> next Wednesday
     assert.equal(nextBusy({ windows: [] }, WED(1, 0)), null);
     assert.equal(nextBusy(OPEN, WED(1, 0)), null);
-    for (const t of THEMES) for (let h = 0; h < 24 * 8; h += 5) { const now = WED(0, 0) + h * 3600000; assert.ok(nextBusy(t, now) > now, t.id); }
+    for (const t of THEMES.filter(x => x.windows)) for (let h = 0; h < 24 * 8; h += 5) { const now = WED(0, 0) + h * 3600000; assert.ok(nextBusy(t, now) > now, t.id); }
 });
 
 test('busyNow and featured', () => {
@@ -76,7 +76,7 @@ test('schedule text is readable', () => {
 });
 
 import fs from 'node:fs';
-import { compatible } from '/home/user/ohmygoal/js/transport.js';
+import { compatible, exchangeScore } from '/home/user/ohmygoal/js/transport.js';
 
 test('the database rules list exactly the themes in rooms.js', () => {
     const rules = fs.readFileSync('/home/user/ohmygoal/firestore.rules', 'utf8');
@@ -93,4 +93,23 @@ test('matching: same room or both open; never across rooms', () => {
     assert.equal(compatible({}, { theme: 'study' }), false);
     assert.equal(compatible({ theme: 'cricket' }, { theme: 'study' }), false);
     assert.equal(compatible({ theme: '' }, {}), true);
+});
+
+test('language exchange: a fit has to give both something', () => {
+    const hiEn = { theme: 'langx', lang: 'hi', learn: 'en' }, enHi = { theme: 'langx', lang: 'en', learn: 'hi' };
+    const taEn = { theme: 'langx', lang: 'ta', learn: 'en' }, taFr = { theme: 'langx', lang: 'ta', learn: 'fr' };
+    assert.equal(exchangeScore(hiEn, enHi), 2);          // each speaks what the other is learning
+    assert.equal(exchangeScore(enHi, hiEn), 2);
+    assert.equal(exchangeScore(hiEn, taEn), 1);          // both are learning English
+    assert.equal(exchangeScore(hiEn, taFr), 0);
+    assert.equal(exchangeScore({ lang: 'en', learn: 'hi' }, { lang: 'hi', learn: 'hi' }), 0);  // a native speaker who "learns" their own language is not a partner
+    assert.equal(exchangeScore({ lang: 'en', learn: 'en' }, { lang: 'hi', learn: 'en' }), 0);  // someone who only teaches is not a fit
+    assert.equal(exchangeScore({ lang: 'hi' }, { lang: 'en', learn: 'hi' }), 0);
+    assert.equal(exchangeScore({}, {}), 0);
+    assert.equal(exchangeScore(), 0);
+    assert.equal(compatible(hiEn, enHi), true);
+    assert.equal(compatible(hiEn, taEn), true);
+    assert.equal(compatible(hiEn, taFr), false);
+    assert.equal(compatible(hiEn, { theme: 'cricket' }), false);
+    assert.equal(compatible({ ...hiEn, theme: 'langx' }, { lang: 'en', learn: 'hi' }), false);  // the other person is not in the exchange
 });

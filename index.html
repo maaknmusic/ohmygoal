@@ -42,6 +42,7 @@
             <a href="#faq">FAQ</a>
         </nav>
         <div class="topbar-actions">
+            <select id="uiLang" class="ui-lang" aria-label="Language" title="Language"></select>
             <span id="onlineChip" class="chip online hidden"><span class="live-dot"></span><span id="onlineChipCount">0</span> online</span>
             <span id="modeChip" class="chip hidden"></span>
             <button id="premiumBtn" class="btn btn-sm btn-premium hidden" title="Premium">👑 <span id="premiumBtnText">Go Premium</span></button>
@@ -677,6 +678,13 @@
             <div class="sheet-body">
                 <p class="hint">Pick a room and you’ll only meet people who picked the same one, so there’s something to talk about from the first hello. Times are Indian Standard Time; every room can be joined at any time.</p>
                 <div id="roomList" class="room-list" role="radiogroup" aria-label="Room"></div>
+                <div id="langxForm" class="langx-form hidden">
+                    <p class="hint">Language exchange meets you with someone who speaks what you’re learning and is learning what you speak (or who is learning the same language as you).</p>
+                    <label class="lp-pf-h" for="speakSelect">I speak</label>
+                    <select id="speakSelect" class="input"></select>
+                    <label class="lp-pf-h" for="learnSelect">I want to practise</label>
+                    <select id="learnSelect" class="input"></select>
+                </div>
             </div>
         </div>
     </div>

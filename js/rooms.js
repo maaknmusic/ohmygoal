@@ -16,6 +16,8 @@ export const THEMES = Object.freeze([
     Object.freeze({ id: 'latenight', name: 'Late-night talks', blurb: 'Deep chats for night owls.', windows: [{ days: [0, 1, 2, 3, 4, 5, 6], from: 23, to: 27 }] }),
     Object.freeze({ id: 'gaming', name: 'Game night', blurb: 'Find a partner for the games built into chat, or talk about yours.', windows: [{ days: [5, 6], from: 21, to: 25 }] }),
     Object.freeze({ id: 'chill', name: 'Sunday chill', blurb: 'No agenda, good vibes.', windows: [{ days: [6, 0], from: 16, to: 19 }] }),
+    // Not a schedule but a way of matching: you speak one language and practise another, and meet someone who does the opposite.
+    Object.freeze({ id: 'langx', name: 'Language exchange', blurb: 'Practise a language with someone who speaks it, while you help with theirs.' }),
 ]);
 
 export const OPEN = Object.freeze({ id: '', name: 'Open chat', blurb: 'Anyone, about anything.' });

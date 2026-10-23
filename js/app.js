@@ -17,6 +17,7 @@ import { TIERS, createAdaptive, qualityNote, readSample } from './adaptive.js';
 import { mediaErrorText, matchFailure, connectionLostCopy, CAMERA_UNAVAILABLE } from './failures.js';
 import { THEMES, OPEN, themeId, themeById, isBusy, nextBusy, featured, scheduleText } from './rooms.js';
 import { sanitizeProgress, recordChat, levelFor, streakNow, progressLine } from './progress.js';
+import { createI18n, UI_LANGS, sanitizeUiLang, guessUiLang } from './i18n.js';
 import { REACTIONS, reactionById, parseReaction, takeBudget, spriteURL, MAX_BURST, HOLD_MAX, SEND_CAP, RECEIVE_CAP } from './reactions.js';
 import { LANGS, sanitizeLang, langNative, langLabel, guessLang } from './languages.js';
 import { createEngine, createDeviceProvider, parseChatMessage } from './translate.js';
@@ -185,6 +186,7 @@ const S = {
     blocked: new Set(store.get('blocked', [])),
     sound: store.get('sound', true),
     gender: store.get('gender', 'x'),
+    learn: sanitizeLang(store.get('learn', '')), // the language to practise in a language exchange
     theme: themeId(store.get('theme', '')), // the room picked on the start screen ('' = open chat)
     progress: sanitizeProgress(store.get('progress', null)),
     lang: sanitizeLang(store.get('lang', '')), // '' until the person picks one: the browser's language is only a suggestion
@@ -1073,7 +1075,7 @@ function attachChannel(sess, dc) {
         el.avatar.textContent = (sess.friend?.name || 'S')[0].toUpperCase();
         el.avatar.style.background = '';
         if (sess.friend && sess.role === 'offerer') friends?.clearCall(sess.friend.id);
-        sendData({ t: 'hello', nick: S.nick, avatar: S.avatar, loc: locOffer(), interests: S.interests, country: S.country, gender: S.gender, timed: S.timed, premium: isPremium(), ...(S.lang ? { lang: S.lang } : {}), ...(AGE.enabled && ageVerified() ? { age: 'checked' } : {}) });
+        sendData({ t: 'hello', nick: S.nick, avatar: S.avatar, loc: locOffer(), interests: S.interests, country: S.country, gender: S.gender, timed: S.timed, premium: isPremium(), ...(S.lang ? { lang: S.lang } : {}), ...(S.theme === 'langx' && S.learn ? { learn: S.learn } : {}), ...(AGE.enabled && ageVerified() ? { age: 'checked' } : {}) });
         if (S.timed && !sess.friend) startRound(sess);
         sendData({ t: 'av', muted: S.muted, camOff: S.camOff });
         sess.games = createGamesUi({
@@ -1152,6 +1154,13 @@ function renderMatchCard(p, shared) {
         speaks.appendChild(name);
         card.appendChild(speaks);
     }
+    if (p.learn && S.theme === 'langx') {
+        const prac = h('div', 'speaks', 'Practising ');
+        const pn = h('span', '', langNative(p.learn));
+        pn.lang = p.learn === 'zh-TW' ? 'zh-Hant' : p.learn;
+        prac.appendChild(pn);
+        card.appendChild(prac);
+    }
     if (p.adult) card.appendChild(h('div', 'age-line', '✓ 18+ checked on their device'));
     if (S.theme && !S.session?.friend) card.appendChild(h('div', 'room-line', `Room: ${themeById(S.theme).name}`));
     if (shared.length) {
@@ -1175,8 +1184,9 @@ function onPeerData(sess, msg) {
             const country = typeof msg.country === 'string' && /^[A-Z]{2}$/.test(msg.country) ? msg.country : '';
             const gender = ['male', 'female'].includes(msg.gender) ? msg.gender : '';
             const lang = sanitizeLang(msg.lang); // a code from our list, or '' (untrusted like everything else)
+            const learn = sanitizeLang(msg.learn);
             const adult = msg.age === 'checked'; // only that exact word; the chip says what it means (an on-device estimate), not that they are verified
-            sess.partner = { nick, interests, country, gender, avatar, lang, loc: msg.loc === true, adult };
+            sess.partner = { nick, interests, country, gender, avatar, lang, learn, loc: msg.loc === true, adult };
             el.partnerAge.classList.toggle('hidden', !adult);
             el.partnerName.textContent = nick;
             el.partnerFlag.textContent = country ? flagOf(country) : '';
@@ -2456,6 +2466,7 @@ function renderRooms() {
         return f?.busy ? `Open chat · ${f.theme.name} is busy now` : 'Open chat';
     })();
     el.roomBtn.classList.toggle('on', Boolean(S.theme));
+    renderLangx();
     el.roomList.replaceChildren(...[OPEN, ...THEMES].map(t => {
         const b = h('button', 'room-opt' + (t.id === S.theme ? ' on' : ''));
         b.type = 'button';
@@ -2467,10 +2478,27 @@ function renderRooms() {
         if (when) main.appendChild(when);
         b.appendChild(main);
         if (t.windows) b.appendChild(h('span', 'room-tag' + (busy(t) ? ' busy' : ''), busy(t) ? 'Busy now' : 'Join anytime'));
-        b.onclick = () => { setTheme(t.id); closeSheet(el.roomSheet); };
+        b.onclick = () => { setTheme(t.id); if (t.id !== 'langx') closeSheet(el.roomSheet); };
         return b;
     }));
 }
+const speakSelect = $('speakSelect'), learnSelect = $('learnSelect'), langxForm = $('langxForm');
+function renderLangx() {
+    langxForm.classList.toggle('hidden', S.theme !== 'langx');
+    for (const sel of [speakSelect, learnSelect]) {
+        if (sel.options.length) continue;
+        sel.add(new Option('Choose…', ''));
+        for (const l of [...LANGS].sort((a, b) => a.en.localeCompare(b.en))) {
+            const o = new Option(langLabel(l.code), l.code);
+            o.lang = l.code === 'zh-TW' ? 'zh-Hant' : l.code;
+            sel.add(o);
+        }
+    }
+    speakSelect.value = S.lang;
+    learnSelect.value = S.learn;
+}
+speakSelect.onchange = () => setLang(speakSelect.value);
+learnSelect.onchange = () => { S.learn = sanitizeLang(learnSelect.value); store.set('learn', S.learn); };
 function renderProgress() {
     const now = Date.now();
     const lv = levelFor(S.progress.xp);
@@ -2544,7 +2572,7 @@ el.tags.onclick = () => el.tagInput.focus();
 function myProfile() {
     const pro = isPremium();
     return {
-        gender: S.gender, country: S.country, premium: pro, theme: S.theme,
+        gender: S.gender, country: S.country, premium: pro, theme: S.theme, lang: S.lang, learn: S.learn,
         genderFilter: pro ? S.genderFilter : 'any', countryFilter: pro ? S.countryFilter : 'any',
     };
 }
@@ -2576,7 +2604,7 @@ function renderLang() {
     langSuggest.textContent = `Use ${langLabel(guess)}`;
     langSuggest.classList.toggle('hidden', Boolean(S.lang));
 }
-function setLang(code) { S.lang = sanitizeLang(code); store.set('lang', S.lang); renderLang(); lt?.refresh(); }
+function setLang(code) { S.lang = sanitizeLang(code); store.set('lang', S.lang); renderLang(); renderLangx(); lt?.refresh(); }
 langSelect.onchange = () => setLang(langSelect.value);
 langSuggest.onclick = () => setLang(browserLang());
 renderLang();
@@ -2617,6 +2645,12 @@ el.startBtn.onclick = async () => {
         const box = el.ageCheck.closest('label, .check') || el.ageCheck;
         box.classList.remove('nudge'); void box.offsetWidth; box.classList.add('nudge');
         el.ageCheck.focus();
+        return;
+    }
+    if (S.theme === 'langx' && (!S.lang || !S.learn || S.lang === S.learn)) {
+        toast('For a language exchange, pick the language you speak and a different one you want to practise.', true);
+        renderRooms();
+        openSheet(el.roomSheet);
         return;
     }
     S.nick = sanitizeHandle(el.nickInput.value) || generateHandle();
@@ -3271,6 +3305,22 @@ window.addEventListener('appinstalled', () => el.installBtn.classList.add('hidde
 // Boot
 // =====================================================================
 renderAccents();
+// Interface language: the page and app are written in English and translated in place (see js/i18n.js).
+const i18n = createI18n({ loadTable: code => import(`./i18n/${code}.js`).then(m => m.default) });
+const uiLangSelect = $('uiLang');
+for (const l of UI_LANGS) uiLangSelect.add(new Option(l.native, l.code));
+{
+    const saved = store.get('uiLang', null);
+    const first = sanitizeUiLang(saved ?? guessUiLang(navigator.languages));
+    uiLangSelect.value = first;
+    i18n.set(first).then(l => { uiLangSelect.value = l; });
+}
+uiLangSelect.onchange = async () => {
+    const l = await i18n.set(uiLangSelect.value);
+    uiLangSelect.value = l;
+    store.set('uiLang', l);
+};
+
 initLanding();
 setMode(S.mode);
 renderTags();

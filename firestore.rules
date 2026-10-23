@@ -87,7 +87,7 @@ service cloud.firestore {
       // ---------------- Matchmaking queue ----------------
       function validQueue(d) {
         return d.keys().hasOnly(['mode', 'interests', 'blocked', 'gender', 'country', 'genderFilter',
-                                 'countryFilter', 'premium', 'theme', 'ts', 'roomId'])
+                                 'countryFilter', 'premium', 'theme', 'lang', 'learn', 'ts', 'roomId'])
           && d.mode in ['video', 'voice', 'text']
           && d.get('interests', []) is list && d.get('interests', []).size() <= 5
           && d.get('interests', []).join(',').size() <= 140
@@ -98,7 +98,9 @@ service cloud.firestore {
           && d.get('genderFilter', 'any') in ['any', 'male', 'female']
           && d.get('countryFilter', 'any') is string && d.get('countryFilter', 'any').size() <= 3
           && d.get('premium', false) is bool
-          && d.get('theme', '') in ['', 'study', 'cricket', 'music', 'latenight', 'gaming', 'chill']
+          && d.get('theme', '') in ['', 'study', 'cricket', 'music', 'latenight', 'gaming', 'chill', 'langx']
+          && d.get('lang', '') is string && d.get('lang', '').size() <= 8
+          && d.get('learn', '') is string && d.get('learn', '').size() <= 8
           && d.get('roomId', null) == null
           && recentTs(d.ts);
       }
