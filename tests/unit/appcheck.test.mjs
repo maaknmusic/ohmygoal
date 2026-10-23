@@ -74,9 +74,9 @@ test('every callable function is created through callOpts, so the switch reaches
     assert.ok(total >= 18, `found only ${total} callable functions`);
 });
 
-test('the switch defaults to off, and the site key is empty until you paste one', () => {
+test('the switch defaults to off, and the site key in config.js looks like a real key (or is empty to keep App Check off)', () => {
     const env = fs.readFileSync('/home/user/ohmygoal/functions/.env', 'utf8');
     assert.match(env, /^ENFORCE_APP_CHECK=false$/m);
     const cfg = fs.readFileSync('/home/user/ohmygoal/config.js', 'utf8');
-    assert.match(cfg, /appCheck: \{ siteKey: '' \}/);
+    assert.match(cfg, /appCheck: \{ siteKey: '([\w-]{40})?' \}/);
 });
