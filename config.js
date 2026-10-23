@@ -16,6 +16,9 @@ window.APP_CONFIG = {
         appId: '1:719459235525:web:5886e6a4a5d5ee2ab122ac',
     },
     appId: 'anon-connect',
+    // Firebase App Check (bot protection). Paste the reCAPTCHA v3 SITE key here (it is public). Leave '' to keep it off.
+    // See README "Bots and App Check" for creating the key and turning enforcement on.
+    appCheck: { siteKey: '' },
     // STUN only here. The relay (Cloudflare TURN) credentials are short-lived and come from the turnCredentials Cloud
     // Function (key stored in Secret Manager via deploy.sh), so nothing relay-related is public in this file.
     iceServers: [

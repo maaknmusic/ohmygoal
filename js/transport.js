@@ -7,6 +7,7 @@
 
 import { themeId } from './rooms.js';
 import { sanitizeLang } from './languages.js';
+import { startAppCheck } from './appcheck.js';
 
 const QUEUE_STALE_MS = 30000;
 const PRESENCE_BEAT_MS = 30000;
@@ -46,7 +47,7 @@ const profileFields = p => ({
     ...(themeId(p?.theme) === 'langx' ? { ...(sanitizeLang(p?.lang) ? { lang: sanitizeLang(p.lang) } : {}), ...(sanitizeLang(p?.learn) ? { learn: sanitizeLang(p.learn) } : {}) } : {}),
 });
 
-export async function createFirebaseTransport({ firebaseConfig, appId, initialAuthToken, emulators }) {
+export async function createFirebaseTransport({ firebaseConfig, appId, initialAuthToken, emulators, appCheck }) {
     const v = '11.6.1';
     const [appMod, authMod, fs] = await Promise.all([
         import(`https://www.gstatic.com/firebasejs/${v}/firebase-app.js`),
@@ -58,6 +59,7 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
         onSnapshot, deleteDoc, addDoc, updateDoc, serverTimestamp, getCountFromServer } = fs;
 
     const app = appMod.initializeApp(firebaseConfig);
+    await startAppCheck(app, appCheck, { emulators }); // before anything talks to Firebase
     const auth = getAuth(app);
     const db = getFirestore(app);
     if (emulators) { // local testing only

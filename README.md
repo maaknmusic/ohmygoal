@@ -130,6 +130,21 @@ Until the API is enabled the function answers *Translation is unavailable right 
 
 **Language profile.** For a Google account the preferences are stored in `artifacts/<app>/public/data/profiles/{uid}`: readable and writable only by that account (and only with a Google sign-in), with a strict schema in `firestore.rules`. After signing in the app loads it (what the account holds wins; a missing document is created from the values on the device), and later edits are saved a moment after they are made. Anonymous accounts never write it.
 
+## Bots and App Check
+
+**Firebase App Check** makes every request to the database and the functions carry a short-lived token that only a real browser on your own website can get (from Google reCAPTCHA v3, invisible to people). Scripts that call the backend directly have no token and can be refused. It works alongside the age check, the rate limits and the bans; it does not replace them.
+
+It is built in but **off until you add a site key**, and then it only *counts* (monitor mode) until you switch enforcement on. Nobody is turned away by mistake.
+
+1. **Create the reCAPTCHA key.** Open https://www.google.com/recaptcha/admin/create, label it `OhMyGoal`, choose **Score based (v3)**, add the domains `ohmygoal.app`, `www.ohmygoal.app`, `ohmygoal.web.app` and `ohmygoal-c8a4a.firebaseapp.com`, accept the terms and submit. You get a **site key** (public) and a **secret key** (private).
+2. **Tell Firebase.** Firebase console → **App Check** → **Apps** → your web app → **reCAPTCHA** → paste the **secret key** → Save.
+3. **Put the site key on the website.** In `config.js` set `appCheck: { siteKey: 'your-site-key' }`, commit, then publish: `bash deploy.sh` (functions and website) or `npx --yes firebase-tools@15.32.1 deploy --only hosting --project ohmygoal-c8a4a`.
+4. **Watch it (a few days).** Firebase console → App Check → **APIs** → *Cloud Functions* and *Cloud Firestore*. You see how many requests are **verified** (real browsers) and **unverified** (old cached pages, scripts, bots). Wait until nearly all are verified.
+5. **Enforce.** First *Cloud Firestore* → **Enforce** (console button). Then for the functions set `ENFORCE_APP_CHECK=true` in `functions/.env` and run `bash deploy.sh`. Unverified calls are refused from then on.
+6. **If something goes wrong,** press **Unenforce** in the console (instant) and set `ENFORCE_APP_CHECK=false` again.
+
+Good to know: people whose browser blocks Google reCAPTCHA (some strict content blockers) can no longer chat once enforcement is on, so keep an eye on the "unverified" number first. The payment webhook and the database triggers are server to server and are not affected. Sign-in itself (Firebase Authentication) is not covered by App Check on the free plan. For testing on your own computer, App Check needs a *debug token* (Firebase docs: "Use App Check with the debug provider in web apps").
+
 ## Page language
 
 The menu at the top lets people read the whole interface in **English, Hindi and eight more Indian languages, plus Spanish, Portuguese, Arabic, Indonesian, Turkish, Russian, French and German**. The first visit follows the browser's language (a phone set to Spanish opens in Spanish); the choice is remembered on that device. It does not depend on the visitor's country. Arabic switches the page to right-to-left.

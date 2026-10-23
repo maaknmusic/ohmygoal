@@ -17,7 +17,7 @@ import { logger } from 'firebase-functions/v2';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { Timestamp } from 'firebase-admin/firestore';
-import { db, publicDoc, privateDoc, privateCol, publicCol } from './common.js';
+import { db, publicDoc, privateDoc, privateCol, publicCol, callOpts } from './common.js';
 import { markActive } from './stats.js';
 
 export const ADMIN_EMAILS = defineSecret('ADMIN_EMAILS'); // comma-separated Google emails
@@ -204,7 +204,7 @@ async function refreshAccess(id) {
 
 // ---------------- public callables ----------------
 
-export const checkAccess = onCall(async request => {
+export const checkAccess = onCall(callOpts(), async request => {
     const who = identity(request);
     const status = await refreshAccess(who);
     if (status?.allowed) await markActive(who.uid);
@@ -213,7 +213,7 @@ export const checkAccess = onCall(async request => {
     return status;
 });
 
-export const reportViolation = onCall(async request => {
+export const reportViolation = onCall(callOpts(), async request => {
     const id = identity(request);
     const type = request.data?.type;
     // Tries and strikes are counted per account and device, not per IP: many people can share
@@ -245,7 +245,7 @@ export const reportViolation = onCall(async request => {
     return refreshAccess(id);
 });
 
-export const requestUnban = onCall(async request => {
+export const requestUnban = onCall(callOpts(), async request => {
     const id = identity(request);
     const message = String(request.data?.message || '').trim().slice(0, 600);
     const contact = String(request.data?.contact || '').trim().slice(0, 120);
@@ -339,7 +339,7 @@ async function sweepOldRecords() {
     }
 }
 
-export const admin = onCall({ secrets: [ADMIN_EMAILS] }, async request => {
+export const admin = onCall(callOpts({ secrets: [ADMIN_EMAILS] }), async request => {
     const email = requireAdmin(request);
     const { action } = request.data || {};
     const log = (what, details) => privateCol('adminLog').add({ at: Date.now(), by: email, what, details: details || {} });

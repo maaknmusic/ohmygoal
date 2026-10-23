@@ -7,7 +7,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
-import { db, publicDoc, publicCol, privateDoc, privateCol } from './common.js';
+import { db, publicDoc, publicCol, privateDoc, privateCol, callOpts } from './common.js';
 import { ADMIN_EMAILS, requireAdmin } from './moderation.js';
 import { istDay, statsRef } from './stats.js';
 import { MAX_COINS } from './gifts.js';
@@ -183,7 +183,7 @@ async function lookup(q) {
     };
 }
 
-export const adminAnalytics = onCall({ secrets: [ADMIN_EMAILS], timeoutSeconds: 60, memory: '512MiB' }, async request => {
+export const adminAnalytics = onCall(callOpts({ secrets: [ADMIN_EMAILS], timeoutSeconds: 60, memory: '512MiB' }), async request => {
     const email = requireAdmin(request);
     const { action } = request.data || {};
     const now = Date.now();

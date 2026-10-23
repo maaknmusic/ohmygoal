@@ -7,7 +7,7 @@
 // A member nobody has heard from for STALE_MS has left. Rooms that stay empty are removed when somebody next joins.
 // =====================================================================
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { db, publicCol, publicDoc, privateDoc } from './common.js';
+import { db, publicCol, publicDoc, privateDoc, callOpts } from './common.js';
 import { bump } from './stats.js';
 
 export const TOPICS = Object.freeze(['cricket', 'music', 'bollywood', 'gaming', 'movies', 'travel', 'coding', 'study', 'anime', 'fitness', 'hindi', 'latenight']);
@@ -49,7 +49,7 @@ async function freshMembers(gid, now) {
     return fresh;
 }
 
-export const joinGroup = onCall(async request => {
+export const joinGroup = onCall(callOpts(), async request => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Please reload the page.');
     const uid = request.auth.uid;
     const { topic, mode } = request.data || {};

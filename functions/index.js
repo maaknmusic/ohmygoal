@@ -13,7 +13,7 @@ import crypto from 'node:crypto';
 import { logger } from 'firebase-functions/v2';
 import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret, defineString } from 'firebase-functions/params';
-import { db, APP_ID } from './common.js';
+import { db, APP_ID, callOpts } from './common.js';
 import { COIN_PACKS } from './gifts.js';
 import { addCoinsTx, walletDoc } from './wallet.js';
 
@@ -177,7 +177,7 @@ async function confirmCaptured(paymentId, orderId, order) {
     }
 }
 
-export const createOrder = onCall({ secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET] }, async request => {
+export const createOrder = onCall(callOpts({ secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET] }), async request => {
     if (request.data?.tip !== undefined) return createTipOrder(request);
     if (request.data?.coins !== undefined) return createCoinOrder(request);
     const uid = requireGoogleUser(request);
@@ -241,7 +241,7 @@ async function createTipOrder(request) {
     return { orderId: order.id, amount, currency: CURRENCY, plan: 'tip', label: 'Tip for OhMyGoal', keyId: RAZORPAY_KEY_ID.value() };
 }
 
-export const verifyPayment = onCall({ secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET] }, async request => {
+export const verifyPayment = onCall(callOpts({ secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET] }), async request => {
     const uid = requireUser(request);
     const { orderId, paymentId, signature } = request.data || {};
     if (![orderId, paymentId, signature].every(v => typeof v === 'string' && v.length > 0 && v.length < 200)) {
@@ -268,7 +268,7 @@ export const verifyPayment = onCall({ secrets: [RAZORPAY_KEY_ID, RAZORPAY_KEY_SE
  * Is my chat partner's Premium badge real? Answers yes/no, and only about the other person in a room the caller is in,
  * so Premium status (and when it ends) can't be looked up for arbitrary users.
  */
-export const partnerPremium = onCall(async request => {
+export const partnerPremium = onCall(callOpts(), async request => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Please reload the page.');
     const roomId = request.data?.roomId;
     if (typeof roomId !== 'string' || !/^[A-Za-z0-9]{10,40}$/.test(roomId)) throw new HttpsError('invalid-argument', 'Unknown chat.');

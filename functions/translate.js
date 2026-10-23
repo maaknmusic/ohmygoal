@@ -54,7 +54,7 @@ import { logger } from 'firebase-functions/v2';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineString } from 'firebase-functions/params';
 import { GoogleAuth } from 'google-auth-library';
-import { db, publicDoc, privateDoc } from './common.js';
+import { db, publicDoc, privateDoc, callOpts } from './common.js';
 import { LANGS, LANG_CODES, langName } from './languages.js';
 
 const MINUTE = 60000;
@@ -383,7 +383,7 @@ const answer = (text, target, { text: translated, source }) => {
     return { text: same ? text : translated, source, target, same };
 };
 
-export const translateText = onCall({ timeoutSeconds: 20 }, async request => {
+export const translateText = onCall(callOpts({ timeoutSeconds: 20 }), async request => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Please reload the page.');
     const uid = request.auth.uid;
     const { text, target, source } = parseRequest(request.data);

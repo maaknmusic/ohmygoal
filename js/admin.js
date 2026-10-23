@@ -6,6 +6,7 @@
 const CFG = window.APP_CONFIG || {};
 const V = '11.6.1';
 import { createAnalytics } from './admin-analytics.js';
+import { startAppCheck } from './appcheck.js';
 
 const [appMod, authMod, fnMod] = await Promise.all([
     import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`),
@@ -14,6 +15,7 @@ const [appMod, authMod, fnMod] = await Promise.all([
 ]);
 // A separate app instance, so signing in here never replaces the chat app's account in this browser.
 const app = appMod.initializeApp(CFG.firebase, 'admin');
+await startAppCheck(app, CFG.appCheck, { emulators: CFG.emulators });
 const auth = authMod.getAuth(app);
 const functions = fnMod.getFunctions(app, CFG.premium?.functionsRegion || 'asia-south1');
 if (CFG.emulators) { // local testing only

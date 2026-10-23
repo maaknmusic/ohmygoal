@@ -3650,7 +3650,7 @@ detectCountry(store).then(code => { S.country = code; renderCountryFilter(); });
 el.startBtn.textContent = 'Connecting…';
 try {
     S.transport = firebaseConfig
-        ? await createFirebaseTransport({ firebaseConfig, appId, initialAuthToken, emulators: CFG.emulators })
+        ? await createFirebaseTransport({ firebaseConfig, appId, initialAuthToken, emulators: CFG.emulators, appCheck: CFG.appCheck })
         : createLocalTransport();
     el.demoNote.classList.toggle('hidden', S.transport.kind !== 'local');
     el.startBtn.textContent = 'Start chatting';

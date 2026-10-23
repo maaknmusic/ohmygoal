@@ -9,7 +9,7 @@
 import { logger } from 'firebase-functions/v2';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret, defineString } from 'firebase-functions/params';
-import { publicDoc } from './common.js';
+import { publicDoc, callOpts } from './common.js';
 
 const CF_TURN_KEY_ID = defineSecret('CF_TURN_KEY_ID');
 const CF_TURN_API_TOKEN = defineSecret('CF_TURN_API_TOKEN');
@@ -58,7 +58,7 @@ async function shared() {
     return inflight;
 }
 
-export const turnCredentials = onCall({ secrets: [CF_TURN_KEY_ID, CF_TURN_API_TOKEN] }, async request => {
+export const turnCredentials = onCall(callOpts({ secrets: [CF_TURN_KEY_ID, CF_TURN_API_TOKEN] }), async request => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Please reload the page.');
     const uid = request.auth.uid;
     const pass = (await publicDoc(`access/${uid}`).get()).data();

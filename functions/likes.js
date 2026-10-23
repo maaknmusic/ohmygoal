@@ -13,7 +13,7 @@
 // =====================================================================
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { FieldValue } from 'firebase-admin/firestore';
-import { db, publicDoc, privateDoc } from './common.js';
+import { db, publicDoc, privateDoc, callOpts } from './common.js';
 import { bump } from './stats.js';
 
 const MIN = 60000;
@@ -37,7 +37,7 @@ function createdMs(created) {
 /** Timestamps from the last 24 h (a true rolling window, unlike a counter that resets at a fixed time). */
 const recent = (times, now) => (Array.isArray(times) ? times : []).filter(t => typeof t === 'number' && t > now - DAY);
 
-export const likeUser = onCall(async request => {
+export const likeUser = onCall(callOpts(), async request => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Please reload the page.');
     const uid = request.auth.uid;
     // Only `roomId` is read; any other field a client sends (a target uid, say) is ignored.

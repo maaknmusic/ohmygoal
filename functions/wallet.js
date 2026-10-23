@@ -8,7 +8,7 @@
 // =====================================================================
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { FieldValue } from 'firebase-admin/firestore';
-import { db, publicDoc, privateDoc } from './common.js';
+import { db, publicDoc, privateDoc, callOpts } from './common.js';
 import { bump } from './stats.js';
 import { GIFTS, DAILY_COINS, DAILY_COINS_PREMIUM, GIFT_HOURLY_CAP, MAX_COINS } from './gifts.js';
 
@@ -27,13 +27,13 @@ function requireGoogle(request) {
 
 const isPremium = async uid => ((await publicDoc(`entitlements/${uid}`).get()).data()?.premiumUntil || 0) > Date.now();
 
-export const getWallet = onCall(async request => {
+export const getWallet = onCall(callOpts(), async request => {
     const uid = requireGoogle(request);
     const w = (await walletRef(uid).get()).data() || {};
     return { coins: Number.isInteger(w.coins) ? w.coins : 0, dailyAvailable: w.dailyDay !== today(Date.now()) };
 });
 
-export const claimDaily = onCall(async request => {
+export const claimDaily = onCall(callOpts(), async request => {
     const uid = requireGoogle(request);
     const bonus = (await isPremium(uid)) ? DAILY_COINS_PREMIUM : DAILY_COINS;
     const day = today(Date.now());
@@ -47,7 +47,7 @@ export const claimDaily = onCall(async request => {
     });
 });
 
-export const sendGift = onCall(async request => {
+export const sendGift = onCall(callOpts(), async request => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Please reload the page.');
     const uid = requireGoogle(request);
     const { roomId, gift } = request.data || {};

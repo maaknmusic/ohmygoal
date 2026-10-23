@@ -17,7 +17,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { onDocumentWritten, onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { defineString } from 'firebase-functions/params';
 import { getMessaging } from 'firebase-admin/messaging';
-import { db, publicCol, publicDoc, privateDoc, privateCol } from './common.js';
+import { db, publicCol, publicDoc, privateDoc, privateCol, callOpts } from './common.js';
 
 const PUSH_MODE = defineString('PUSH_MODE', { default: 'live' });
 
@@ -108,7 +108,7 @@ function requireGoogle(request) {
     return request.auth.uid;
 }
 
-export const registerPush = onCall(async request => {
+export const registerPush = onCall(callOpts(), async request => {
     const uid = requireGoogle(request);
     const token = cleanToken(request.data?.token);
     if (!token) throw new HttpsError('invalid-argument', 'Not a valid notification token.');
@@ -126,7 +126,7 @@ export const registerPush = onCall(async request => {
     return { ok: true };
 });
 
-export const unregisterPush = onCall(async request => {
+export const unregisterPush = onCall(callOpts(), async request => {
     const uid = requireGoogle(request);
     const ref = pushDoc(uid);
     const token = cleanToken(request.data?.token);
@@ -139,7 +139,7 @@ export const unregisterPush = onCall(async request => {
 });
 
 /** "I'm online": tell friends who asked to hear it, if I chose to share it. At most once every 30 minutes. */
-export const announceOnline = onCall(async request => {
+export const announceOnline = onCall(callOpts(), async request => {
     const uid = requireGoogle(request);
     const mine = (await pushDoc(uid).get()).data();
     if (!mine?.shareOnline) return { sent: 0 };
