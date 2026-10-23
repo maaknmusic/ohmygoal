@@ -13,6 +13,8 @@ import { scanMessage, maskContact } from './shield.js';
 import { meterStream } from './audio-meter.js';
 import { callable } from './cloud.js';
 import { initLanding } from './landing.js';
+import { TIERS, createAdaptive, qualityNote, readSample } from './adaptive.js';
+import { mediaErrorText, matchFailure, connectionLostCopy, CAMERA_UNAVAILABLE } from './failures.js';
 import { REACTIONS, reactionById, parseReaction, takeBudget, spriteURL, MAX_BURST, HOLD_MAX, SEND_CAP, RECEIVE_CAP } from './reactions.js';
 import { LANGS, sanitizeLang, langNative, langLabel, guessLang } from './languages.js';
 import { createEngine, createDeviceProvider, parseChatMessage } from './translate.js';
@@ -363,25 +365,37 @@ const EMOJI_ONLY = /^(?=.*\p{Extended_Pictographic})(?:\p{Extended_Pictographic}
 let mediaGen = 0;       // bumped when media is stopped: a request finishing after that must throw its stream away
 let mediaPending = null;
 async function ensureMedia() {
-    const wantVideo = S.mode === 'video';
+    let wantVideo = S.mode === 'video';
     if (S.localStream && (!wantVideo || S.localStream.getVideoTracks().length)) return true;
     if (S.localStream) stopMedia(); // e.g. an audio-only stream left over from a voice chat
     if (mediaPending) return mediaPending;
     const gen = mediaGen;
     mediaPending = (async () => {
         let stream;
+        const gum = video => navigator.mediaDevices.getUserMedia({
+            video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } : false,
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        });
         try {
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: wantVideo ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } : false,
-                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-            });
+            stream = await gum(wantVideo);
         } catch (e) {
             console.warn('getUserMedia failed', e);
-            if (gen === mediaGen) {
-                toast(S.mode === 'voice' ? 'Microphone unavailable, switched to text only.' : 'Camera/microphone unavailable, switched to text only.', true);
-                setMode('text');
+            // The camera is missing or busy but the microphone may be fine: a voice chat beats no chat.
+            if (wantVideo && gen === mediaGen && CAMERA_UNAVAILABLE.has(e?.name)) {
+                try {
+                    stream = await gum(false);
+                    wantVideo = false;
+                    setMode('voice');
+                    toast(`${mediaErrorText(e, 'video')} Switched to voice chat.`, true);
+                } catch { stream = null; }
             }
-            return false;
+            if (!stream) {
+                if (gen === mediaGen) {
+                    toast(`${mediaErrorText(e, S.mode)} You’re in text chat for now.`, true);
+                    setMode('text');
+                }
+                return false;
+            }
         }
         // The person left, or changed mode, while the permission prompt was open: don't keep the camera or mic.
         if (gen !== mediaGen || S.mode === 'text' || (S.mode === 'video') !== wantVideo || S.localStream) {
@@ -783,34 +797,39 @@ async function startSearch(note) {
 
     const ac = new AbortController();
     S.searchAbort = ac;
-    if (S.loc) {
-        // Permission was granted earlier, so this is quick; don't let a slow GPS hold up the search for long.
-        await Promise.race([
+    S.timing = { searchAt: Date.now() };
+    const stale = () => ac.signal.aborted || S.searchAbort !== ac;
+    // The matching queue only accepts people with a current access pass (see firestore.rules). Normally the answer is
+    // already cached from page load; if not, ask before anything prompts for a camera (so a banned person isn't asked).
+    if (access && !access.status) {
+        const st = await access.fresh().catch(e => (console.warn('access check failed', e), null));
+        if (stale()) return;
+        if (st && applyAccess(st)) return;
+    }
+    // Everything that has to be ready before we can queue runs at the same time, not one after the other:
+    // the approximate location, the access pass + relay credentials, and the camera / microphone.
+    await Promise.all([
+        S.loc ? Promise.race([
+            // Permission was granted earlier, so this is quick; don't let a slow GPS hold up the search for long.
             refreshCell().catch(e => { S.loc = false; myCell = null; el.locCheck.checked = false; store.set('loc', false); toast(LOC_ERRORS[e?.code] || 'Distance turned off.', true); }),
             new Promise(r => setTimeout(r, 4000)),
-        ]);
-        if (ac.signal.aborted || S.searchAbort !== ac) return;
-    }
-    // The matching queue only accepts people with a current access pass (see firestore.rules).
-    if (access) {
-        const st = await access.fresh().catch(e => (console.warn('access check failed', e), null));
-        if (ac.signal.aborted || S.searchAbort !== ac) return;
-        if (st && applyAccess(st)) return;
-        await Promise.race([refreshIce(), new Promise(r => setTimeout(r, 4000))]);
-        if (ac.signal.aborted || S.searchAbort !== ac) return;
-    }
+        ]) : null,
+        access ? (async () => {
+            const st = await access.fresh().catch(e => (console.warn('access check failed', e), null));
+            if (st && applyAccess(st)) return;
+            await Promise.race([refreshIce(), new Promise(r => setTimeout(r, 4000))]);
+        })() : null,
+        S.mode !== 'text' ? ensureMedia() : null,
+    ]);
+    if (stale()) return; // they left or pressed Stop while a permission prompt was open, or the access check banned them
     // "Hide my IP address" is on but the relay can't be reached: don't quietly connect directly and show the IP.
     if (hideIpWanted() && !hasTurn()) {
+        stopMedia();
         toast('“Hide my IP address” is on, but the relay isn’t reachable right now, so no chat was started.', true);
         setPhase('ended', { title: 'Relay unavailable', sub: 'Try again in a moment, or turn off “Hide my IP address” in the menu to connect directly.' });
         return;
     }
-
-    if (S.mode !== 'text') {
-        const ok = await ensureMedia();
-        if (ac.signal.aborted || S.searchAbort !== ac) return; // they left or pressed Stop while the permission prompt was open
-        if (!ok && S.mode !== 'text') setMode('text');
-    }
+    if (S.mode !== 'text' && !S.localStream) setMode('text'); // the camera / microphone couldn't start (ensureMedia said why)
     // A saved mask / background gets time to load (and a late Premium answer time to arrive) before anyone can be matched with your camera.
     if (S.mode === 'video' && (S.fx.mask !== 'none' || S.fx.background !== 'none')) {
         if (premium) await premium.waitReady(3000);
@@ -856,12 +875,14 @@ async function startSearch(note) {
         clearTimeout(slowHint);
         if (ac.signal.aborted) return;
         console.error(e);
-        sys('Matching failed. Check your connection and try again.', 'bad');
-        setPhase('ended', { title: 'Matching failed', sub: e.message });
+        const why = matchFailure(e, navigator.onLine);
+        sys(why.title + '.', 'bad');
+        setPhase('ended', { title: why.title, sub: why.sub });
         return;
     }
     if (ac.signal.aborted || S.searchAbort !== ac) { match.bus.close(); return; }
     S.searchAbort = null;
+    if (S.timing) S.timing.matchedAt = Date.now();
     connect(match);
 }
 
@@ -879,6 +900,7 @@ async function connect({ roomId, role, bus, partnerId, friend = null }) {
         roomId, role, bus, partnerId, pc, dc: null, partner: null, friend,
         pendingCandidates: [], ended: false, startedAt: 0, statsTimer: null, connectTimer: null, clockTimer: null,
     };
+    sess.videoSender = () => pc.getSenders().find(x => x.track?.kind === 'video') || null;
 
     if (S.mode !== 'text' && S.localStream) {
         // startSearch already gave a saved mask / background time to load; if it still isn't ready, no video is sent.
@@ -898,15 +920,35 @@ async function connect({ roomId, role, bus, partnerId, friend = null }) {
         if (!remote.getTracks().includes(e.track)) remote.addTrack(e.track);
         if (el.remoteVideo.srcObject !== remote) el.remoteVideo.srcObject = remote;
     };
+    // A dropped network often comes back within seconds. The caller restarts ICE (new routes, same call) and both sides
+    // wait a few seconds before giving up, instead of ending the chat at the first hiccup.
     pc.onconnectionstatechange = () => {
         if (sess.ended) return;
-        if (pc.connectionState === 'failed') {
-            partnerLeft('Connection failed', hideIpOn()
-                ? 'The privacy relay could not connect. You can turn off “Hide my IP address” in the menu to allow direct connections (this shows your IP address to the other person).'
-                : 'The network blocked a direct connection. A TURN server fixes this.');
-        } else if (pc.connectionState === 'disconnected') {
-            setTimeout(() => { if (!sess.ended && pc.connectionState === 'disconnected') partnerLeft(leftText(sess)); }, 5000);
+        const st = pc.connectionState;
+        if (st === 'connected') {
+            clearTimeout(sess.dropTimer);
+            sess.dropTimer = 0;
+            if (sess.reconnecting) { sess.reconnecting = false; renderPartnerSub(sess); }
+        } else if (st === 'disconnected' || st === 'failed') {
+            if (sess.opened && !sess.reconnecting) { sess.reconnecting = true; renderPartnerSub(sess); }
+            restartIce(sess);
+            if (st === 'failed' || !sess.dropTimer) {
+                clearTimeout(sess.dropTimer);
+                sess.dropTimer = setTimeout(() => {
+                    if (!sess.ended && (pc.connectionState === 'disconnected' || pc.connectionState === 'failed')) connectionLost(sess);
+                }, st === 'failed' ? 6000 : 8000);
+            }
         }
+    };
+    pc.onnegotiationneeded = async () => {
+        if (!sess.restarting || sess.ended) return;
+        sess.restarting = false;
+        try {
+            if (pc.signalingState !== 'stable') return;
+            const offer = await pc.createOffer({ iceRestart: true });
+            await pc.setLocalDescription(offer);
+            bus.send('offer', { type: offer.type, sdp: offer.sdp });
+        } catch (e) { console.warn('ICE restart failed', e); }
     };
 
     if (role === 'offerer') attachChannel(sess, pc.createDataChannel('chat', { ordered: true }));
@@ -949,7 +991,7 @@ async function connect({ roomId, role, bus, partnerId, friend = null }) {
 
     sess.connectTimer = setTimeout(() => {
         if (!sess.ended && S.phase === 'connecting') {
-            partnerLeft(friend ? 'No answer' : 'Could not connect', friend ? `${friend.name} didn’t pick up.` : 'The other person didn’t respond in time.');
+            partnerLeft(friend ? 'No answer' : 'Couldn’t connect', friend ? `${friend.name} didn’t pick up.` : 'They didn’t respond in time (they may have closed the tab). Finding someone new…');
         }
     }, friend ? 45000 : CONNECT_TIMEOUT_MS);
 
@@ -961,6 +1003,23 @@ async function connect({ roomId, role, bus, partnerId, friend = null }) {
 }
 
 const leftText = sess => (sess.friend ? 'Call ended' : 'Stranger disconnected');
+
+/** The caller asks the browser for fresh network routes; the other side answers the new offer as usual. */
+function restartIce(sess) {
+    if (sess.role !== 'offerer' || sess.ended || (sess.restarts || 0) >= 3) return;
+    const now = Date.now();
+    if (now - (sess.restartAt || 0) < 2500) return;
+    sess.restartAt = now;
+    sess.restarts = (sess.restarts || 0) + 1;
+    sess.restarting = true;
+    try { sess.pc.restartIce(); } catch { sess.restarting = false; }
+}
+
+/** The connection did not come back: say why, in plain words. */
+function connectionLost(sess) {
+    const c = connectionLostCopy({ opened: Boolean(sess.opened), online: navigator.onLine, hideIp: hideIpOn(), leftTitle: leftText(sess) });
+    partnerLeft(c.title, c.sub);
+}
 
 const MAX_PEER_BYTES = 4096;
 const FLOOD_LIMIT = 200;
@@ -983,6 +1042,7 @@ function attachChannel(sess, dc) {
         sess.opened = true;
         clearTimeout(sess.connectTimer);
         sess.startedAt = Date.now();
+        if (S.timing && !sess.friend) { S.timing.connectedAt = sess.startedAt; sess.timing = { ...S.timing }; }
         setPhase('connected');
         lt.onChatStart(); // Live translate starts off (or as remembered) in every chat
         clearMessages();
@@ -1015,6 +1075,7 @@ function attachChannel(sess, dc) {
         SOUND.match();
         sess.clockTimer = setInterval(() => renderPartnerSub(sess), 1000);
         if (S.mode !== 'text') startStats(sess);
+        if (S.mode === 'video') applyVideoTier(sess, 0); // a sensible ceiling from the start (about 1.5 Mbit/s)
         if (S.mode === 'video') startAgeRecheck(sess);
         if (S.mode === 'voice') startVoiceStage(sess);
     };
@@ -1164,27 +1225,45 @@ function renderPartnerSub(sess) {
     const flags = [];
     if (sess.partnerAv?.muted && S.mode !== 'text') flags.push('muted');
     if (sess.partnerAv?.camOff && S.mode === 'video') flags.push('camera off');
-    el.partnerSub.textContent = ['Connected', clock, sess.distText ? `📍 ${sess.distText}` : '', ...flags].filter(Boolean).join(' · ');
+    el.partnerSub.textContent = [sess.reconnecting ? 'Reconnecting…' : 'Connected', clock, sess.distText ? `📍 ${sess.distText}` : '', ...flags].filter(Boolean).join(' · ');
 }
 
 function startStats(sess) {
+    sess.adaptive = createAdaptive();
     sess.statsTimer = setInterval(async () => {
         if (sess.ended) return;
         try {
-            const stats = await sess.pc.getStats();
-            let rtt = null;
-            stats.forEach(r => {
-                if (r.type === 'candidate-pair' && r.nominated && r.state === 'succeeded' && r.currentRoundTripTime != null) {
-                    rtt = Math.round(r.currentRoundTripTime * 1000);
-                }
-            });
-            if (rtt == null) return;
-            const q = rtt < 150 ? 'good' : rtt < 350 ? 'ok' : 'poor';
+            const sample = readSample(await sess.pc.getStats());
+            let tier = sess.adaptive.tier;
+            if (S.mode === 'video' && sess.videoSender()) {
+                // The bandwidth estimate starts low and climbs, so it isn't trusted for the first 12 seconds.
+                const next = sess.adaptive.update({ ...sample, available: Date.now() - sess.startedAt > 12000 ? sample.available : null });
+                if (next !== null) { tier = next; applyVideoTier(sess, next); }
+            }
+            if (sample.rtt == null) return;
+            const q = tier >= 3 ? 'poor' : sample.rtt < 150 && tier === 0 ? 'good' : sample.rtt < 350 && tier < 3 ? 'ok' : 'poor';
             el.qdot.className = 'qdot ' + q;
-            el.qtext.textContent = q === 'good' ? 'Good' : q === 'ok' ? 'Fair' : 'Poor';
-            el.quality.title = `Round-trip time: ${rtt} ms`;
+            el.qtext.textContent = tier >= 3 ? 'Low data' : q === 'good' ? 'Good' : q === 'ok' ? 'Fair' : 'Poor';
+            const t = sess.timing;
+            el.quality.title = `Round-trip time: ${sample.rtt} ms` + (S.mode === 'video' ? ` · Video: ${TIERS[tier].label}` : '')
+                + (t?.searchAt && t.connectedAt ? ` · Matched in ${((t.connectedAt - t.searchAt) / 1000).toFixed(1)} s` : '');
         } catch { /* ignore */ }
     }, 2000);
+}
+
+/** Turns a quality tier into limits on the outgoing video. The browser still picks the exact size within them. */
+async function applyVideoTier(sess, tier) {
+    const sender = sess.videoSender();
+    if (!sender) return;
+    const t = TIERS[tier];
+    try {
+        const params = sender.getParameters();
+        if (!params.encodings?.length) params.encodings = [{}];
+        Object.assign(params.encodings[0], { maxBitrate: t.maxBitrate, scaleResolutionDownBy: t.scale, maxFramerate: t.fps });
+        await sender.setParameters(params);
+        sess.appliedTier = tier;
+    } catch (e) { console.warn('could not change the video quality', e); }
+    if (tier >= 1 && !sess.qualityNoted && !sess.ended) { sess.qualityNoted = true; sys(qualityNote(tier)); }
 }
 
 /** Tear down the current peer session. notify=true tells the partner we left. */
@@ -1195,6 +1274,7 @@ function endSession({ notify }) {
     lt.onChatEnd();
     if (notify) sess.bus.send('bye');
     clearTimeout(sess.connectTimer);
+    clearTimeout(sess.dropTimer);
     clearInterval(sess.statsTimer);
     clearInterval(sess.clockTimer);
     clearInterval(sess.ageTimer);

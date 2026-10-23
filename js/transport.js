@@ -156,7 +156,7 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
                 done = true;
                 unsub();
                 clearInterval(heartbeat);
-                clearInterval(retry);
+                clearTimeout(retry);
                 signal.removeEventListener('abort', onAbort);
                 error ? reject(error) : resolve(value);
             };
@@ -168,15 +168,23 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
                 }
             });
             const heartbeat = setInterval(() => updateDoc(queueRef, { ts: Date.now() }).catch(() => {}), 10000);
-            // Keep trying to claim others too, so two people who enqueue at the same moment still meet.
-            const retry = setInterval(async () => {
-                if (claiming || done) return;
-                claiming = true;
-                try {
-                    const m = await tryClaim(opts);
-                    if (m) { if (done) m.bus.close(); else finish(m); }
-                } finally { claiming = false; }
-            }, 4000 + Math.random() * 2000);
+            // Keep trying to claim others too, so two people who enqueue at the same moment still meet. The first tries come
+            // quickly (about every 1.5 s, which is when a simultaneous arrival is most likely), then it settles to every 4-6 s.
+            let tries = 0, retry = 0;
+            const schedule = () => {
+                retry = setTimeout(async () => {
+                    if (done) return;
+                    if (!claiming) {
+                        claiming = true;
+                        try {
+                            const m = await tryClaim(opts);
+                            if (m) { if (done) m.bus.close(); else return finish(m); }
+                        } catch (e) { console.warn('claim failed', e); } finally { claiming = false; }
+                    }
+                    if (!done) schedule();
+                }, ++tries <= 6 ? 1300 + Math.random() * 500 : 4000 + Math.random() * 2000);
+            };
+            schedule();
             const onAbort = () => {
                 deleteDoc(queueRef).catch(() => {});
                 finish(null, new DOMException('aborted', 'AbortError'));
