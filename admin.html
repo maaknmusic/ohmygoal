@@ -64,6 +64,35 @@
         .inbox-row .w { font-size: 11px; color: var(--muted); white-space: nowrap; }
         .inbox-row .k { display: inline-block; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 999px; margin-right: 6px; background: rgba(120,120,160,.2); }
         .inbox-row .k.appeal { background: rgba(217,38,108,.2); }
+
+        .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 14px 0; }
+        .tile { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; display: grid; gap: 2px; }
+        .tile.hot { border-color: var(--success); }
+        .tile.warn { border-color: var(--warning); }
+        .tile-label { font-size: 12px; font-weight: 600; color: var(--muted); }
+        .tile-value { font-size: 26px; letter-spacing: -0.02em; }
+        .tile-sub { font-size: 12px; color: var(--muted); }
+        .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 12px; }
+        .chart-card { margin: 0; }
+        .chart-body { margin-top: 8px; }
+        .chart { width: 100%; height: auto; display: block; }
+        .chart .grid { stroke: var(--border); stroke-width: 1; }
+        .chart .tick { fill: var(--muted); font-size: 10px; }
+        .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+        .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; }
+        .bar-row { display: grid; grid-template-columns: minmax(70px, 130px) 1fr auto; gap: 10px; align-items: center; margin: 7px 0; font-size: 13px; }
+        .bar-track { height: 10px; border-radius: 999px; background: var(--panel-2); overflow: hidden; }
+        .bar-track i { display: block; height: 100%; border-radius: 999px; }
+        .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; margin: 10px 0; }
+        .grid-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .grid-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding: 10px 12px; white-space: nowrap; }
+        .grid-table td { padding: 10px 12px; border-top: 1px solid var(--border); vertical-align: top; }
+        .grid-table code.small { font-size: 11px; color: var(--muted); }
+        .row-actions { white-space: nowrap; }
+        .row-actions .btn { margin: 0 4px 4px 0; }
+        .line { font-size: 13px; padding: 6px 0; border-top: 1px solid var(--border); color: var(--muted); word-break: break-word; }
+        .line:first-of-type { margin-top: 6px; }
+        .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin: 12px 0; }
 </style>
 </head>
 <body>
@@ -95,12 +124,70 @@
             </div>
 
             <nav class="tabs" id="tabs">
+                <button data-tab="dashboard">Dashboard</button>
+                <button data-tab="premium">Premium</button>
+                <button data-tab="payments">Payments</button>
+                <button data-tab="people">People</button>
                 <button data-tab="inbox">Inbox<span class="count" id="countInbox">0</span></button>
                 <button data-tab="requests">Unban requests<span class="count" id="countRequests">0</span></button>
                 <button data-tab="bans">Active bans<span class="count" id="countBans">0</span></button>
                 <button data-tab="whitelist">IP whitelist<span class="count" id="countWhitelist">0</span></button>
                 <button data-tab="reports">Reports<span class="count" id="countReports">0</span></button>
             </nav>
+
+            <section data-view="dashboard" class="hidden">
+                <div class="toolbar">
+                    <span class="help" style="margin:0">How OhMyGoal is doing. Numbers in rupees (₹); days are Indian days.</span>
+                    <select id="dashDays" class="input" style="max-width: 170px" aria-label="Period">
+                        <option value="7">Last 7 days</option>
+                        <option value="30" selected>Last 30 days</option>
+                        <option value="90">Last 90 days</option>
+                    </select>
+                </div>
+                <div id="dashBody"></div>
+            </section>
+
+            <section data-view="premium" class="hidden">
+                <div class="toolbar">
+                    <div class="inbox-filters" id="memberFilters" role="group" aria-label="Filter">
+                        <button type="button" data-f="active" class="active">Active</button>
+                        <button type="button" data-f="soon">Ending in 7 days</button>
+                        <button type="button" data-f="expired">Ended</button>
+                        <button type="button" data-f="granted">Given by you</button>
+                        <button type="button" data-f="all">All</button>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" id="memberCsv">Download CSV</button>
+                </div>
+                <div class="filter"><input id="memberSearch" class="input" placeholder="Search email, name or user ID" autocomplete="off"></div>
+                <p class="help" id="memberSummary"></p>
+                <div id="memberList"></div>
+            </section>
+
+            <section data-view="payments" class="hidden">
+                <div class="tiles" id="payTiles"></div>
+                <div class="toolbar">
+                    <div class="inbox-filters" id="orderKinds" role="group" aria-label="Kind">
+                        <button type="button" data-f="all" class="active">All</button>
+                        <button type="button" data-f="premium">Premium</button>
+                        <button type="button" data-f="coins">Coin packs</button>
+                        <button type="button" data-f="tip">Tips</button>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" id="orderCsv">Download CSV</button>
+                </div>
+                <div id="orderList"></div>
+            </section>
+
+            <section data-view="people" class="hidden">
+                <div class="card">
+                    <b>Find a person</b>
+                    <p class="help">Type their Google email or their user ID (from a report or the Premium list). You can then see their Premium, coins, orders, bans and reports, and change them.</p>
+                    <form id="personForm" class="form-grid" style="margin-top: 10px">
+                        <div><label for="personQuery">Email or user ID</label><input id="personQuery" class="input" required autocomplete="off"></div>
+                        <div><button class="btn btn-primary" type="submit" style="width: 100%">Look up</button></div>
+                    </form>
+                </div>
+                <div id="personResult"></div>
+            </section>
 
             <section data-view="inbox" class="hidden">
                 <div class="inbox-bar">

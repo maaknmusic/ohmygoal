@@ -39,7 +39,8 @@ await p.waitForSelector('#panel:not(.hidden)', { timeout: 20000 });
 const text = sel => p.textContent(sel).then(t => (t || '').trim());
 const mine = sel => p.locator(`${sel}`);
 
-step('1a. the Inbox is the first tab and opens by default', (await p.getAttribute('#tabs button[data-tab="inbox"]', 'class'))?.includes('active') && await p.isVisible('#inboxList'));
+await p.click('#tabs button[data-tab="inbox"]');
+step('1a. the Inbox tab shows the list', (await p.getAttribute('#tabs button[data-tab="inbox"]', 'class'))?.includes('active') && await p.isVisible('#inboxList'));
 const rows = await p.locator('#inboxList .inbox-row').count();
 step('1b. the unban request and both reports are listed, all unread', rows >= 3 && await p.locator('#inboxList .inbox-row.unread').count() >= 3, String(rows));
 const count0 = Number(await text('#countInbox'));

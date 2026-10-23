@@ -14,6 +14,7 @@ Need `npm i playwright` (Chromium), a static server (`python3 -m http.server 876
 ```
 node tests/e2e/v2.mjs <scratch-dir>   # UI flows on desktop and phone
 node tests/e2e/admin-inbox.mjs <scratch>   # admin Inbox (needs the emulators)
+node tests/e2e/admin-analytics.mjs <scratch>   # admin Dashboard, Premium, Payments, People, CSV (needs the emulators)
 node tests/e2e/hardening.mjs          # hostile peer (floods, oversize frames, extra channels)
 node tests/e2e/distance.mjs           # approximate distance
 node tests/e2e/reactions.mjs          # drawn reactions: tap, hold burst, Premium pack, hostile peer, phone

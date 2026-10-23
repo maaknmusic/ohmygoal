@@ -8,6 +8,7 @@
 // =====================================================================
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { db, publicCol, publicDoc, privateDoc } from './common.js';
+import { bump } from './stats.js';
 
 export const TOPICS = Object.freeze(['cricket', 'music', 'bollywood', 'gaming', 'movies', 'travel', 'coding', 'study', 'anime', 'fitness', 'hindi', 'latenight']);
 export const CAPS = Object.freeze({ voice: 8, video: 4 });
@@ -68,6 +69,7 @@ export const joinGroup = onCall(async request => {
         t.set(limitRef, { times: [...times, now] });
     });
 
+    await bump('groupJoins'); await bump(`groupJoins_${mode}`);
     const member = { nick: cleanNick(request.data.nick), avatar: cleanAvatar(request.data.avatar), ts: now, joined: now };
     const found = await publicCol('groups').where('topic', '==', topic).where('mode', '==', mode).limit(CANDIDATES).get();
     const rooms = [];

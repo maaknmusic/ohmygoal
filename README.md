@@ -42,9 +42,9 @@ Random one-on-one **video or text** chat with strangers. A static site (plain HT
 | `js/translate.js`, `js/livetranslate.js`, `css/translate.css` | Live translate: the engine (on-device first, queue, cache, limits) and the chat UI (switches, slim bar, lines under messages) |
 | `css/landing.css`, `css/chat.css` | Landing page and chat screen styles (`styles.css` holds the shared design tokens) |
 | `js/access.js`, `js/fingerprint.js`, `js/cloud.js` | Server-side bans: access check, device fingerprint, Cloud Functions calls |
-| `admin.html`, `js/admin.js` | **Admin page**: unban requests, bans, IP whitelist, reports |
+| `admin.html`, `js/admin.js`, `js/admin-analytics.js`, `js/admin-charts.js` | **Admin page**: dashboard, Premium members, payments, people lookup, inbox, unban requests, bans, IP whitelist, reports |
 | `firestore.rules` | Database security rules: publish with `bash deploy.sh --rules-only` (or paste into the console) |
-| `functions/` | Cloud Functions: payments (`index.js`), bans and admin (`moderation.js`), Live translate (`translate.js`, `languages.js`) |
+| `functions/` | Cloud Functions: payments (`index.js`), bans and admin (`moderation.js`), admin numbers (`analytics.js`, daily counters in `stats.js`), Live translate (`translate.js`, `languages.js`) |
 | `deploy.sh`, `firebase.json`, `.firebaserc` | One-command deploy of rules + functions |
 | `legal.html` | Terms, Privacy, Refunds, Delivery, Contact (needed by Razorpay) |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Installable app |
@@ -144,10 +144,18 @@ Until the API is enabled the function answers *Translation is unavailable right 
 Browsers can't read MAC addresses, so the device is identified by a fingerprint: a hash of the browser, screen, graphics card and similar traits. It survives private windows and clearing site data, but not switching to a different browser or device. Phones of the same model and browser version often have the same fingerprint, so a device ban only applies **on the same network neighbourhood** (IPv4 /24, IPv6 /48). That catches someone who reconnects to get a new IP, without banning strangers with the same phone elsewhere. IPv6 addresses are banned by their /64 block, since one home or phone usually has a whole block.
 
 **Admin page:** `admin.html`, at **https://ohmygoal.web.app/admin.html** once `deploy.sh` has published the website to Firebase Hosting. Open it only from there: `raw.githack.com` is one address shared with every other GitHub project, so another site on it could read your admin sign-in. Sign in with a Google account listed in the `ADMIN_EMAILS` secret, which `deploy.sh` asks for (to change it later: `bash deploy.sh --reset-secrets`). There you can:
+- **Dashboard:** people online now, chats today (video, voice, text), people active, Premium members and how many end within 7 days, revenue today / 7 days / 30 days / all time, open unban requests, active bans, and charts for the last 7, 30 or 90 days. *Download daily numbers* gives a CSV.
+- **Premium:** every member with email, status (Active, Ending soon, Ended), the date it ends, days left, how many times they paid and how much. Filters, search, a CSV download, and per row **+30 days**, **Revoke** and **Look up**. A *Granted* tag marks passes with no payment behind them (given by an admin).
+- **Payments:** revenue by period and by kind (Premium, coin packs, tips), and the newest 300 orders with a CSV download.
+- **People:** type an email or user ID to see their Premium, coins, likes, orders, bans, reports about them and the admin log; give Premium days (1–365), end Premium, change coins (±1000), or ban for 24 hours. Every change is recorded in the admin log with your email and an optional note.
 - **Unban requests:** approve (removes the bans and resets their strike counters, so they can try the age check again), approve and whitelist their IP, or reject.
 - **Active bans:** unban, whitelist the IP, or add a ban by IP address or user ID.
 - **IP whitelist:** for shared networks. On a whitelisted IP only **account** bans apply (no IP or device bans), so a banned person there could get back in with a private window. Whitelist only when innocent people on that network are being blocked.
 - **Reports:** ban the reported person for 24 h, 7 days, or from video only.
+
+**The numbers.** Online, Premium and revenue are read live from the database and your payment records, so they go back to your first order. Chats, people active, room joins, gifts and likes are counted by small per-day counters (`stats/YYYY-MM-DD` in the private tree) that start on the day the new functions are deployed, so the charts begin that day. Days are Indian calendar days (IST). Only the admin functions can read the counters.
+
+**Power BI and Excel.** Every table has a *Download CSV* button. In Power BI Desktop choose *Get data → Text/CSV*, pick the file, and build visuals from it (the files are UTF-8 with a header row; amounts are in rupees). For a live link that refreshes by itself, export Firestore to BigQuery (the Firebase *Firestore BigQuery Export* extension on the `artifacts/anon-connect/private/data/orders` and `stats` paths) and connect Power BI to BigQuery. That needs billing turned on for BigQuery and is optional.
 
 The page also shows **your IP as the server sees it**. Check that it matches your real IP (search "what is my ip"); if it shows a Google address instead, IP bans won't work correctly, so tell your developer.
 

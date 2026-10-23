@@ -25,6 +25,10 @@ export { likeUser } from './likes.js';
 export { turnCredentials } from './turn.js';
 // Friend notifications (web push / Android).
 export { registerPush, unregisterPush, announceOnline, onFriendshipWritten, onFriendMessage } from './push.js';
+// Daily counters for the admin dashboard.
+export { onRoomCreated } from './stats.js';
+// Admin analytics (dashboard, members, payments, people).
+export { adminAnalytics } from './analytics.js';
 // Group rooms.
 export { joinGroup } from './groups.js';
 // Coins and gifts.
