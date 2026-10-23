@@ -39,7 +39,9 @@ export function createAnalytics({ $, h, toast, button, empty, kv, when, short, f
 
     function tile(label, value, sub, cls = '') {
         const t = h('div', 'tile ' + cls);
-        t.append(h('span', 'tile-label', label), h('b', 'tile-value', value));
+        const v = h('b', 'tile-value', value);
+        if (label === 'Online now') v.id = 'onlineNow';
+        t.append(h('span', 'tile-label', label), v);
         if (sub) t.append(h('span', 'tile-sub', sub));
         return t;
     }
@@ -66,7 +68,7 @@ export function createAnalytics({ $, h, toast, button, empty, kv, when, short, f
         const n = dash.now, s = dash.series;
         const tiles = h('div', 'tiles');
         tiles.append(
-            tile('Online now', compact(n.online), 'people on the site', 'hot'),
+            tile('Online now', compact(n.online), 'people on the site, updates every 15 s', 'hot'),
             tile('Chats today', compact(n.chatsToday), `${compact(n.dauToday)} people active today`),
             tile('Premium members', compact(n.premiumActive), `${compact(n.premiumExpiringSoon)} end within 7 days`),
             tile('Revenue today', rupees(n.revenueToday), `${rupees(n.revenueWeek)} in 7 days`),
@@ -292,6 +294,18 @@ export function createAnalytics({ $, h, toast, button, empty, kv, when, short, f
         const logRows = r.log.map(l => `${when(l.at)} · ${l.by} · ${l.what}${l.details?.days ? ` ${l.details.days} days` : ''}${l.details?.delta ? ` ${l.details.delta} coins` : ''}${l.details?.note ? ` — ${l.details.note}` : ''}`);
         $('personResult').replaceChildren(card, tools, list('Orders', orderRows, 'No orders.'), list('Active bans', banRows, 'None.'), list('Reports about this person', reportRows, 'None.'), list('Admin log', logRows, 'Nothing yet.'));
     }
+
+    // The "Online now" number is the one that changes every minute: refresh just it while the Dashboard is on screen.
+    let onlineBusy = false;
+    async function refreshOnline() {
+        const node = $('onlineNow');
+        if (onlineBusy || !node || !dash || document.visibilityState === 'hidden' || $('panel').classList.contains('hidden')) return;
+        if ($('dashBody').closest('[data-view]').classList.contains('hidden')) return;
+        onlineBusy = true;
+        try { const r = await call('online'); node.textContent = compact(r.online); dash.now.online = r.online; } catch { /* the next tick will try again */ } finally { onlineBusy = false; }
+    }
+    setInterval(refreshOnline, 15000);
+    document.addEventListener('visibilitychange', refreshOnline);
 
     return {
         /** Called when a tab is opened; loads its data the first time. */

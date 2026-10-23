@@ -53,11 +53,12 @@ const users = await sdk.evaluate(async ({ stamp }) => {
   out.uids = { alice: alice.uid, bob: bob.uid, carol: carol.uid, anon: anon.uid };
   out.plainDenied = await anon.call('adminAnalytics', { action: 'dashboard' });
   out.googleDenied = await alice.call('adminAnalytics', { action: 'members' });
+  out.onlineDenied = await anon.call('adminAnalytics', { action: 'online' });
   const access = await anon.call('checkAccess', { fp: 'a'.repeat(32) });
   out.access = access;
   return out;
 }, { stamp });
-step('1a. someone who is not an admin is refused, signed in anonymously or with Google', users.plainDenied.err === 'functions/permission-denied' && users.googleDenied.err === 'functions/permission-denied', JSON.stringify([users.plainDenied, users.googleDenied]));
+step('1a. someone who is not an admin is refused, signed in anonymously or with Google', users.plainDenied.err === 'functions/permission-denied' && users.googleDenied.err === 'functions/permission-denied' && users.onlineDenied.err === 'functions/permission-denied', JSON.stringify([users.plainDenied, users.googleDenied]));
 const U = users.uids;
 
 // ---- 2. counters: an access pass counts the person as active; a new room counts as a chat
@@ -102,6 +103,11 @@ const tileOf = label => tiles.find(t => t.startsWith(label)) || '';
 step('4b. tiles: Premium members counts the active ones (at least Alice and Bob)', Number(tileOf('Premium members').replace(/^Premium members/, '').match(/^\d+/)?.[0]) >= 2, tileOf('Premium members'));
 step('4c. tiles: revenue shows rupees, and today includes the ₹99 payment', /₹[\d,]+/.test(tileOf('Revenue today')) && Number(tileOf('Revenue today').replace(/^Revenue today₹/, '').match(/^[\d,]+/)[0].replace(/,/g, '')) >= 99, tileOf('Revenue today'));
 step('4d. tiles: people active today is at least 1', /[1-9]\d* people active today/.test(tileOf('Chats today')), tileOf('Chats today'));
+const online0 = Number((await text('#onlineNow')).replace(/\D/g, '')) || 0;
+await put(`${base}/public/data/presence/an-p1-${stamp}`, { ts: N(Date.now()) });
+await put(`${base}/public/data/presence/an-p2-${stamp}`, { ts: N(Date.now()) });
+await p.waitForFunction(n => Number(document.getElementById('onlineNow').textContent.replace(/\D/g, '')) >= n, online0 + 2, { timeout: 40000 }).catch(() => {});
+step('4d2. “Online now” updates by itself (two people arrive while the page is open)', Number((await text('#onlineNow')).replace(/\D/g, '')) >= online0 + 2, `${online0} -> ${await text('#onlineNow')}`);
 step('4e. charts are drawn (SVG), with no script or image elements in them', await p.locator('#dashBody svg.chart').count() >= 5 && await p.locator('#dashBody svg script, #dashBody svg image, #dashBody svg foreignObject').count() === 0);
 step('4f. “Where the money comes from” lists Premium, Coin packs and Tips', /Premium/.test(await text('#dashBody')) && /Coin pack/.test(await text('#dashBody')) && /Tip/.test(await text('#dashBody')));
 await p.selectOption('#dashDays', '7');

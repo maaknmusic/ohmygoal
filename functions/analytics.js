@@ -63,12 +63,18 @@ async function paidOrders() {
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
+/** People online: the same rule as the website (a presence ping within the last 75 seconds). One cheap count query. */
+export const PRESENCE_WINDOW_MS = 75000;
+async function onlineNow(now) {
+    return (await publicCol('presence').where('ts', '>', now - PRESENCE_WINDOW_MS).count().get()).data().count;
+}
+
 async function dashboard(days, now) {
     const list = lastDays(days, now);
     const since = now - days * DAY;
     const [statDocs, online, active, soon, expiredCount, appeals, bans, orders, reports] = await Promise.all([
         db.getAll(...list.map(statsRef)),
-        publicCol('presence').where('ts', '>', now - 75000).count().get(),
+        onlineNow(now),
         publicCol('entitlements').where('premiumUntil', '>', now).count().get(),
         publicCol('entitlements').where('premiumUntil', '>', now).where('premiumUntil', '<', now + 7 * DAY).count().get(),
         publicCol('entitlements').where('premiumUntil', '>', 0).where('premiumUntil', '<=', now).count().get(),
@@ -90,7 +96,7 @@ async function dashboard(days, now) {
     return {
         days: list,
         now: {
-            online: online.data().count, premiumActive: active.data().count, premiumExpiringSoon: soon.data().count, premiumExpired: expiredCount.data().count,
+            online, premiumActive: active.data().count, premiumExpiringSoon: soon.data().count, premiumExpired: expiredCount.data().count,
             openAppeals: appeals.data().count, activeBans: bans.data().count,
             dauToday: today.dau || 0, chatsToday: today.chats || 0, reportsToday: reportsPerDay[list[list.length - 1]] || 0,
             revenueToday: money.window.today, revenueWeek: money.window.week, revenueMonth: money.window.month, revenueAll: money.window.all,
@@ -187,6 +193,7 @@ export const adminAnalytics = onCall({ secrets: [ADMIN_EMAILS], timeoutSeconds: 
 
     switch (action) {
         case 'dashboard': return dashboard(Math.min(90, Math.max(7, Math.floor(Number(request.data.days)) || 30)), now);
+        case 'online': return { online: await onlineNow(now), at: now };
         case 'members': return { members: await members(now) };
         case 'orders': return { orders: await orders() };
         case 'user': return lookup(request.data.q);
