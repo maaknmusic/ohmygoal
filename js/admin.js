@@ -23,7 +23,19 @@ if (CFG.emulators) { // local testing only
 const adminFn = fnMod.httpsCallable(functions, 'admin');
 const analyticsFn = fnMod.httpsCallable(functions, 'adminAnalytics');
 
-try { document.documentElement.dataset.theme = JSON.parse(localStorage.getItem('ac.theme')) || 'dark'; } catch { /* default */ }
+// The admin page has its own light/dark choice (button in the top bar). Until you press it, it follows the website's theme.
+const readTheme = key => { try { const v = JSON.parse(localStorage.getItem(key)); return v === 'light' || v === 'dark' ? v : null; } catch { return null; } };
+function applyAdminTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+    const btn = document.getElementById('themeBtn');
+    if (btn) { btn.textContent = theme === 'dark' ? 'Light mode' : 'Dark mode'; btn.setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`); }
+}
+applyAdminTheme(readTheme('ac.adminTheme') || readTheme('ac.theme') || 'dark');
+document.getElementById('themeBtn').onclick = () => {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    applyAdminTheme(next);
+    try { localStorage.setItem('ac.adminTheme', JSON.stringify(next)); } catch { /* private window: still applies for this visit */ }
+};
 
 // ---------------- helpers ----------------
 const $ = id => document.getElementById(id);
