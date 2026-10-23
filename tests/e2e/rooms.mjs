@@ -43,7 +43,7 @@ const pickRoom = async (p, name) => { await p.click('#roomBtn'); await p.click(`
   step('1a. the start card shows the room button with open chat by default', /Open chat/.test(await text(a, '#roomSummary')));
   await a.click('#roomBtn');
   const opts = await a.locator('#roomList .room-opt').evaluateAll(bs => bs.map(b => b.querySelector('b').textContent));
-  step('1b. the sheet lists open chat plus the themes', opts.length === 7 && opts[0] === 'Open chat' && opts.includes('Cricket night') && opts.includes('Study hour'), opts.join());
+  step('1b. the sheet lists open chat plus the themes and the language exchange', opts.length === 8 && opts[0] === 'Open chat' && opts.includes('Cricket night') && opts.includes('Study hour'), opts.join());
   step('1c. each theme shows when it is busy (IST)', (await text(a, '#roomList')).match(/IST/g).length >= 6);
   await a.click('#roomList .room-opt:has-text("Cricket night")');
   step('1d. choosing a room updates the button and is remembered', /Cricket night/.test(await text(a, '#roomSummary')) && (await a.evaluate(() => JSON.parse(localStorage.getItem('ac.theme')))) === 'cricket');
