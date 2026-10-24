@@ -151,6 +151,18 @@ A session ends when the host ends it or leaves, after 3 hours, or when the host 
 
 **Rough running cost** (my estimate from Google's published prices, not from your bill): about ₹1.35 for 8 people on voice for an hour, ₹2 to ₹3 for 4 on video, ₹8 at the very worst if everyone needed the relay all hour. 49 coins is about ₹34 to ₹40.
 
+## Gifting coins to another person
+
+Anyone signed in with Google can gift **coins they bought** to the person they are with: in a one-to-one chat (Gifts tab → **Send coins**) or in the same live session (a person's ⋯ menu → **Gift coins…**). The platform keeps **30%** and the other person receives **70%** (rounded down) as coins they can **spend** (gifts, private sessions). They cannot be cashed out, and they cannot be gifted again, so there are no chains. The screen shows what the other person will get before you confirm. The rules live in `functions/gifts.js` and `functions/coingifts.js`:
+
+- **Only bought coins** can be gifted. The wallet keeps a `bought` count next to `coins`: a coin pack adds to both, and spending uses free coins (daily bonus, received gifts) first so bought coins stay giftable as long as possible. Coins from before this feature count as free; an admin's coin adjustments never create giftable coins.
+- 10 to 500 coins a gift, **1,000 coins a day** and **20 gifts an hour** per account.
+- You can only gift someone you are with right now (an open one-to-one chat, or both inside the same running live session). Nobody can send coins to a stranger by id or email.
+- Both people need a Google account.
+- Every gift is written to a private log (`coinGiftLog`) and counted for **Admin → Hosts** (gifts, coins sent, your 30%).
+
+Not built, on purpose: cashing out received coins. Letting people turn gifts into money would let a stolen-card purchase be moved to an accomplice and paid out, and may count as a money-transfer service under Indian rules. If you add it later, add a holding period (for example 7 days) before payout and take advice first.
+
 ## Bots and App Check
 
 **Firebase App Check** makes every request to the database and the functions carry a short-lived token that only a real browser on your own website can get (from Google **Fraud Defense**, formerly reCAPTCHA Enterprise, invisible to people). Scripts that call the backend directly have no token and can be refused. It works alongside the age check, the rate limits and the bans; it does not replace them.

@@ -10,7 +10,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { FieldValue } from 'firebase-admin/firestore';
 import { db, publicDoc, privateDoc, callOpts } from './common.js';
 import { bump } from './stats.js';
-import { GIFTS, DAILY_COINS, DAILY_COINS_PREMIUM, GIFT_HOURLY_CAP, MAX_COINS } from './gifts.js';
+import { GIFTS, DAILY_COINS, DAILY_COINS_PREMIUM, GIFT_HOURLY_CAP, MAX_COINS, afterSpend } from './gifts.js';
 
 const HOUR = 3600000;
 const IST_MS = 330 * 60000;
@@ -19,7 +19,7 @@ const UID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
 const walletRef = uid => privateDoc(`wallet/${uid}`);
 const today = now => new Date(now + IST_MS).toISOString().slice(0, 10);
 
-function requireGoogle(request) {
+export function requireGoogle(request) {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Please sign in.');
     if (request.auth.token.firebase?.sign_in_provider !== 'google.com') throw new HttpsError('failed-precondition', 'Sign in with Google to use coins.');
     return request.auth.uid;
@@ -30,7 +30,8 @@ const isPremium = async uid => ((await publicDoc(`entitlements/${uid}`).get()).d
 export const getWallet = onCall(callOpts(), async request => {
     const uid = requireGoogle(request);
     const w = (await walletRef(uid).get()).data() || {};
-    return { coins: Number.isInteger(w.coins) ? w.coins : 0, dailyAvailable: w.dailyDay !== today(Date.now()) };
+    const coins = Number.isInteger(w.coins) ? w.coins : 0;
+    return { coins, giftable: Math.min(Number.isInteger(w.bought) ? w.bought : 0, coins), dailyAvailable: w.dailyDay !== today(Date.now()) };
 });
 
 export const claimDaily = onCall(callOpts(), async request => {
@@ -72,7 +73,7 @@ export const sendGift = onCall(callOpts(), async request => {
         const sent = (Array.isArray(w.sent) ? w.sent : []).filter(x => typeof x === 'number' && x > now - HOUR);
         if (sent.length >= GIFT_HOURLY_CAP) throw new HttpsError('resource-exhausted', 'That’s a lot of gifts for one hour. Try again later.');
         if (coins < price) throw new HttpsError('failed-precondition', 'Not enough coins.');
-        t.set(walletRef(uid), { coins: coins - price, sent: [...sent, now] }, { merge: true });
+        t.set(walletRef(uid), { ...afterSpend(w, price), sent: [...sent, now] }, { merge: true });
         t.set(privateDoc(`giftLog/${roomId}_${uid}_${now}`), { uid, roomId, gift, price, at: now });
         return { coins: coins - price };
     });
@@ -80,8 +81,11 @@ export const sendGift = onCall(callOpts(), async request => {
     return result;
 });
 
-/** Adds coins to a wallet (called when a coin-pack order is paid). Capped so a wallet can't grow without limit. */
-export function addCoinsTx(t, uid, current, amount) {
-    t.set(walletRef(uid), { coins: Math.min(MAX_COINS, (Number.isInteger(current) ? current : 0) + amount) }, { merge: true });
+/** Adds BOUGHT coins to a wallet (called when a coin-pack order is paid). Capped so a wallet can't grow without limit. `wallet` is the wallet document's data. */
+export function addCoinsTx(t, uid, wallet, amount) {
+    const coins = Number.isInteger(wallet?.coins) ? wallet.coins : 0;
+    const bought = Math.min(Number.isInteger(wallet?.bought) ? wallet.bought : 0, coins);
+    const next = Math.min(MAX_COINS, coins + amount);
+    t.set(walletRef(uid), { coins: next, bought: Math.min(next, bought + amount) }, { merge: true });
 }
 export const walletDoc = walletRef;

@@ -19,7 +19,7 @@ import { db, publicCol, publicDoc, privateCol, privateDoc, callOpts } from './co
 import { ADMIN_EMAILS, requireAdmin } from './moderation.js';
 import { bump, istDay, statsRef } from './stats.js';
 import { cleanNick, cleanAvatar, CAPS, STALE_MS } from './groups.js';
-import { GIFTS, GIFT_HOURLY_CAP } from './gifts.js';
+import { GIFTS, GIFT_HOURLY_CAP, afterSpend } from './gifts.js';
 
 export const LIVE_START_FEE = 49;           // coins a host pays to open a session (kept by the platform)
 export const PRIVATE_FEE = 200;             // coins each guest pays to join a private session
@@ -208,7 +208,7 @@ export const startLive = onCall(callOpts(), async request => {
         fee = firstTime ? 0 : LIVE_START_FEE;
         const coins = asInt(w.data()?.coins);
         if (coins < fee) throw new HttpsError('failed-precondition', `Going live costs ${LIVE_START_FEE} coins. You have ${coins}. Add coins first.`);
-        if (fee) t.set(walletRef(uid), { coins: coins - fee }, { merge: true });
+        if (fee) t.set(walletRef(uid), afterSpend(w.data(), fee), { merge: true });
         t.set(limitRef, { times: [...times, now] });
         t.set(publicDoc(`groups/${sid}`), {
             topic: 'live', live: true, status: 'live', hostUid: uid, hostName, hostAvatar, title, mode, cap, kind,
@@ -255,7 +255,7 @@ export const joinLive = onCall(callOpts(), async request => {
             const coins = asInt(guestWallet.data()?.coins);
             if (coins < g.fee) throw new HttpsError('failed-precondition', `This private session costs ${g.fee} coins. You have ${coins}.`);
             const { host: share, platform } = splitCoins(g.fee);
-            t.set(walletRef(uid), { coins: coins - g.fee }, { merge: true });
+            t.set(walletRef(uid), afterSpend(guestWallet.data(), g.fee), { merge: true });
             creditHost(t, g.hostUid, hostWallet.data(), share, { type: 'private', fromUid: uid, sid, total: g.fee, platformShare: platform }, now);
             t.set(privateDoc(`livePaid/${sid}_${uid}`), { uid, sid, coins: g.fee, at: now });
             charged = g.fee;
@@ -349,7 +349,7 @@ export const sendLiveGift = onCall(callOpts(), async request => {
         if (sent.length >= GIFT_HOURLY_CAP) throw new HttpsError('resource-exhausted', 'That’s a lot of gifts for one hour. Try again later.');
         if (coins < price) throw new HttpsError('failed-precondition', 'Not enough coins.');
         const { host: share, platform } = splitCoins(price);
-        t.set(walletRef(uid), { coins: coins - price, sent: [...sent, now] }, { merge: true });
+        t.set(walletRef(uid), { ...afterSpend(w, price), sent: [...sent, now] }, { merge: true });
         creditHost(t, g.hostUid, hw.data(), share, { type: 'gift', fromUid: uid, sid, gift, total: price, platformShare: platform }, now);
         t.set(publicCol(`groups/${sid}/events`).doc(), { kind: 'gift', gift, price, nick: mineDoc?.data().nick || nickGiven || 'Someone', at: now });
         return { coins: coins - price, hostShare: share };
@@ -404,7 +404,7 @@ export const adminHosts = onCall(callOpts({ secrets: [ADMIN_EMAILS], timeoutSeco
                 const h = d.data(), w = wmap.get(d.id) || {};
                 return { uid: d.id, status: h.status === 'suspended' ? 'suspended' : 'active', name: h.name || '', email: h.email || '', firstLiveAt: h.firstLiveAt || 0, lastLiveAt: h.lastLiveAt || 0, note: h.note || '', coins: asInt(w.coins), pending: asInt(w.pending), paidOut: asInt(w.paidOut), lifetime: asInt(w.lifetime) };
             }).sort((a, b) => b.lastLiveAt - a.lastLiveAt);
-            const FIELDS = ['liveStarts', 'liveFeeCoins', 'privateJoins', 'privateCoins', 'liveGifts', 'liveGiftCoins', 'hostShareCoins', 'platformShareCoins', 'liveEnded', 'liveMinutes', 'liveParticipantMinutes'];
+            const FIELDS = ['liveStarts', 'liveFeeCoins', 'privateJoins', 'privateCoins', 'liveGifts', 'liveGiftCoins', 'hostShareCoins', 'platformShareCoins', 'liveEnded', 'liveMinutes', 'liveParticipantMinutes', 'liveFreeStarts', 'coinGifts', 'coinGiftCoins'];
             const sum = (from, to) => Object.fromEntries(FIELDS.map(f => [f, statDocs.slice(from, to).reduce((a, d) => a + asInt(d.data()?.[f]), 0)]));
             const sessions = live.docs.filter(d => sessionIsLive(d.data(), now, now)).map(d => ({ sid: d.id, title: d.data().title, hostName: d.data().hostName, mode: d.data().mode, kind: d.data().kind, created: d.data().created }));
             return {

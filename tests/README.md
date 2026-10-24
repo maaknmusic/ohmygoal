@@ -15,6 +15,8 @@ Need `npm i playwright` (Chromium), a static server (`python3 -m http.server 876
 node tests/e2e/v2.mjs <scratch-dir>   # UI flows on desktop and phone
 node tests/e2e/admin-inbox.mjs <scratch>   # admin Inbox (needs the emulators)
 node tests/e2e/live-emulator.mjs <scratch>   # live sessions: fees, the 70/30 split, private seats, gifts, payouts, suspension (needs the emulators)
+node tests/e2e/coingifts-emulator.mjs <scratch>  # gifting coins: purchased-only, 70/30, limits, who you can gift (needs the emulators)
+node tests/e2e/coingifts-ui.mjs <scratch>        # two browsers: Send coins from a chat
 node tests/e2e/live-ui.mjs <scratch>         # two browsers: host goes live, guest joins and gifts, private session (needs the emulators)
 node tests/e2e/admin-hosts.mjs <scratch>     # admin Hosts tab: usage, live now, suspend, payouts (needs the emulators)
 node tests/e2e/admin-analytics.mjs <scratch>   # admin Dashboard, Premium, Payments, People, CSV (needs the emulators)

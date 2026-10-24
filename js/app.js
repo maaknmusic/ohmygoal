@@ -1261,6 +1261,16 @@ function onPeerData(sess, msg) {
             SOUND.match();
             break;
         }
+        case 'coingift': {
+            // Only a notice: the coins were moved by the server, so a made-up message gets nothing. Refreshing the balance shows the truth.
+            const n = Number.isInteger(msg.n) && msg.n > 0 && msg.n <= 500 ? msg.n : 0;
+            if (!n || sess.coinNotes >= 5) break;
+            sess.coinNotes = (sess.coinNotes || 0) + 1;
+            toast(`${sess.partner?.nick || 'Stranger'} sent you coins.`);
+            SOUND.match();
+            refreshWallet();
+            break;
+        }
         case 'loc':
             receiveCell(sess, msg);
             break;
@@ -2003,7 +2013,7 @@ function showRevealCard(sess, c) {
 }
 
 // ---- Stickers and gifts (js/stickers.js, functions/wallet.js) ----
-const walletState = { coins: null };
+const walletState = { coins: null, giftable: 0 };
 function showSticker(who, id, caption = '') {
     const wrap = h('div', 'msg ' + who + ' sticker-msg');
     const img = new Image();
@@ -2046,6 +2056,7 @@ async function refreshWallet() {
     try {
         const w = (await (await callable(S.transport, 'getWallet', PREMIUM_CFG.functionsRegion))()).data;
         walletState.coins = w.coins;
+        walletState.giftable = w.giftable ?? 0;
         walletState.daily = w.dailyAvailable;
     } catch { walletState.coins = null; }
     renderCoins();
@@ -2125,6 +2136,51 @@ $('getCoinsBtn').onclick = async () => {
     }));
     openSheet($('coinSheet'));
 };
+// ---- gifting coins to the person you are with (functions/coingifts.js): the platform keeps 30%, they receive the rest to spend ----
+const GIFT_COIN_CHOICES = [50, 100, 200, 500];
+/** target: { to: uid, name, roomId } for a chat or { to: uid, name, sid } for a live session. */
+async function openGiftCoins(target) {
+    if (!coinsOnline()) { toast('Coins are available on the online version of the site.', true); return; }
+    if (!friends?.signedIn && !(await signInFlow())) return;
+    await refreshWallet();
+    const name = String(target.name || 'them').slice(0, 20);
+    $('giftCoinsWho').textContent = `Send coins to ${name}`;
+    $('giftCoinsHint').textContent = walletState.giftable > 0
+        ? `You can send up to ${Math.min(500, walletState.giftable)} coins now (the coins you bought).`
+        : 'You have no purchased coins to send. Buy coins first; free daily coins can’t be sent.';
+    $('giftCoinsChoices').replaceChildren(...GIFT_COIN_CHOICES.map(n => {
+        const got = Math.floor((n * 70) / 100);
+        const b = h('button', 'btn btn-primary coin-pack', `${n} coins → ${name} gets ${got}`);
+        b.type = 'button';
+        b.disabled = walletState.giftable < n;
+        b.onclick = async () => {
+            if (!confirm(`Send ${n} coins to ${name}? They will receive ${got} (we keep 30%). This can’t be undone.`)) return;
+            b.disabled = true;
+            try {
+                const r = (await (await callable(S.transport, 'giftCoins', PREMIUM_CFG.functionsRegion))({ to: target.to, amount: n, ...(target.sid ? { sid: target.sid } : { roomId: target.roomId }) })).data;
+                walletState.coins = r.coins; walletState.giftable = r.giftable; renderCoins();
+                closeSheet($('giftCoinsSheet'));
+                toast(`You sent ${n} coins. ${name} received ${r.recipient}.`);
+                SOUND.match();
+                if (target.onSent) target.onSent(r);
+            } catch (e) {
+                toast(e.message && /failed-precondition|resource-exhausted|permission-denied|invalid-argument/.test(e.code || '') ? e.message : 'Couldn’t send the coins. Try again.', true);
+            } finally { b.disabled = false; }
+        };
+        return b;
+    }));
+    openSheet($('giftCoinsSheet'));
+}
+$('sendCoinsBtn').onclick = () => {
+    const sess = S.session;
+    if (!sess || S.phase !== 'connected' || sess.friend) { toast('Send coins to someone while you are chatting with them.', true); return; }
+    el.stickerPop.classList.add('hidden');
+    openGiftCoins({
+        to: sess.partnerId, name: sess.partner?.nick || 'them', roomId: sess.roomId,
+        onSent: r => { sendData({ t: 'coingift', n: r.recipient }); showSticker('me', 'rose', `You sent ${sess.partner?.nick || 'them'} ${r.recipient} coins`); },
+    });
+};
+
 $('dailyCoinsBtn').onclick = async () => {
     try {
         const r = (await (await callable(S.transport, 'claimDaily', PREMIUM_CFG.functionsRegion))()).data;
@@ -2950,6 +3006,7 @@ const groupUi = createGroupUi({
     // live sessions (js/liveui.js): sign-in and the coin wallet live in this file
     signedIn: () => Boolean(friends?.signedIn),
     signIn: () => signInFlow(),
+    giftCoins: target => openGiftCoins(target),
     coins: {
         get: () => walletState.coins,
         set: n => { walletState.coins = n; renderCoins(); },
