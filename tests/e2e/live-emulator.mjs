@@ -74,6 +74,7 @@ const stamp = await P(() => window.T.stamp);
 const early = await call('anon', 'startLive', { title: 'Hindi songs', mode: 'voice', kind: 'public' });
 const na = await call('g1', 'adminHosts', { action: 'list' });
 step('1a. there is no application: but anonymous accounts cannot host, and the admin functions refuse non-admins', early.err === 'functions/failed-precondition' && na.err === 'functions/permission-denied', JSON.stringify([early.err, na.err]));
+const u0 = (await call('boss', 'adminHosts', { action: 'list' })).ok.usage.today;
 const my = await call('host', 'myHost', {});
 step('1b. the host screen data shows the fixed numbers, an active status, and that the first session is free', my.ok?.status === 'active' && my.ok.startFee === 49 && my.ok.privateFee === 200 && my.ok.sharePct === 70 && my.ok.coins === 0 && my.ok.firstFree === true && my.ok.minPayoutCoins === 300, JSON.stringify(my.ok));
 const t0 = await call('host', 'startLive', { name: 'Riya Live', title: 'Warm up session', mode: 'voice', kind: 'public' });
@@ -82,7 +83,6 @@ step('1c. the first session is free: it opens with no coins at all, and takes no
 const my1 = await call('host', 'myHost', {});
 const t0b = await call('host', 'startLive', { title: 'Second session', mode: 'voice', kind: 'public' });
 step('1c2. from the second session on it costs 49 coins, and with none the host is told so', my1.ok.firstFree === false && t0b.err === 'functions/failed-precondition' && /49 coins/.test(t0b.msg), t0b.msg);
-const u0 = (await call('boss', 'adminHosts', { action: 'list' })).ok.usage.today;
 const approveTry = await call('boss', 'adminHosts', { action: 'decide', uid: hostUid, decision: 'approve' });
 step('1d. approval no longer exists', approveTry.err === 'functions/invalid-argument');
 
@@ -262,7 +262,7 @@ step('10. a browser cannot read host money, payouts or paid markers, and cannot 
 // ------------------------------------------------------------------------------------------------ 11. numbers for the dashboard
 const st = await read(`${base}/private/data/stats/${dayKey}`);
 const d = k => (st?.[k] || 0) - (st0[k] || 0);
-step('11. the daily counters record starts, start fees, private seats and gifts', d('liveStarts') === 4 && d('liveFeeCoins') === 196 && d('privateJoins') === 2 && d('privateCoins') === 400 && d('liveGifts') === 33 && d('liveGiftCoins') === 5 + 50 + 150 + 5, JSON.stringify(['liveStarts', 'liveFeeCoins', 'privateJoins', 'privateCoins', 'liveGifts', 'liveGiftCoins'].map(k => [k, d(k)])));
+step('11. the daily counters record starts, start fees, private seats and gifts', d('liveStarts') === 5 && d('liveFeeCoins') === 196 && d('privateJoins') === 2 && d('privateCoins') === 400 && d('liveGifts') === 33 && d('liveGiftCoins') === 5 + 50 + 150 + 5, JSON.stringify(['liveStarts', 'liveFeeCoins', 'privateJoins', 'privateCoins', 'liveGifts', 'liveGiftCoins'].map(k => [k, d(k)])));
 
 await browser.close();
 console.log(failures ? `${failures} FAILED` : 'ALL PASSED');
