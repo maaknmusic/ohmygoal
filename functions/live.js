@@ -3,7 +3,7 @@
 // and a host can run a paid private session. All money moves here, in transactions, and the browser never decides a price or a share.
 //
 //   Anyone signed in with Google (and past the age check) can host: no application, no approval. You can suspend a host in the admin panel.
-//   startLive      the host pays LIVE_START_FEE coins and a room opens: public (anyone joins free) or private (every guest pays PRIVATE_FEE coins).
+//   startLive      the host pays LIVE_START_FEE coins (the first session of each account is free) and a room opens: public (anyone joins free) or private (every guest pays PRIVATE_FEE coins).
 //   joinLive       adds the caller to the room. A private session charges the guest once per session, in the same transaction that
 //                  credits the host.
 //   sendLiveGift   spends gift coins; the host gets HOST_SHARE_PCT of them, the rest is yours.
@@ -25,7 +25,7 @@ export const LIVE_START_FEE = 49;           // coins a host pays to open a sessi
 export const PRIVATE_FEE = 200;             // coins each guest pays to join a private session
 export const HOST_SHARE_PCT = 70;           // share of every gift and private fee that the host earns
 export const COIN_VALUE_PAISE = 75;         // what one earned coin is worth when you pay the host (₹0.75)
-export const MIN_PAYOUT_COINS = 500;        // smallest payout a host can ask for
+export const MIN_PAYOUT_COINS = 300;        // smallest payout a host can ask for (about ₹225)
 export const MAX_SESSION_MS = 3 * 3600000;  // a session closes by itself after this
 export const STARTS_PER_DAY = 12;
 /** Rough running cost of one person in a live room for one hour, in paise (database writes and reads, plus an allowance for the video relay). Only used for the admin usage panel. */
@@ -165,7 +165,7 @@ export const myHost = onCall(callOpts(), async request => {
         coins, pendingCoins: asInt(wallet.pending), paidOutCoins: asInt(wallet.paidOut), lifetimeCoins: asInt(wallet.lifetime),
         paise: coinsToPaise(coins), coinPaise: COIN_VALUE_PAISE, minPayoutCoins: MIN_PAYOUT_COINS,
         startFee: LIVE_START_FEE, privateFee: PRIVATE_FEE, sharePct: HOST_SHARE_PCT,
-        activeSid: active?.id || null,
+        activeSid: active?.id || null, firstFree: !host.firstLiveAt,
         payouts: pays.docs.map(d => ({ id: d.id, coins: d.data().coins, paise: d.data().paise, status: d.data().status, at: d.data().at, paidAt: d.data().paidAt || 0, reference: d.data().status === 'paid' ? d.data().reference || '' : '' }))
             .sort((a, b) => b.at - a.at).slice(0, 10),
     };
@@ -198,14 +198,17 @@ export const startLive = onCall(callOpts(), async request => {
     for (const d of mine.docs) if (d.data().status === 'live') await closeSession(d.id, now, 'replaced');
 
     const sid = publicCol('groups').doc().id;
+    let fee = LIVE_START_FEE;
     const limitRef = privateDoc(`liveStarts/${uid}`);
     await db.runTransaction(async t => {
-        const [lim, w] = await Promise.all([t.get(limitRef), t.get(walletRef(uid))]);
+        const [lim, w, hostSnap] = await Promise.all([t.get(limitRef), t.get(walletRef(uid)), t.get(privateDoc(`hosts/${uid}`))]);
         const times = (lim.data()?.times || []).filter(x => typeof x === 'number' && x > now - DAY);
         if (times.length >= STARTS_PER_DAY) throw new HttpsError('resource-exhausted', 'You have started a lot of sessions today. Try again tomorrow.');
+        const firstTime = !hostSnap.data()?.firstLiveAt;       // an account's first session is free
+        fee = firstTime ? 0 : LIVE_START_FEE;
         const coins = asInt(w.data()?.coins);
-        if (coins < LIVE_START_FEE) throw new HttpsError('failed-precondition', `Going live costs ${LIVE_START_FEE} coins. You have ${coins}. Add coins first.`);
-        t.set(walletRef(uid), { coins: coins - LIVE_START_FEE }, { merge: true });
+        if (coins < fee) throw new HttpsError('failed-precondition', `Going live costs ${LIVE_START_FEE} coins. You have ${coins}. Add coins first.`);
+        if (fee) t.set(walletRef(uid), { coins: coins - fee }, { merge: true });
         t.set(limitRef, { times: [...times, now] });
         t.set(publicDoc(`groups/${sid}`), {
             topic: 'live', live: true, status: 'live', hostUid: uid, hostName, hostAvatar, title, mode, cap, kind,
@@ -213,10 +216,10 @@ export const startLive = onCall(callOpts(), async request => {
         });
         t.set(membersCol(sid).doc(uid), { nick: hostName, avatar: hostAvatar, ts: now, joined: now, host: true });
         t.set(privateDoc(`hosts/${uid}`), { status: host.status || 'active', name: hostName, avatar: hostAvatar, email: request.auth.token.email || '', lastLiveAt: now, firstLiveAt: host.firstLiveAt || now }, { merge: true });
-        t.set(privateCol('liveFees').doc(), { hostUid: uid, sid, coins: LIVE_START_FEE, at: now });
+        if (fee) t.set(privateCol('liveFees').doc(), { hostUid: uid, sid, coins: fee, at: now });
     });
-    await bump('liveStarts'); await bump('liveFeeCoins', LIVE_START_FEE);
-    return { sid, cap, kind, maxGuests };
+    await bump('liveStarts'); if (fee) await bump('liveFeeCoins', fee); else await bump('liveFreeStarts');
+    return { sid, cap, kind, maxGuests, fee };
 });
 
 export const joinLive = onCall(callOpts(), async request => {

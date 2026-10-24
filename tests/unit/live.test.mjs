@@ -11,7 +11,7 @@ test('the agreed numbers: 49 coins to go live, 200 coins for a private seat, the
     assert.equal(HOST_SHARE_PCT, 70);
     assert.equal(MAX_SESSION_MS, 3 * 3600000);
     assert.ok(COIN_VALUE_PAISE > 0 && COIN_VALUE_PAISE <= 100);
-    assert.ok(MIN_PAYOUT_COINS >= 100);
+    assert.equal(MIN_PAYOUT_COINS, 300);
     assert.ok(STARTS_PER_DAY >= 1);
 });
 

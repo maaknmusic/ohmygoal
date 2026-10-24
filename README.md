@@ -136,14 +136,14 @@ On the **Group rooms** screen, the **Live sessions** tab lists who is live now. 
 
 | | Price | Who gets it |
 |---|---|---|
-| Go live (a public or a private session) | **49 coins**, paid by the host | the platform |
+| Go live (a public or a private session) | **49 coins**, paid by the host; **each account's first session is free** | the platform |
 | Join a **public** session | free | |
 | Join a **private** session (the host sets 1 to 7 guests) | **200 coins** per guest, once per session (re-joining is free) | 70% to the host, 30% to the platform |
 | A gift to the host | the gift's coin price (5 to 50) | 70% to the host (rounded down), the rest to the platform |
 
 A session ends when the host ends it or leaves, after 3 hours, or when the host has been gone for 3 minutes. A host can run 12 sessions a day.
 
-**Payouts.** Each host has an earnings balance (coins). From **500 earned coins** they can ask for a payout and give a UPI ID or bank details; an earned coin is worth **₹0.75**. You pay by hand and record the reference in **Admin → Hosts → Payout requests**; rejecting a payout gives the coins back. Nothing is paid out automatically. Hosts are responsible for their own taxes; take advice on TDS, GST and KYC before paying real money out.
+**Payouts.** Each host has an earnings balance (coins). From **300 earned coins** (about ₹225) they can ask for a payout and give a UPI ID or bank details; an earned coin is worth **₹0.75**. You pay by hand and record the reference in **Admin → Hosts → Payout requests**; rejecting a payout gives the coins back. Nothing is paid out automatically. Hosts are responsible for their own taxes; take advice on TDS, GST and KYC before paying real money out.
 
 **Admin → Hosts** shows: a usage and margin table (sessions, live hours, people hours, private seats and gifts, your income, what you owe hosts, an *estimated* running cost, and the margin) for today, 7 and 30 days; what is live now with an **End this session** button; every host with their earnings and **Suspend / Reinstate**; and the payout requests. A suspended host's session ends at once and they cannot go live.
 

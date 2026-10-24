@@ -3,7 +3,7 @@
 export const LIVE_START_FEE = 49;      // coins a host pays to open a session
 export const PRIVATE_FEE = 200;        // coins each guest pays to join a private session
 export const HOST_SHARE_PCT = 70;      // share of gifts and private fees the host earns
-export const MIN_PAYOUT_COINS = 500;
+export const MIN_PAYOUT_COINS = 300;
 export const MAX_TITLE = 60;
 
 /** Same rule as the server: does this text try to move people off the platform (a link, e-mail, phone number or social handle)? */
