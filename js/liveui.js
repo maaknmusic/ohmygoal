@@ -37,7 +37,7 @@ export function createLiveUi({ pane, ctx, enter }) {
             if (ctx.signedIn()) {
                 let next = null;
                 try { next = await api().call('myHost'); } catch { next = null; }
-                const key = JSON.stringify([next?.status, next?.coins, next?.pendingCoins, next?.paidOutCoins, next?.activeSid, next?.payouts?.length, true]);
+                const key = JSON.stringify([next?.status, next?.coins, next?.heldCoins, next?.payoutsPaused, next?.pendingCoins, next?.paidOutCoins, next?.activeSid, next?.payouts?.length, true]);
                 if (key !== meKey) { hostChanged = true; meKey = key; }
                 me = next;
             } else { if (me !== null || meKey !== 'out') hostChanged = true; me = null; meKey = 'out'; }
@@ -180,17 +180,20 @@ export function createLiveUi({ pane, ctx, enter }) {
         c.append(h('p', 'hint', 'Only coins that people bought count. Gifts and seats paid with free coins earn nothing.'));   // functions/live.js earningSplit
         const tiles = h('div', 'live-tiles');
         const tile = (label, value, sub) => { const t = h('div', 'live-tile'); t.append(h('small', '', label), h('b', '', value)); if (sub) t.append(h('small', '', sub)); return t; };
-        tiles.append(tile('Ready to pay out', `${me.coins} coins`, rupees(me.paise)), tile('Payout in progress', `${me.pendingCoins} coins`, rupees(me.pendingCoins * me.coinPaise)), tile('Paid to you', `${me.paidOutCoins} coins`, rupees(me.paidOutCoins * me.coinPaise)));
+        const payable = Number.isInteger(me.payableCoins) ? me.payableCoins : me.coins, held = me.heldCoins || 0;
+        tiles.append(tile('Ready to pay out', `${payable} coins`, rupees(payable * me.coinPaise)), tile(`On hold (${me.holdDays || 7} days)`, `${held} coins`, rupees(held * me.coinPaise)), tile('Payout in progress', `${me.pendingCoins} coins`, rupees(me.pendingCoins * me.coinPaise)), tile('Paid to you', `${me.paidOutCoins} coins`, rupees(me.paidOutCoins * me.coinPaise)));
         c.append(tiles);
         const details = input('payDetails', { maxLength: 120, placeholder: 'Your UPI ID or bank account details' });
         const ask = h('button', 'btn btn-primary btn-sm', 'Ask for a payout'); ask.type = 'button';
-        ask.disabled = me.coins < MIN_PAYOUT_COINS;
+        ask.disabled = payable < MIN_PAYOUT_COINS || me.payoutsPaused;
         ask.onclick = async () => {
             ask.disabled = true;
             try { const r = await api().call('requestPayout', { details: details.value }); ctx.toast(`Payout requested: ${rupees(r.paise)}. We’ll pay you and mark it done here.`); await load(); }
             catch (e) { fail(e); ask.disabled = false; }
         };
-        if (me.coins < MIN_PAYOUT_COINS) c.append(h('p', 'hint', `You can ask for a payout from ${MIN_PAYOUT_COINS} coins. You have ${me.coins}.`));
+        if (held) c.append(h('p', 'hint', `Coins you earn can be paid out ${me.holdDays || 7} days later, so refunds and chargebacks show up first.`));
+        if (me.payoutsPaused) c.append(h('p', 'hint', 'Payouts are paused for your account while we check a refunded or disputed payment. Contact us if you have questions.'));
+        else if (payable < MIN_PAYOUT_COINS) c.append(h('p', 'hint', `You can ask for a payout from ${MIN_PAYOUT_COINS} coins. You have ${payable}.`));
         c.append(field('Pay me at', details, 'Only the admins see this.'), ask);
         if (me.payouts?.length) {
             const list = h('div', 'live-history');
