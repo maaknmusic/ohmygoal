@@ -2154,7 +2154,7 @@ async function openGiftCoins(target) {
         b.type = 'button';
         b.disabled = walletState.giftable < n;
         b.onclick = async () => {
-            if (!confirm(`Send ${n} coins to ${name}? They will receive ${got} (we keep 30%). This can’t be undone.`)) return;
+            if (!confirm(i18n.t(`Send ${n} coins to ${name}? They will receive ${got} (we keep 30%). This can’t be undone.`))) return;
             b.disabled = true;
             try {
                 const r = (await (await callable(S.transport, 'giftCoins', PREMIUM_CFG.functionsRegion))({ to: target.to, amount: n, ...(target.sid ? { sid: target.sid } : { roomId: target.roomId }) })).data;
@@ -2177,7 +2177,7 @@ $('sendCoinsBtn').onclick = () => {
     el.stickerPop.classList.add('hidden');
     openGiftCoins({
         to: sess.partnerId, name: sess.partner?.nick || 'them', roomId: sess.roomId,
-        onSent: r => { sendData({ t: 'coingift', n: r.recipient }); showSticker('me', 'rose', `You sent ${sess.partner?.nick || 'them'} ${r.recipient} coins`); },
+        onSent: r => { sendData({ t: 'coingift', n: r.recipient }); showSticker('me', 'rose', i18n.t(`You sent ${sess.partner?.nick || 'them'} ${r.recipient} coins`)); },
     });
 };
 
@@ -3006,6 +3006,7 @@ const groupUi = createGroupUi({
     // live sessions (js/liveui.js): sign-in and the coin wallet live in this file
     signedIn: () => Boolean(friends?.signedIn),
     signIn: () => signInFlow(),
+    t: text => i18n.t(text),
     giftCoins: target => openGiftCoins(target),
     coins: {
         get: () => walletState.coins,
