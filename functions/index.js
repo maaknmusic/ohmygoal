@@ -17,6 +17,7 @@ import { db, APP_ID, callOpts } from './common.js';
 import { COIN_PACKS } from './gifts.js';
 import { addCoinsTx, walletDoc } from './wallet.js';
 import { reverseOrder } from './reversals.js';
+import { record } from './ledger.js';
 
 // Gifting bought coins to the person you are with (the platform keeps 30%).
 export { giftCoins } from './coingifts.js';
@@ -136,14 +137,17 @@ async function grantOrder(orderId, paymentId) {
         const order = oSnap.data();
         if (order.kind === 'tip') {
             // A tip is recorded as paid (exactly once) and changes nothing else.
-            if (order.status !== 'paid') t.update(orderRef(orderId), { status: 'paid', paymentId, paidAt: Date.now() });
+            if (order.status !== 'paid') {
+                t.update(orderRef(orderId), { status: 'paid', paymentId, paidAt: Date.now() });
+                record(t, { type: 'tip', uid: order.uid, paise: order.amount, ref: orderId, by: 'razorpay', note: paymentId });
+            }
             return { uid: order.uid, premiumUntil: 0, alreadyGranted: order.status === 'paid', tip: true };
         }
         if (order.kind === 'coins') {
             // Coins are added exactly once per paid order.
             const wSnap = await t.get(walletDoc(order.uid));
             if (order.status !== 'paid') {
-                addCoinsTx(t, order.uid, wSnap.data(), order.coins);
+                addCoinsTx(t, order.uid, wSnap.data(), order.coins, { paise: order.amount, ref: orderId, by: 'razorpay', note: paymentId });
                 t.update(orderRef(orderId), { status: 'paid', paymentId, paidAt: Date.now() });
             }
             const after = Math.min(100000, (Number.isInteger(wSnap.data()?.coins) ? wSnap.data().coins : 0) + (order.status === 'paid' ? 0 : order.coins));
@@ -161,6 +165,7 @@ async function grantOrder(orderId, paymentId) {
         const premiumUntil = Math.max(now, eSnap.data()?.premiumUntil || 0) + days * DAY_MS;
         t.set(eRef, { premiumUntil, updatedAt: now });
         t.update(orderRef(orderId), { status: 'paid', paymentId, paidAt: now });
+        record(t, { at: now, type: 'purchase_premium', uid: order.uid, paise: order.amount, days, ref: orderId, by: 'razorpay', note: paymentId });
         return { uid: order.uid, premiumUntil, alreadyGranted: false };
     });
 }

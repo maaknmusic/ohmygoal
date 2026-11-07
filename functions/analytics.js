@@ -11,6 +11,7 @@ import { db, publicDoc, publicCol, privateDoc, privateCol, callOpts } from './co
 import { ADMIN_EMAILS, requireAdmin } from './moderation.js';
 import { istDay, statsRef } from './stats.js';
 import { MAX_COINS } from './gifts.js';
+import { record, firstBreak } from './ledger.js';
 
 const DAY = 86400000;
 const UID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
@@ -165,11 +166,13 @@ async function lookup(q) {
     try { user = query.includes('@') ? await getAuth().getUserByEmail(query.toLowerCase()) : UID.test(query) ? await getAuth().getUser(query) : null; } catch { user = null; }
     if (!user) return { found: false };
     const uid = user.uid, now = Date.now();
-    const [ent, wallet, rep, orderSnap, banSnap, reportSnap, logSnap] = await Promise.all([
+    const [ent, wallet, rep, orderSnap, banSnap, reportSnap, logSnap, txSnap] = await Promise.all([
         publicDoc(`entitlements/${uid}`).get(), privateDoc(`wallet/${uid}`).get(), publicDoc(`reputation/${uid}`).get(),
         privateCol('orders').where('uid', '==', uid).limit(30).get(), privateCol('bans').where('uid', '==', uid).limit(30).get(),
         publicCol('reports').where('reported', '==', uid).limit(30).get(), privateCol('adminLog').where('details.uid', '==', uid).limit(30).get(),
+        privateCol('transactions').where('uid', '==', uid).limit(2000).get(),
     ]);
+    const tx = txSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.at - b.at);
     return {
         found: true,
         user: { uid, email: user.email || '', name: user.displayName || '', anonymous: !user.email, createdAt: Date.parse(user.metadata.creationTime) || 0, lastSignIn: Date.parse(user.metadata.lastSignInTime) || 0 },
@@ -180,6 +183,8 @@ async function lookup(q) {
         bans: banSnap.docs.map(d => d.data()).filter(b => (b.until || 0) > now).map(b => ({ scope: b.scope, reason: b.reason, until: b.until, type: b.type })),
         reportsAbout: reportSnap.docs.map(d => d.data()).map(r => ({ reason: r.reason, ts: r.ts?.toMillis?.() || 0 })).sort((a, b) => b.ts - a.ts),
         log: logSnap.docs.map(d => d.data()).sort((a, b) => b.at - a.at).map(l => ({ at: l.at, by: l.by, what: l.what, details: l.details })),
+        // every transaction of this person, newest first, and whether the history adds up step by step
+        transactions: tx.slice().reverse(), transactionsCapped: txSnap.size >= 2000, ledgerBreak: firstBreak(tx),
     };
 }
 
@@ -197,6 +202,11 @@ export const adminAnalytics = onCall(callOpts({ secrets: [ADMIN_EMAILS], timeout
         case 'members': return { members: await members(now) };
         case 'orders': return { orders: await orders() };
         case 'user': return lookup(request.data.q);
+        case 'transactions': {      // every transaction in the last `days` days (newest first, at most 20,000) for the CSV download
+            const days = Math.min(366, Math.max(1, Math.floor(Number(request.data.days)) || 30));
+            const snap = await privateCol('transactions').where('at', '>=', now - days * DAY).orderBy('at', 'desc').limit(20000).get();
+            return { transactions: snap.docs.map(d => ({ id: d.id, ...d.data() })), capped: snap.size >= 20000, days };
+        }
         case 'grantPremium': {
             const uid = target();
             const days = Number(request.data.days);
@@ -206,6 +216,7 @@ export const adminAnalytics = onCall(callOpts({ secrets: [ADMIN_EMAILS], timeout
                 const cur = (await t.get(ref)).data()?.premiumUntil || 0;
                 const next = Math.max(now, cur) + days * DAY;
                 t.set(ref, { premiumUntil: next, updatedAt: now });
+                record(t, { at: now, type: 'admin_premium', uid, days, by: email, note: note() });
                 return next;
             });
             await log('grantPremium', { uid, days, note: note() });
@@ -213,7 +224,12 @@ export const adminAnalytics = onCall(callOpts({ secrets: [ADMIN_EMAILS], timeout
         }
         case 'revokePremium': {
             const uid = target();
-            await publicDoc(`entitlements/${uid}`).set({ premiumUntil: now, updatedAt: now }, { merge: true });
+            await db.runTransaction(async t => {
+                const ref = publicDoc(`entitlements/${uid}`);
+                const cur = (await t.get(ref)).data()?.premiumUntil || 0;
+                t.set(ref, { premiumUntil: now, updatedAt: now }, { merge: true });
+                record(t, { at: now, type: 'admin_premium', uid, days: -Math.max(0, Math.round((cur - now) / DAY)), by: email, note: note() || 'revoked' });
+            });
             await log('revokePremium', { uid, note: note() });
             return { ok: true };
         }
@@ -227,6 +243,7 @@ export const adminAnalytics = onCall(callOpts({ secrets: [ADMIN_EMAILS], timeout
                 const cur = w.coins;
                 const next = Math.min(MAX_COINS, Math.max(0, (Number.isInteger(cur) ? cur : 0) + delta));
                 t.set(ref, { coins: next, bought: Math.min(next, Number.isInteger(w.bought) ? w.bought : 0) }, { merge: true });   // coins an admin adds can be spent but not gifted
+                record(t, { at: now, type: 'admin_coins', uid, coins: next - (Number.isInteger(cur) ? cur : 0), balance: next, by: email, note: note() });
                 return next;
             });
             await log('adjustCoins', { uid, delta, note: note() });

@@ -8,6 +8,7 @@
 import { logger } from 'firebase-functions/v2';
 import { db, privateCol, privateDoc, publicDoc } from './common.js';
 import { walletDoc } from './wallet.js';
+import { record } from './ledger.js';
 
 const DAY = 86400000;
 const whole = v => (Number.isInteger(v) && v > 0 ? v : 0);
@@ -44,12 +45,14 @@ export async function reverseOrder(orderId, { reason, refunded, paymentId }) {
             const w = (await t.get(wRef)).data() || {};
             const after = walletAfterTakeBack(w, due);
             t.set(wRef, { coins: after.coins, bought: after.bought }, { merge: true });
+            record(t, { at: now, type: reason, uid: o.uid, coins: -after.taken, balance: after.coins, paise: total - whole(o.refundedPaise), ref: orderId, by: 'razorpay', note: `coins taken back ${after.taken}, unrecovered ${due - after.taken}` });
             t.update(oRef, { status: reason === 'dispute' ? 'disputed' : 'refunded', reversedAt: now, refundedPaise: total, reversedCoins: whole(o.reversedCoins) + due, unrecoveredCoins: whole(o.unrecoveredCoins) + (due - after.taken) });
             return { uid: o.uid, kind: 'coins', taken: after.taken, unrecovered: due - after.taken };
         }
         if (o.kind === 'tip') {
             if (o.reversedAt) return null;
             t.update(oRef, { status: reason === 'dispute' ? 'disputed' : 'refunded', reversedAt: now, refundedPaise: total });
+            record(t, { at: now, type: reason, uid: o.uid, paise: total, ref: orderId, by: 'razorpay', note: 'tip' });
             return { uid: o.uid, kind: 'tip' };
         }
         // a Premium pass: its days are removed (never below "now", so time from other passes is kept)
@@ -59,6 +62,7 @@ export async function reverseOrder(orderId, { reason, refunded, paymentId }) {
         const next = Math.max(now, until - whole(o.days) * DAY);
         if (until > now) t.set(eRef, { premiumUntil: next, updatedAt: now }, { merge: true });
         t.update(oRef, { status: reason === 'dispute' ? 'disputed' : 'refunded', reversedAt: now, refundedPaise: total });
+        record(t, { at: now, type: reason, uid: o.uid, paise: total, days: -Math.round((until - next) / DAY), ref: orderId, by: 'razorpay', note: 'premium' });
         return { uid: o.uid, kind: 'premium', premiumUntil: next };
     });
     if (!res) return null;

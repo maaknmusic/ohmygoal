@@ -11,6 +11,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { db, publicDoc, privateDoc, callOpts } from './common.js';
 import { bump } from './stats.js';
 import { GIFTS, DAILY_COINS, DAILY_COINS_PREMIUM, GIFT_HOURLY_CAP, MAX_COINS, afterSpend } from './gifts.js';
+import { record } from './ledger.js';
 
 const HOUR = 3600000;
 const IST_MS = 330 * 60000;
@@ -44,6 +45,7 @@ export const claimDaily = onCall(callOpts(), async request => {
         if (w.dailyDay === day) return { coins, gained: 0 };
         const next = Math.min(MAX_COINS, coins + bonus);
         t.set(walletRef(uid), { coins: next, dailyDay: day }, { merge: true });
+        if (next !== coins) record(t, { type: 'daily_bonus', uid, coins: next - coins, balance: next });
         return { coins: next, gained: next - coins };
     });
 });
@@ -75,17 +77,22 @@ export const sendGift = onCall(callOpts(), async request => {
         if (coins < price) throw new HttpsError('failed-precondition', 'Not enough coins.');
         t.set(walletRef(uid), { ...afterSpend(w, price), sent: [...sent, now] }, { merge: true });
         t.set(privateDoc(`giftLog/${roomId}_${uid}_${now}`), { uid, roomId, gift, price, at: now });
+        record(t, { at: now, type: 'chat_gift', uid, coins: -price, balance: coins - price, platform: price, other: users.find(u => u !== uid), ref: roomId, note: gift });
         return { coins: coins - price };
     });
     await bump('gifts'); await bump('coinsSpent', price);
     return result;
 });
 
-/** Adds BOUGHT coins to a wallet (called when a coin-pack order is paid). Capped so a wallet can't grow without limit. `wallet` is the wallet document's data. */
-export function addCoinsTx(t, uid, wallet, amount) {
+/**
+ * Adds BOUGHT coins to a wallet (called when a coin-pack order is paid). Capped so a wallet can't grow without limit. `wallet` is the
+ * wallet document's data; `entry` the ledger fields of the purchase (paise, ref, by).
+ */
+export function addCoinsTx(t, uid, wallet, amount, entry = {}) {
     const coins = Number.isInteger(wallet?.coins) ? wallet.coins : 0;
     const bought = Math.min(Number.isInteger(wallet?.bought) ? wallet.bought : 0, coins);
     const next = Math.min(MAX_COINS, coins + amount);
     t.set(walletRef(uid), { coins: next, bought: Math.min(next, bought + amount) }, { merge: true });
+    record(t, { type: 'purchase_coins', uid, coins: next - coins, balance: next, ...entry });
 }
 export const walletDoc = walletRef;

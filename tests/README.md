@@ -19,6 +19,7 @@ node tests/e2e/coingifts-emulator.mjs <scratch>  # gifting coins: purchased-only
 node tests/e2e/coingifts-ui.mjs <scratch>        # two browsers: Send coins from a chat
 node tests/e2e/live-ui.mjs <scratch>         # two browsers: host goes live, guest joins and gifts, private session (needs the emulators)
 node tests/e2e/payout-safety-emulator.mjs <scratch>   # 7-day hold, refunds and chargebacks taking coins back and pausing payouts, admin warnings (needs the emulators and mockrzp)
+node tests/e2e/transactions-emulator.mjs <scratch>   # every kind of transaction leaves its ledger entry; histories add up; admin views and export (needs the emulators and mockrzp)
 node tests/e2e/admin-hosts.mjs <scratch>     # admin Hosts tab: usage, live now, suspend, payouts (needs the emulators)
 node tests/e2e/admin-analytics.mjs <scratch>   # admin Dashboard, Premium, Payments, People, CSV (needs the emulators)
 node tests/e2e/hardening.mjs          # hostile peer (floods, oversize frames, extra channels)
