@@ -21,6 +21,7 @@ import { ADMIN_EMAILS, requireAdmin } from './moderation.js';
 import { bump, istDay, statsRef } from './stats.js';
 import { cleanNick, cleanAvatar, CAPS, STALE_MS } from './groups.js';
 import { GIFTS, GIFT_HOURLY_CAP, afterSpend } from './gifts.js';
+import { record } from './ledger.js';
 
 export const LIVE_START_FEE = 49;           // coins a host pays to open a session (kept by the platform)
 export const PRIVATE_FEE = 200;             // coins each guest pays to join a private session
@@ -146,6 +147,7 @@ function creditHost(t, hostUid, hw, share, entry, now) {
         recent: recentAfter(cur.recent, share, now),
     }, { mergeFields: ['coins', 'lifetime', 'pending', 'paidOut', 'recent'] });
     t.set(privateCol('hostLedger').doc(), { hostUid, ...entry, hostShare: share, at: now });
+    if (share) record(t, { at: now, type: 'host_earning', uid: hostUid, earned: share, earnedBalance: asInt(cur.coins) + share, other: entry.fromUid, ref: entry.sid, note: entry.gift || entry.type });
 }
 
 /** A person can host unless an admin suspended them. Returns their host record (or an empty one for a first-timer). */
@@ -245,7 +247,10 @@ export const startLive = onCall(callOpts(), async request => {
         fee = firstTime ? 0 : LIVE_START_FEE;
         const coins = asInt(w.data()?.coins);
         if (coins < fee) throw new HttpsError('failed-precondition', `Going live costs ${LIVE_START_FEE} coins. You have ${coins}. Add coins first.`);
-        if (fee) t.set(walletRef(uid), afterSpend(w.data(), fee), { merge: true });
+        if (fee) {
+            t.set(walletRef(uid), afterSpend(w.data(), fee), { merge: true });
+            record(t, { at: now, type: 'live_fee', uid, coins: -fee, balance: coins - fee, platform: fee, ref: sid });
+        }
         t.set(limitRef, { times: [...times, now] });
         t.set(publicDoc(`groups/${sid}`), {
             topic: 'live', live: true, status: 'live', hostUid: uid, hostName, hostAvatar, title, mode, cap, kind,
@@ -293,6 +298,7 @@ export const joinLive = onCall(callOpts(), async request => {
             if (coins < g.fee) throw new HttpsError('failed-precondition', `This private session costs ${g.fee} coins. You have ${coins}.`);
             const { host: share, platform, bought } = earningSplit(guestWallet.data(), g.fee);
             t.set(walletRef(uid), afterSpend(guestWallet.data(), g.fee), { merge: true });
+            record(t, { at: now, type: 'private_seat', uid, coins: -g.fee, balance: coins - g.fee, platform, other: g.hostUid, ref: sid });
             creditHost(t, g.hostUid, hostWallet.data(), share, { type: 'private', fromUid: uid, sid, total: g.fee, boughtCoins: bought, platformShare: platform }, now);
             t.set(privateDoc(`livePaid/${sid}_${uid}`), { uid, sid, coins: g.fee, at: now });
             charged = g.fee; hostShare = share;
@@ -387,6 +393,7 @@ export const sendLiveGift = onCall(callOpts(), async request => {
         if (coins < price) throw new HttpsError('failed-precondition', 'Not enough coins.');
         const { host: share, platform, bought } = earningSplit(w, price);
         t.set(walletRef(uid), { ...afterSpend(w, price), sent: [...sent, now] }, { merge: true });
+        record(t, { at: now, type: 'live_gift', uid, coins: -price, balance: coins - price, platform, other: g.hostUid, ref: sid, note: gift });
         creditHost(t, g.hostUid, hw.data(), share, { type: 'gift', fromUid: uid, sid, gift, total: price, boughtCoins: bought, platformShare: platform }, now);
         t.set(publicCol(`groups/${sid}/events`).doc(), { kind: 'gift', gift, price, nick: mineDoc?.data().nick || nickGiven || 'Someone', at: now });
         return { coins: coins - price, hostShare: share };
@@ -418,6 +425,7 @@ export const requestPayout = onCall(callOpts(), async request => {
         const open = await t.get(privateCol('payouts').where('uid', '==', uid).where('status', '==', 'requested').limit(1));
         if (!open.empty) throw new HttpsError('already-exists', 'You already have a payout waiting.');
         t.set(hostWalletRef(uid), { coins: held, pending: asInt(w.pending) + coins }, { merge: true });
+        record(t, { at: now, type: 'payout_requested', uid, earned: -coins, earnedBalance: held, paise: coinsToPaise(coins), ref: id });
         t.set(privateDoc(`payouts/${id}`), { uid, coins, paise: coinsToPaise(coins), details, status: 'requested', at: now, name: '' });
         return { coins, paise: coinsToPaise(coins) };
     });
@@ -524,9 +532,11 @@ export const adminHosts = onCall(callOpts({ secrets: [ADMIN_EMAILS], timeoutSeco
                 if (action === 'payoutPaid') {
                     t.set(hostWalletRef(p.uid), { pending: Math.max(0, asInt(w.pending) - p.coins), paidOut: asInt(w.paidOut) + p.coins }, { merge: true });
                     t.update(ref, { status: 'paid', paidAt: now, paidBy: email, reference });
+                    record(t, { at: now, type: 'payout_paid', uid: p.uid, paise: p.paise, ref: id, by: email, note: reference });
                 } else {
                     t.set(hostWalletRef(p.uid), { pending: Math.max(0, asInt(w.pending) - p.coins), coins: asInt(w.coins) + p.coins }, { merge: true }); // the coins go back to the host
                     t.update(ref, { status: 'rejected', paidAt: now, paidBy: email, reference: note() });
+                    record(t, { at: now, type: 'payout_rejected', uid: p.uid, earned: p.coins, earnedBalance: asInt(w.coins) + p.coins, ref: id, by: email, note: note() });
                 }
             });
             await log(action, { id, reference: reference || note() });

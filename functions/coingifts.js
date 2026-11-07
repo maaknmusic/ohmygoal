@@ -10,6 +10,7 @@
 //   - every gift is written to a private log (coinGiftLog) and counted for the admin panel
 // =====================================================================
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { record } from './ledger.js';
 import { getAuth } from 'firebase-admin/auth';
 import { db, publicDoc, publicCol, privateDoc, privateCol, callOpts } from './common.js';
 import { bump, istDay } from './stats.js';
@@ -84,6 +85,8 @@ export const giftCoins = onCall(callOpts(), async request => {
         t.set(walletRef(to), { coins: rc + recipient }, { merge: true });          // received coins are free coins: spendable, never giftable
         t.set(limitRef, { day, total: sentToday + amount, times: [...times, now] });
         t.set(privateCol('coinGiftLog').doc(), { from: uid, to, amount, recipient, platform, context, ctxId, at: now });
+        record(t, { at: now, type: 'coin_gift_sent', uid, coins: -amount, balance: coins - amount, bought: -amount, platform, other: to, ref: ctxId, note: context });
+        record(t, { at: now, type: 'coin_gift_received', uid: to, coins: recipient, balance: rc + recipient, other: uid, ref: ctxId, note: context });
         if (context === 'live') t.set(publicCol(`groups/${sid}/events`).doc(), { kind: 'coins', amount: recipient, nick: fromNick, toNick, at: now });
         return { coins: coins - amount, giftable: bought - amount, leftToday: COIN_GIFT_DAILY_CAP - sentToday - amount };
     });

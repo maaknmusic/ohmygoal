@@ -225,6 +225,28 @@ export function createAnalytics({ $, h, toast, button, empty, kv, when, short, f
         ]);
     };
 
+    // ---------------- transactions (every coin, earning and rupee movement: functions/ledger.js) ----------------
+    const TX_HEAD = ['transaction_id', 'time', 'type', 'user_id', 'coins_change', 'coins_after', 'host_earnings_change', 'host_earnings_after', 'amount_inr', 'platform_coins', 'premium_days', 'other_user', 'reference', 'by', 'note'];
+    const txRow = t => [t.id, new Date(t.at).toISOString(), t.type, t.uid, t.coins ?? '', t.balance ?? '', t.earned ?? '', t.earnedBalance ?? '', t.paise !== undefined ? t.paise / 100 : '', t.platform ?? '', t.days ?? '', t.other || '', t.ref || '', t.by || '', t.note || ''];
+    const TX_WORDS = {
+        purchase_coins: 'Bought coins', purchase_premium: 'Bought Premium', tip: 'Tip', daily_bonus: 'Daily bonus', chat_gift: 'Gift in a chat', live_fee: 'Went live',
+        private_seat: 'Private seat', live_gift: 'Gift to a host', coin_gift_sent: 'Gave coins', coin_gift_received: 'Received coins', host_earning: 'Host earning',
+        payout_requested: 'Asked for payout', payout_paid: 'Payout paid', payout_rejected: 'Payout rejected', refund: 'Refund', dispute: 'Chargeback',
+        admin_coins: 'Admin changed coins', admin_premium: 'Admin changed Premium',
+    };
+    const sign = n => (n > 0 ? '+' + n : String(n));
+    const txLine = t => [when(t.at), TX_WORDS[t.type] || t.type,
+        t.coins !== undefined ? `${sign(t.coins)} coins (now ${t.balance})` : '', t.earned !== undefined ? `${sign(t.earned)} earned (now ${t.earnedBalance})` : '',
+        t.paise !== undefined ? rupees(t.paise / 100) : '', t.days ? `${sign(t.days)} Premium days` : '', t.note || '', t.by && t.by !== 'user' ? `by ${t.by}` : ''].filter(Boolean).join(' · ');
+    $('txCsv').onclick = async () => {
+        const b = $('txCsv'); b.disabled = true;
+        try {
+            const r = await call('transactions', { days: Number($('txDays').value) });
+            download(`ohmygoal-transactions-${r.days}d-${stamp()}.csv`, [TX_HEAD, ...r.transactions.map(txRow)]);
+            if (r.capped) toast('That is more than 20,000 transactions: the file has the newest 20,000. Pick a shorter period for the rest.', true);
+        } catch (e) { toast(e.message || 'That didn’t work.', true); } finally { b.disabled = false; }
+    };
+
     // ---------------- people ----------------
     async function findPerson(q) {
         const box = $('personResult');
@@ -292,7 +314,17 @@ export function createAnalytics({ $, h, toast, button, empty, kv, when, short, f
         const banRows = r.bans.map(b => `${b.scope === 'video' ? 'Video only' : 'All chat'} · ${b.reason} · until ${when(b.until)}`);
         const reportRows = r.reportsAbout.map(x => `${when(x.ts)} · ${x.reason}`);
         const logRows = r.log.map(l => `${when(l.at)} · ${l.by} · ${l.what}${l.details?.days ? ` ${l.details.days} days` : ''}${l.details?.delta ? ` ${l.details.delta} coins` : ''}${l.details?.note ? ` — ${l.details.note}` : ''}`);
-        $('personResult').replaceChildren(card, tools, list('Orders', orderRows, 'No orders.'), list('Active bans', banRows, 'None.'), list('Reports about this person', reportRows, 'None.'), list('Admin log', logRows, 'Nothing yet.'));
+        const tx = h('div', 'card');
+        tx.append(h('b', '', `Transactions (${r.transactions.length}${r.transactionsCapped ? ', newest 2,000' : ''})`));
+        tx.append(h('p', 'help', r.ledgerBreak
+            ? `⚠ The history does not add up at ${when(r.ledgerBreak.at)} (${TX_WORDS[r.ledgerBreak.type] || r.ledgerBreak.type}): the ${r.ledgerBreak.kind === 'coins' ? 'coin balance' : 'host earnings'} should have been ${r.ledgerBreak.expected} before it, but was ${r.ledgerBreak.found}.`
+            : 'Every coin, earning and rupee movement of this person. Each step starts from the balance the one before ended with: checked, it adds up.'));
+        if (r.transactions.length) {
+            tx.append(button('Download this person’s transactions (CSV)', 'btn btn-ghost btn-sm', () => download(`ohmygoal-transactions-${u.uid}-${stamp()}.csv`, [TX_HEAD, ...r.transactions.map(txRow)])));
+            for (const t of r.transactions.slice(0, 200)) tx.append(h('div', 'line', txLine(t)));
+            if (r.transactions.length > 200) tx.append(h('p', 'help', 'The newest 200 are shown; the CSV has all of them.'));
+        } else tx.append(h('p', 'help', 'No transactions yet.'));
+        $('personResult').replaceChildren(card, tools, tx, list('Orders', orderRows, 'No orders.'), list('Active bans', banRows, 'None.'), list('Reports about this person', reportRows, 'None.'), list('Admin log', logRows, 'Nothing yet.'));
     }
 
     // The "Online now" number is the one that changes every minute: refresh just it while the Dashboard is on screen.
