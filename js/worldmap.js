@@ -7,7 +7,7 @@
 //    the square's two numbers leave it (to mapPins/{uid}, which no phone can read).
 //  - The server counts the squares (functions/worldmap.js) and publishes only "n people in this square" (counters/map).
 //    So the map shows how many people are around a city, never who they are or where exactly.
-//  - Turning it off deletes the pin at once. Closing the app stops it counting within a few minutes.
+//  - Turning it off deletes the pin at once. Leaving the page tries to delete it too; either way it stops counting within 6 minutes.
 //  - The map does not zoom in past city level.
 // Pure helpers first (tests/unit/worldmap.test.mjs), then the view.
 // =====================================================================

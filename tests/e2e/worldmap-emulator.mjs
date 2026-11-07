@@ -55,11 +55,11 @@ const sdk = (p, fn, arg) => p.evaluate(async ([src, arg]) => {
   return await (eval(src))({ auth, db, f, base, tryIt, arg });
 }, [fn.toString(), arg]);
 // The server job (functions/worldmap.js saveMapCells), run with the Admin SDK against the emulator.
-function serverCount(clearFirst = false) {
+function serverCount(clearFirst = false, at = 'Date.now()') {
   const out = execFileSync('node', ['-e', `import('./worldmap.js').then(async m => { const { publicCol } = await import('./common.js');
     if (${clearFirst}) { for (const d of (await publicCol('mapPins').get()).docs) await d.ref.delete(); }
     const pins = (await publicCol('mapPins').get()).docs.map(d => ({ id: d.id, ...d.data() }));
-    const r = await m.saveMapCells(); const doc = (await m.mapRef().get()).data();
+    const r = await m.saveMapCells(${at}); const doc = (await m.mapRef().get()).data();
     console.log(JSON.stringify({ r, doc, pins })); process.exit(0); })`], { cwd: SP + '/emu/functions', env: { ...process.env, FIRESTORE_EMULATOR_HOST: '127.0.0.1:8080', GCLOUD_PROJECT: 'demo-ohmygoal', APP_ID: 'anon-connect' }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   return JSON.parse(out.trim().split('\n').pop());
 }
@@ -146,12 +146,13 @@ step('7a. turning it off deletes the pin straight away; the next count no longer
 // ---- 8. coming back: someone who chose to be on the map is put back without asking; leaving takes them off
 await B.close();
 await new Promise(r => setTimeout(r, 800));
-const gone = serverCount();
+// Closing a tab tries to delete the pin, but a browser may drop a request from a closing page; the 6-minute window is the guarantee.
+const gone = serverCount(false, 'Date.now() + 7 * 60000');
 const { p: B2 } = await device('Bilal', { ctx: ctxB });
 await until(B2, () => document.getElementById('mapShowMe').checked, null, 15000);
 await B2.waitForTimeout(1000);
 const back = serverCount();
-step('8a. closing the page takes you off the map; opening it again puts you back without asking (location already allowed)', gone.doc.total === 0 && back.doc.total === 1 && back.pins.length === 1, JSON.stringify({ gone: gone.doc.total, back: back.doc.total }));
+step('8a. after closing the page you stop counting (at the latest 6 minutes later); opening it again puts you back without asking (location already allowed)', gone.doc.total === 0 && back.doc.total === 1 && back.pins.length === 1, JSON.stringify({ gone: gone.doc.total, back: back.doc.total }));
 
 // ---- 9. stale counts are not shown as live
 const stale = await A.evaluate(async () => (await import('/js/worldmap.js')).readMapDoc({ at: Date.now() - 11 * 60000, total: 5, c: [1, 1, 5] }));
