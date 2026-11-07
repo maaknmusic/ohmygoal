@@ -51,7 +51,9 @@ export function createGroupUi(ctx) {
         ctx.applyAvatar(av, { avatar: meta.avatar, nick: meta.nick });
         media.appendChild(av);
         const name = h('div', 'g-name');
-        name.append(h('span', '', self ? `${meta.nick} (you)` : meta.nick));
+        const nickEl = h('span', '', self ? `${meta.nick} (you)` : meta.nick);
+        if (!self) nickEl.setAttribute('data-no-i18n', '');   // another person's nickname: never translated
+        name.append(nickEl);
         if (meta.host) name.append(h('span', 'g-host', 'Host'));
         const state = h('small', 'g-state', self ? '' : 'Connecting…');
         name.appendChild(state);
@@ -179,7 +181,10 @@ export function createGroupUi(ctx) {
     // ---- chat ----
     function addChat(who, text, meta) {
         const row = h('div', 'g-msg' + (who === 'me' ? ' me' : ''));
-        row.append(h('b', '', who === 'me' ? 'You' : meta.nick), h('span', '', ctx.cleanText(text)));
+        const nickEl = h('b', '', who === 'me' ? 'You' : meta.nick), textEl = h('span', '', ctx.cleanText(text));
+        textEl.setAttribute('data-no-i18n', '');   // what people write is never translated
+        if (who !== 'me') nickEl.setAttribute('data-no-i18n', '');
+        row.append(nickEl, textEl);
         const list = $('groupMessages');
         list.appendChild(row);
         while (list.childElementCount > 200) list.firstElementChild.remove();
@@ -250,7 +255,11 @@ export function createGroupUi(ctx) {
         }
         busyBox.classList.remove('busy');
         room = { gid: joined.gid, topic, mode: m, backend, stream, tiles: new Map(), timers: [], stops: [], meta, mic: true, cam: true, live: null };
-        $('groupTitle').textContent = joined.title ? `${joined.title} · ${m === 'video' ? 'Video' : 'Voice'}` : `${GROUP_TOPICS.find(t => t.id === topic)?.name || topic} · ${m === 'video' ? 'Video' : 'Voice'}`;
+        const modeName = m === 'video' ? 'Video' : 'Voice';
+        if (joined.title) {   // a session title was written by the host: kept out of the translator, the rest of the line is translated
+            const t = h('span', '', joined.title); t.setAttribute('data-no-i18n', '');
+            $('groupTitle').replaceChildren(t, document.createTextNode(` · ${modeName}`));
+        } else $('groupTitle').textContent = `${GROUP_TOPICS.find(t => t.id === topic)?.name || topic} · ${modeName}`;
         $('groupMessages').replaceChildren();
         $('groupGrid').replaceChildren();
         $('gGiftPop').classList.add('hidden');
