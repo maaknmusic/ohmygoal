@@ -18,7 +18,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { FieldValue } from 'firebase-admin/firestore';
 import { db, publicCol, publicDoc, privateCol, privateDoc, callOpts } from './common.js';
 import { ADMIN_EMAILS, requireAdmin } from './moderation.js';
-import { bump, istDay, statsRef } from './stats.js';
+import { bump, istDay, readStats } from './stats.js';
 import { cleanNick, cleanAvatar, CAPS, STALE_MS } from './groups.js';
 import { GIFTS, GIFT_HOURLY_CAP, afterSpend } from './gifts.js';
 import { record } from './ledger.js';
@@ -518,7 +518,7 @@ export const adminHosts = onCall(callOpts({ secrets: [ADMIN_EMAILS], timeoutSeco
             const days = Array.from({ length: 30 }, (_, i) => istDay(now - (29 - i) * DAY));
             const [hosts, pays, live, statDocs] = await Promise.all([
                 privateCol('hosts').limit(500).get(), privateCol('payouts').orderBy('at', 'desc').limit(100).get(),
-                publicCol('groups').where('live', '==', true).where('status', '==', 'live').limit(60).get(), db.getAll(...days.map(statsRef)),
+                publicCol('groups').where('live', '==', true).where('status', '==', 'live').limit(60).get(), readStats(days),
             ]);
             const wallets = hosts.docs.length ? await db.getAll(...hosts.docs.map(d => hostWalletRef(d.id))) : [];
             const wmap = new Map(wallets.map(w => [w.ref.id, w.data() || {}]));
@@ -528,7 +528,7 @@ export const adminHosts = onCall(callOpts({ secrets: [ADMIN_EMAILS], timeoutSeco
                     kyc: h.kyc ? { name: h.kyc.name, pan: h.kyc.pan, method: h.kyc.method, payTo: payTo(h.kyc), status: h.kyc.status || 'submitted', submittedAt: h.kyc.submittedAt || 0, changedAt: h.kyc.changedAt || 0, verifiedBy: h.kyc.verifiedBy || '', note: h.kyc.note || '' } : null, name: h.name || '', email: h.email || '', firstLiveAt: h.firstLiveAt || 0, lastLiveAt: h.lastLiveAt || 0, note: h.note || '', coins: asInt(w.coins), pending: asInt(w.pending), paidOut: asInt(w.paidOut), lifetime: asInt(w.lifetime) };
             }).sort((a, b) => b.lastLiveAt - a.lastLiveAt);
             const FIELDS = ['liveStarts', 'liveFeeCoins', 'privateJoins', 'privateCoins', 'liveGifts', 'liveGiftCoins', 'hostShareCoins', 'platformShareCoins', 'liveEnded', 'liveMinutes', 'liveParticipantMinutes', 'liveFreeStarts', 'coinGifts', 'coinGiftCoins'];
-            const sum = (from, to) => Object.fromEntries(FIELDS.map(f => [f, statDocs.slice(from, to).reduce((a, d) => a + asInt(d.data()?.[f]), 0)]));
+            const sum = (from, to) => Object.fromEntries(FIELDS.map(f => [f, statDocs.slice(from, to).reduce((a, d) => a + asInt(d[f]), 0)]));
             const sessions = live.docs.filter(d => sessionIsLive(d.data(), now, now)).map(d => ({ sid: d.id, title: d.data().title, hostName: d.data().hostName, mode: d.data().mode, kind: d.data().kind, created: d.data().created }));
             return {
                 hosts: rows, coinPaise: COIN_VALUE_PAISE, minPayoutCoins: MIN_PAYOUT_COINS, infraPaise: INFRA_PAISE_PER_PARTICIPANT_HOUR,

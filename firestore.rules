@@ -87,8 +87,10 @@ service cloud.firestore {
       // ---------------- Matchmaking queue ----------------
       function validQueue(d) {
         return d.keys().hasOnly(['mode', 'interests', 'blocked', 'gender', 'country', 'genderFilter',
-                                 'countryFilter', 'premium', 'theme', 'lang', 'learn', 'ts', 'roomId'])
+                                 'countryFilter', 'premium', 'theme', 'lang', 'learn', 'ts', 'roomId', 'rk'])
           && d.mode in ['video', 'voice', 'text']
+          // a random place in the queue (js/transport.js queueKey), so people looking for a match spread out
+          && (!('rk' in d) || (d.rk is string && d.rk.matches('^' + d.mode + ':0[.][0-9]{6}$')))
           && d.get('interests', []) is list && d.get('interests', []).size() <= 5
           && d.get('interests', []).join(',').size() <= 140
           && d.get('blocked', []) is list && d.get('blocked', []).size() <= 100
@@ -215,6 +217,12 @@ service cloud.firestore {
             && validSignal(request.resource.data);
           allow delete: if request.auth != null && resource.data.from == request.auth.uid;
         }
+      }
+
+      // ---------------- "People online", counted once a minute by the countOnline function ----------------
+      match /counters/{id} {
+        allow read: if request.auth != null;
+        allow write: if false;
       }
 
       // ---------------- Presence ("people online") ----------------

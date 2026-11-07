@@ -20,6 +20,14 @@ const istDay = ms => new Date(ms + 330 * 60000).toISOString().slice(0, 10);
 const FS = 'http://127.0.0.1:8080/v1/projects/demo-ohmygoal/databases/(default)/documents/';
 const put = (path, fields) => fetch(FS + path, { method: 'PATCH', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) }).then(r => { if (!r.ok) throw new Error('seed ' + r.status); });
 const getDoc = async path => { const r = await fetch(FS + path, { headers: { Authorization: 'Bearer owner' } }); if (!r.ok) return null; return Object.fromEntries(Object.entries((await r.json()).fields || {}).map(([k, v]) => [k, Number(v.integerValue ?? v.doubleValue ?? v.stringValue)])); };
+// A day's counters: the day document plus its shards (functions/stats.js spreads the busy counters over stats/<day>/shards/N).
+const fieldsOf = doc => Object.fromEntries(Object.entries(doc.fields || {}).map(([k, v]) => [k, Number(v.integerValue ?? v.doubleValue ?? v.stringValue)]));
+const dayStats = async day => {
+  const out = { ...((await getDoc(`${base}/private/data/stats/${day}`)) || {}) };
+  const r = await fetch(FS + `${base}/private/data/stats/${day}/shards?pageSize=100`, { headers: { Authorization: 'Bearer owner' } });
+  for (const d of (r.ok ? (await r.json()).documents || [] : [])) for (const [k, v] of Object.entries(fieldsOf(d))) out[k] = (out[k] || 0) + v;
+  return out;
+};
 const S = v => ({ stringValue: v }), N = v => ({ integerValue: String(v) });
 const base = 'artifacts/anon-connect';
 const now = Date.now();
@@ -64,13 +72,13 @@ const U = users.uids;
 // ---- 2. counters: an access pass counts the person as active; a new room counts as a chat
 const today = istDay(now);
 await new Promise(r => setTimeout(r, 1500));
-const dau1 = await getDoc(`${base}/private/data/stats/${today}`);
+const dau1 = await dayStats(today);
 step('2a. getting an access pass counts the person as active today', (dau1?.dau || 0) >= 1, JSON.stringify(dau1));
 const chats0 = dau1?.chats || 0;
 await put(`${base}/public/data/rooms/an-room-${stamp}`, { mode: S('video'), a: S('x'), b: S('y'), createdAt: N(now) });
 await put(`${base}/public/data/rooms/an-room2-${stamp}`, { mode: S('text'), a: S('x'), b: S('y'), createdAt: N(now) });
 let st;
-for (let i = 0; i < 20; i++) { st = await getDoc(`${base}/private/data/stats/${today}`); if ((st?.chats || 0) >= chats0 + 2) break; await new Promise(r => setTimeout(r, 500)); }
+for (let i = 0; i < 20; i++) { st = await dayStats(today); if ((st?.chats || 0) >= chats0 + 2) break; await new Promise(r => setTimeout(r, 500)); }
 step('2b. a new room adds to the chat counters by kind', (st?.chats || 0) >= chats0 + 2 && (st?.chats_video || 0) >= 1 && (st?.chats_text || 0) >= 1, JSON.stringify(st));
 
 // ---- 3. seed Premium and payments

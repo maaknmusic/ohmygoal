@@ -10,6 +10,7 @@ import { sanitizeLang } from './languages.js';
 import { startAppCheck } from './appcheck.js';
 
 const QUEUE_STALE_MS = 30000;
+const QUEUE_WINDOW = 15;       // how many waiting people one claim attempt looks at (from a random point in the queue)
 const PRESENCE_BEAT_MS = 30000;
 const PRESENCE_WINDOW_MS = 75000;
 
@@ -27,6 +28,13 @@ export function exchangeScore(me = {}, them = {}) {
     if (me.learn === them.learn && me.lang !== me.learn && them.lang !== them.learn) return 1;
     return 0;
 }
+
+/**
+ * A waiting person's random place in the queue: "<mode>:0.123456". Each claim attempt reads a small window of the queue starting at a
+ * random place, so when thousands are waiting people spread out instead of all reading (and fighting over) the same first entries,
+ * and everyone, including people with filters, is seen sooner or later. firestore.rules checks the format.
+ */
+export const queueKey = (mode, r) => `${mode}:${Math.min(Math.max(Number(r) || 0, 0), 0.999999).toFixed(6)}`;
 
 export function compatible(me = {}, them = {}) {
     const ok = (filter, value) => !filter || filter === 'any' || filter === value;
@@ -55,8 +63,8 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
         import(`https://www.gstatic.com/firebasejs/${v}/firebase-firestore.js`),
     ]);
     const { getAuth, signInAnonymously, signInWithCustomToken } = authMod;
-    const { getFirestore, collection, doc, setDoc, getDocs, query, where, limit, runTransaction,
-        onSnapshot, deleteDoc, addDoc, updateDoc, serverTimestamp, getCountFromServer } = fs;
+    const { getFirestore, collection, doc, setDoc, getDocs, query, where, limit, orderBy, runTransaction,
+        onSnapshot, deleteDoc, addDoc, updateDoc, serverTimestamp, getCountFromServer, getDoc } = fs;
 
     const app = appMod.initializeApp(firebaseConfig);
     await startAppCheck(app, appCheck, { emulators }); // before anything talks to Firebase
@@ -111,19 +119,37 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
         };
     }
 
+    /**
+     * Some of the people waiting for `mode`: a window of QUEUE_WINDOW entries from a random place in the queue (wrapping round to the
+     * start), plus anyone with priority matching (Premium), who must not be missed. If that finds nobody, the first entries of the
+     * mode are read too: entries saved by pages loaded before the random place existed have none.
+     */
+    async function readQueue(mode, usable) {
+        const seen = new Map();
+        const add = snap => snap.docs.forEach(d => seen.set(d.id, d));
+        const from = queueKey(mode, Math.random()), end = `${mode};`;
+        const first = await getDocs(query(queueCol, where('rk', '>=', from), where('rk', '<', end), orderBy('rk'), limit(QUEUE_WINDOW)));
+        add(first);
+        if (first.size < QUEUE_WINDOW) add(await getDocs(query(queueCol, where('rk', '>=', `${mode}:`), where('rk', '<', from), orderBy('rk'), limit(QUEUE_WINDOW - first.size))));
+        add(await getDocs(query(queueCol, where('premium', '==', true), limit(10))));
+        if (![...seen.values()].some(usable)) add(await getDocs(query(queueCol, where('mode', '==', mode), limit(QUEUE_WINDOW))));
+        return [...seen.values()];
+    }
+
     async function tryClaim({ mode, interests, blocked, profile }) {
-        const snap = await getDocs(query(queueCol, where('mode', '==', mode), limit(50)));
-        const now = Date.now();
-        // Entries nobody has refreshed for ~3 minutes are left-overs from closed tabs: clear a few each time (the rules allow it).
-        snap.docs.filter(d => d.id !== me() && now - (d.data().ts || 0) > 190000).slice(0, 5).forEach(d => deleteDoc(d.ref).catch(() => {}));
-        const shared = d => (d.interests || []).filter(i => interests.includes(i)).length;
-        const candidates = snap.docs
-            .filter(d => {
-                const x = d.data();
-                return d.id !== me() && !x.roomId && now - (x.ts || 0) < QUEUE_STALE_MS
+        let now = Date.now();
+        const usable = d => {
+            const x = d.data();
+            return d.id !== me() && x.mode === mode && !x.roomId && now - (x.ts || 0) < QUEUE_STALE_MS
                     && !blocked.includes(d.id) && !(x.blocked || []).includes(me())
                     && compatible(profile, x);
-            })
+        };
+        const docs = await readQueue(mode, usable);
+        now = Date.now();
+        // Entries nobody has refreshed for ~3 minutes are left-overs from closed tabs: clear a few each time (the rules allow it).
+        docs.filter(d => d.id !== me() && now - (d.data().ts || 0) > 190000).slice(0, 5).forEach(d => deleteDoc(d.ref).catch(() => {}));
+        const shared = d => (d.interests || []).filter(i => interests.includes(i)).length;
+        const candidates = docs.filter(usable)
             // Premium (priority) entries are matched first, then the best language fit, then shared interests, then longest waiting.
             .sort((a, b) => (b.data().premium === true ? 1 : 0) - (a.data().premium === true ? 1 : 0)
                 || exchangeScore(profile, b.data()) - exchangeScore(profile, a.data())
@@ -156,9 +182,10 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
         // Queue ourselves first: the rules only let queued users claim someone (so they can check
         // mode, block lists and the other person's filters against our entry).
         const queueRef = myQueueRef();
-        const entry = () => ({
+        const rk = queueKey(opts.mode, Math.random());
+        const entry = (withKey = true) => ({
             mode: opts.mode, interests: opts.interests.slice(0, 5), blocked: opts.blocked.slice(-100),
-            ...profileFields(opts.profile), ts: Date.now(), roomId: null,
+            ...profileFields(opts.profile), ts: Date.now(), roomId: null, ...(withKey ? { rk } : {}),
         });
         try {
             await setDoc(queueRef, entry());
@@ -166,7 +193,11 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
             // A leftover entry (e.g. after a crash) may not be overwritable under older rules: replace it.
             if (e?.code !== 'permission-denied') throw e;
             await deleteDoc(queueRef).catch(() => {});
-            await setDoc(queueRef, entry());
+            try { await setDoc(queueRef, entry()); } catch (e2) {
+                // rules from before the random place in the queue: queue without it (the fallback read in readQueue still finds us)
+                if (e2?.code !== 'permission-denied') throw e2;
+                await setDoc(queueRef, entry(false));
+            }
         }
         if (signal.aborted) { deleteDoc(queueRef).catch(() => {}); throw new DOMException('aborted', 'AbortError'); }
 
@@ -245,7 +276,13 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
     beat();
     setInterval(beat, PRESENCE_BEAT_MS);
     document.addEventListener('visibilitychange', beat);
+    // The server counts once a minute (functions/stats.js countOnline): one document read. If that count is missing or old (the
+    // function is not deployed, or stopped), count here as before.
     async function onlineCount() {
+        try {
+            const c = (await getDoc(doc(db, ...base, 'counters', 'online'))).data();
+            if (Number.isInteger(c?.count) && typeof c.at === 'number' && Math.abs(Date.now() - c.at) < 3 * 60000) return c.count;
+        } catch { /* rules from before the counter: count here */ }
         const snap = await getCountFromServer(query(presenceCol, where('ts', '>', Date.now() - PRESENCE_WINDOW_MS)));
         return snap.data().count;
     }

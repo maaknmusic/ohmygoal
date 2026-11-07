@@ -238,6 +238,21 @@ The page also shows **your IP as the server sees it**. Check that it matches you
 2. Create a JSON key for it.
 3. In GitHub, add the key as the repository secret **FIREBASE_SERVICE_ACCOUNT**.
 
+## Busy days (thousands online at once)
+Video and voice go directly between the two people (or through the Cloudflare relay), never through our servers. What grows with
+the crowd is matching, the "people online" number, the daily counters and the server functions:
+- **Matching** (`js/transport.js`): each waiting person has a random place in the queue (`rk`, like `video:0.123456`, checked by
+  `firestore.rules`). A claim attempt reads 15 entries from a random place (plus anyone with Premium priority), so people spread
+  out instead of all reading and fighting over the same first entries, and people with filters are still seen. Entries without a
+  place (pages loaded before this) are read when the window finds nobody.
+- **People online**: the `countOnline` function counts once a minute and saves the number in `counters/online`; pages read that one
+  document every minute. If it is missing or older than 3 minutes, the page counts by itself as before.
+- **Daily counters** (`functions/stats.js`): the counters bumped for every chat, join and visitor are spread over 20 shard documents
+  per day (`stats/<day>/shards/N`); the admin pages add them up (`readStats`).
+- **Function ceilings** (`functions/common.js`): up to 50 copies of each function, 150 for the ones every visitor calls (access check,
+  relay credentials, wallet, group join, translation). Copies only cost money while they serve requests.
+- Set a **budget alert** in Google Cloud (Billing → Budgets) so a sudden crowd or an attack cannot surprise you.
+
 ## Privacy design
 
 What strangers can and can't learn about each other, and what we store:

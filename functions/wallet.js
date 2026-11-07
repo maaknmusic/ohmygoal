@@ -8,7 +8,7 @@
 // =====================================================================
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { FieldValue } from 'firebase-admin/firestore';
-import { db, publicDoc, privateDoc, callOpts } from './common.js';
+import { db, publicDoc, privateDoc, callOpts, BUSY } from './common.js';
 import { bump } from './stats.js';
 import { GIFTS, DAILY_COINS, DAILY_COINS_PREMIUM, GIFT_HOURLY_CAP, MAX_COINS, afterSpend } from './gifts.js';
 import { record } from './ledger.js';
@@ -28,7 +28,7 @@ export function requireGoogle(request) {
 
 const isPremium = async uid => ((await publicDoc(`entitlements/${uid}`).get()).data()?.premiumUntil || 0) > Date.now();
 
-export const getWallet = onCall(callOpts(), async request => {
+export const getWallet = onCall(callOpts(BUSY), async request => {
     const uid = requireGoogle(request);
     const w = (await walletRef(uid).get()).data() || {};
     const coins = Number.isInteger(w.coins) ? w.coins : 0;

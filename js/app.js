@@ -52,7 +52,7 @@ const iceConfig = () => ({ iceServers, iceTransportPolicy: hideIpOn() ? 'relay' 
 const MAX_INTERESTS = 5;
 const CONNECT_TIMEOUT_MS = 20000;
 const ROUND_SECONDS = 60;
-const ONLINE_REFRESH_MS = 30000;
+const ONLINE_REFRESH_MS = 60000; // the server recounts once a minute (functions/stats.js countOnline)
 
 // =====================================================================
 // Icons (inline, no external dependency)

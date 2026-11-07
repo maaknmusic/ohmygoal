@@ -9,7 +9,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { db, publicDoc, publicCol, privateDoc, privateCol, callOpts } from './common.js';
 import { ADMIN_EMAILS, requireAdmin } from './moderation.js';
-import { istDay, statsRef } from './stats.js';
+import { istDay, readStats, PRESENCE_WINDOW_MS } from './stats.js';
 import { MAX_COINS } from './gifts.js';
 import { record, firstBreak } from './ledger.js';
 import { unblockBuyer } from './buyerrules.js';
@@ -66,7 +66,7 @@ async function paidOrders() {
 }
 
 /** People online: the same rule as the website (a presence ping within the last 75 seconds). One cheap count query. */
-export const PRESENCE_WINDOW_MS = 75000;
+export { PRESENCE_WINDOW_MS };
 async function onlineNow(now) {
     return (await publicCol('presence').where('ts', '>', now - PRESENCE_WINDOW_MS).count().get()).data().count;
 }
@@ -75,7 +75,7 @@ async function dashboard(days, now) {
     const list = lastDays(days, now);
     const since = now - days * DAY;
     const [statDocs, online, active, soon, expiredCount, appeals, bans, orders, reports] = await Promise.all([
-        db.getAll(...list.map(statsRef)),
+        readStats(list),
         onlineNow(now),
         publicCol('entitlements').where('premiumUntil', '>', now).count().get(),
         publicCol('entitlements').where('premiumUntil', '>', now).where('premiumUntil', '<', now + 7 * DAY).count().get(),
@@ -86,7 +86,7 @@ async function dashboard(days, now) {
         publicCol('reports').where('ts', '>=', Timestamp.fromMillis(since)).limit(3000).get(),
     ]);
     const series = {};
-    statDocs.forEach((s, i) => { series[list[i]] = s.data() || {}; });
+    statDocs.forEach((s, i) => { series[list[i]] = s; });
     const money = summarizeOrders(orders, list, now);
     const byReason = {}, reportsPerDay = Object.fromEntries(list.map(d => [d, 0]));
     for (const d of reports.docs) {

@@ -17,7 +17,7 @@ import { logger } from 'firebase-functions/v2';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { Timestamp } from 'firebase-admin/firestore';
-import { db, publicDoc, privateDoc, privateCol, publicCol, callOpts } from './common.js';
+import { db, publicDoc, privateDoc, privateCol, publicCol, callOpts, BUSY } from './common.js';
 import { markActive } from './stats.js';
 
 export const ADMIN_EMAILS = defineSecret('ADMIN_EMAILS'); // comma-separated Google emails
@@ -208,7 +208,7 @@ async function refreshAccess(id) {
 
 // ---------------- public callables ----------------
 
-export const checkAccess = onCall(callOpts(), async request => {
+export const checkAccess = onCall(callOpts(BUSY), async request => {
     const who = identity(request);
     const status = await refreshAccess(who);
     if (status?.allowed) await markActive(who.uid);
