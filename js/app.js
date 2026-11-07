@@ -1225,6 +1225,8 @@ function onPeerData(sess, msg) {
             lt.onPartnerHello(sess);
             if (!sess.friend) showIcebreakers();
             maybeSendCell(sess);
+            // their position may have come in before their greeting (when the first greeting was lost): use it now
+            if (sess.earlyLoc) { const m = sess.earlyLoc; sess.earlyLoc = null; receiveCell(sess, m); }
             if (!sess.friend) likeCount(sess.partnerId).then(n => {
                 if (!n || sess !== S.session) return;
                 document.querySelector('.match-card')?.appendChild(h('div', 'vibes', vibesText(n)));
@@ -1284,6 +1286,8 @@ function onPeerData(sess, msg) {
             break;
         }
         case 'loc':
+            // before their greeting we do not know yet whether they offered: keep it until then (it is read only if they did)
+            if (!sess.partner) { sess.earlyLoc = msg; break; }
             receiveCell(sess, msg);
             break;
         case 'reveal': {
