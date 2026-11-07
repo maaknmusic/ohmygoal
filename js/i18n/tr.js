@@ -848,4 +848,6 @@ export default {
     "Loading the map…": "Harita yükleniyor…",
     "Couldn’t load the map. Check your connection and try again.": "Harita yüklenemedi. Bağlantını kontrol edip tekrar dene.",
     "This service is for adults only.": "Bu hizmet yalnızca yetişkinler içindir.",
+    "Explore": "Keşfet",
+    "Languages": "Diller",
 };

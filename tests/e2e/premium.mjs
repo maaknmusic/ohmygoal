@@ -35,7 +35,7 @@ async function device(name) {
   await p.fill('#nickInput', name);
   await p.click('.seg[data-mode=text]'); await p.check('#ageCheck');
   await p.waitForFunction(() => document.getElementById('startBtn').textContent === 'Start chatting', null, { timeout: 20000 });
-  await p.waitForSelector('#premiumBtn:not(.hidden)', { timeout: 10000 });
+  await p.waitForSelector('#premiumBtn:not(.hidden):not(.late)', { timeout: 10000 });
   return p;
 }
 const step = (n, ok, extra = '') => console.log(`${ok ? 'PASS' : 'FAIL'} ${n} ${extra}`);

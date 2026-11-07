@@ -181,6 +181,10 @@ let premium = null;
 let lt = null; // Live translate (set up in the Messaging section)
 let access = null; // server-side bans (Firebase only); null in the local demo
 const PREMIUM_CFG = { enabled: true, functionsRegion: 'asia-south1', plans: [], ...(CFG.premium || {}) };
+// Top-bar buttons that appear once the app has connected keep their place from the first paint (invisible, class "late"), so the
+// bar never rearranges itself while the page loads. Ones that will never appear here are taken out of the layout.
+if (!firebaseConfig) el.friendsBtn.classList.replace('late', 'hidden');
+if (!firebaseConfig || !PREMIUM_CFG.enabled) el.premiumBtn.classList.replace('late', 'hidden');
 // Premium only exists on the live (Firebase) site with premium.enabled; otherwise everything is unlocked.
 // Note: firestore.rules also enforce the filters, so turning Premium off needs a rules change too.
 const premiumExpected = !!firebaseConfig && PREMIUM_CFG.enabled;
@@ -3169,7 +3173,7 @@ function maybeAnnounceOnline() {
 
 function initFriends() {
     friends = new Friends(S.transport);
-    el.friendsBtn.classList.remove('hidden');
+    el.friendsBtn.classList.remove('hidden', 'late');
     el.addFriendBtn.classList.remove('hidden');
     let lastUid = friends.uid;
     friends.onChange(() => {
@@ -3206,7 +3210,7 @@ function initFriends() {
             // Show the free colour, but keep the saved choice: the Premium answer may just be slow.
             if (a && !a.free && !isPremium()) applyAccent('rani', { save: false });
         });
-        el.premiumBtn.classList.remove('hidden');
+        el.premiumBtn.classList.remove('hidden', 'late');
         renderPremium();
     }
 }
@@ -3712,21 +3716,26 @@ el.callAccept.onclick = async () => {
 // =====================================================================
 // Online count
 // =====================================================================
+function showOnlinePill(n) {
+    el.onlineCount.classList.toggle('hidden', !n);
+    document.getElementById('onlineLabel').textContent = !n ? 'Free · no sign-up' : n === 1 ? 'person online now' : 'people online now';
+}
 async function refreshOnline() {
     if (!S.transport) return;
     try {
         const n = Math.max(1, await S.transport.onlineCount()); // you're online too, even before your first ping lands
         const text = n.toLocaleString();
         el.onlineCount.textContent = text;
-        document.getElementById('onlineLabel').textContent = n === 1 ? 'person online now' : 'people online now';
         el.onlineChipCount.textContent = text;
         // The top bar always shows how many people are online. The big pill on the start page waits until the number means something.
-        el.onlineChip.classList.remove('hidden');
+        el.onlineChip.classList.remove('hidden', 'late');
         el.onlineChip.title = n === 1 ? 'Just you so far. Share the link to bring friends.' : `${text} people online now`;
-        el.onlineCount.closest('.online-pill')?.classList.toggle('hidden', n < 3);
+        // The big pill on the start page shows the number once it means something (3 or more); until then it keeps its place
+        // with a plain line, so the headline under it never jumps.
+        showOnlinePill(n >= 3 ? n : 0);
     } catch (e) {
         console.warn('online count failed', e);
-        el.onlineCount.closest('.online-pill')?.classList.add('hidden');
+        showOnlinePill(0);
     }
 }
 

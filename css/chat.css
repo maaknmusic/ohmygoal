@@ -432,14 +432,14 @@ body.is-premium .react-lock { display: none; }
 .mutual-card { border-color: color-mix(in srgb, var(--primary) 45%, transparent); background: color-mix(in srgb, var(--primary) 8%, var(--panel)); }
 .mutual-card b { color: var(--primary-text); }
 
-.ui-lang { max-width: 112px; height: 34px; padding: 0 8px; border-radius: var(--r-md); border: 1px solid var(--border); background: var(--panel); color: var(--text); font-size: 13px; font-weight: 600; }
+.ui-lang { width: 112px; max-width: 112px; height: 34px; padding: 0 8px; border-radius: var(--r-md); border: 1px solid var(--border); background: var(--panel); color: var(--text); font-size: 13px; font-weight: 600; }
 .langx-form { display: grid; gap: 6px; margin-top: 14px; padding: 12px; border-radius: var(--r-md); border: 1px dashed var(--border); }
 .langx-form .input { width: 100%; }
 @media (max-width: 480px) {
     /* The top bar must fit a 320 px phone: if its buttons are wider than the screen the phone zooms the whole page out. */
     .topbar { padding-inline: 10px; gap: 6px; }
     .topbar-actions { gap: 4px; min-width: 0; }
-    .ui-lang { max-width: 72px; padding: 0 2px; font-size: 11px; }
+    .ui-lang { width: 72px; max-width: 72px; padding: 0 2px; font-size: 11px; }
     #premiumBtn { padding-inline: 10px; }
     #premiumBtnText { display: none; }          /* the crown alone; the button keeps its title and label for screen readers */
 }

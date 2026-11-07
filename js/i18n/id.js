@@ -848,4 +848,6 @@ export default {
     "Loading the map…": "Memuat peta…",
     "Couldn’t load the map. Check your connection and try again.": "Peta gagal dimuat. Periksa koneksimu lalu coba lagi.",
     "This service is for adults only.": "Layanan ini hanya untuk orang dewasa.",
+    "Explore": "Jelajahi",
+    "Languages": "Bahasa",
 };

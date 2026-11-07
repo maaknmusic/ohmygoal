@@ -848,4 +848,6 @@ export default {
     "Loading the map…": "Загрузка карты…",
     "Couldn’t load the map. Check your connection and try again.": "Не удалось загрузить карту. Проверьте подключение и попробуйте снова.",
     "This service is for adults only.": "Этот сервис только для взрослых.",
+    "Explore": "Обзор",
+    "Languages": "Языки",
 };

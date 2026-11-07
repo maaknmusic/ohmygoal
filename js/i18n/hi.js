@@ -848,4 +848,6 @@ export default {
     "Loading the map…": "मानचित्र लोड हो रहा है…",
     "Couldn’t load the map. Check your connection and try again.": "मानचित्र लोड नहीं हो सका। अपना कनेक्शन जाँचें और फिर कोशिश करें।",
     "This service is for adults only.": "यह सेवा केवल वयस्कों के लिए है।",
+    "Explore": "एक्सप्लोर करें",
+    "Languages": "भाषाएँ",
 };

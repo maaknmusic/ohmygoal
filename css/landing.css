@@ -192,7 +192,7 @@
 #welcome .lp-prefs-ico { flex: none; width: 38px; height: 38px; padding: 9px; border-radius: 12px; color: var(--primary-text); background: var(--primary-soft); }
 #welcome .lp-prefs-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 #welcome .lp-prefs-main b { font-size: 15px; font-weight: 600; }
-#welcome .lp-prefs-sum { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+#welcome .lp-prefs-sum { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* one line, so filling it in never moves the card */
 #welcome .lp-chev { width: 18px; height: 18px; color: var(--faint); }
 #welcome .lp-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
 #welcome .lp-chips:empty { display: none; }
@@ -244,7 +244,7 @@
 #welcome .lp-start:not(:disabled):active { transform: scale(0.985); }
 #welcome .lp-start:disabled { opacity: 0.66; box-shadow: none; pointer-events: none; filter: saturate(0.8); }
 #welcome .lp-start:disabled::before { display: none; }
-#welcome .lp-age { margin-top: -2px; font-size: 13px; line-height: 1.4; text-align: center; color: var(--muted); }
+#welcome .lp-age { margin-top: -2px; font-size: 13px; line-height: 1.4; min-height: 2.8em; text-align: center; color: var(--muted); } /* two lines kept, so a one-line status does not pull the card up */
 #welcome .lp-age:empty { display: none; }
 #welcome .lp-trust { display: flex; align-items: flex-start; justify-content: center; gap: 8px; font-size: 13px; line-height: 1.4; text-align: center; color: var(--muted); }
 #welcome .lp-trust .lp-i { width: 16px; height: 16px; margin-top: 1px; color: var(--success); }
@@ -828,8 +828,13 @@
 .room-tag { flex: none; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; color: var(--muted); background: var(--panel-2); }
 .room-tag.busy { color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); }
 /* Footer links to the search pages (tools/seo/build.mjs) */
-#welcome .lp-foot-explore a, #welcome .lp-foot-langs a { font-weight: 500; font-size: 14px; }
-#welcome .lp-foot-langs { gap: 4px 16px; }
+#welcome .lp-foot-links { grid-column: 1 / -1; display: grid; gap: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
+#welcome .lp-foot-h { margin: 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+#welcome .lp-foot-explore { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 0 16px; }
+#welcome .lp-foot-explore a { line-height: 1.3; padding: 4px 0; }
+#welcome .lp-foot-explore a, #welcome .lp-foot-langs a { min-height: 38px; font-weight: 500; font-size: 14px; }
+#welcome .lp-foot-langs { gap: 0 16px; }
+@media (min-width: 900px) { #welcome .lp-foot-links { grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr); gap: 48px; } }
 /* Language names written in their own script use the phone's own font, so English visitors never download the 118 KB Devanagari
    web font just for the language picker and the footer links. */
 #uiLang, #uiLang option, .lp-foot-langs a { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', sans-serif; }
