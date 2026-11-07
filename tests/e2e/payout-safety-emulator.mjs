@@ -101,6 +101,12 @@ const pack = await buy('buyer', { coins: 'coins500' });
 const wb0 = await read(`${base}/private/data/wallet/${buyer}`);
 step('1a. (setup) the buyer bought 500 coins', wb0?.coins === 500 && wb0.bought === 500, JSON.stringify(wb0));
 const live = await call('host', 'startLive', { name: 'Riya', title: 'Evening songs', mode: 'voice', kind: 'public' });
+
+// the host's payout details, checked by the admin, and trusted (7-day hold, no monthly cap): this test is about the hold and refunds
+const runId = String(Date.now()).slice(-6);
+await call('host', 'saveHostKyc', { name: 'Riya Sharma', pan: `${runId.slice(0, 4).replace(/./g, c => 'ABCDEFGHIJ'[c])}R${runId.slice(-4)}Z`, method: 'upi', upi: `rs${runId}@upi` });
+await call('boss', 'adminHosts', { action: 'kycVerify', uid: hostUid });
+await call('boss', 'adminHosts', { action: 'trust', uid: hostUid });
 const sid = live.ok?.sid;
 await call('buyer', 'joinLive', { sid, nick: 'Buyer' });
 for (let i = 0; i < 9; i++) await call('buyer', 'sendLiveGift', { sid, gift: 'fireworks' });   // 450 coins, the host earns 9 × 35 = 315

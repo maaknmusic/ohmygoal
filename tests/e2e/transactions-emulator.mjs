@@ -109,6 +109,12 @@ await call('fan', 'claimDaily', {});                                            
 await call('fan', 'sendGift', { roomId: room, gift: 'rose' });                             // chat_gift       -5
 await call('fan', 'giftCoins', { to: pal, amount: 20, roomId: room });                     // coin_gift_sent  -20 / coin_gift_received +14
 const t0 = await call('host', 'startLive', { name: 'Riya', title: 'Free first session', mode: 'voice', kind: 'public' });
+
+// the host's payout details, checked by the admin, and trusted (7-day hold, no monthly cap): this test is about the hold and refunds
+const runId = String(Date.now()).slice(-6);
+await call('host', 'saveHostKyc', { name: 'Riya Sharma', pan: `${runId.slice(0, 4).replace(/./g, c => 'ABCDEFGHIJ'[c])}T${runId.slice(-4)}Z`, method: 'upi', upi: `tx${runId}@upi` });
+await call('boss', 'adminHosts', { action: 'kycVerify', uid: host });
+await call('boss', 'adminHosts', { action: 'trust', uid: host });
 await call('fan', 'joinLive', { sid: t0.ok.sid, nick: 'Fan' });
 await call('fan', 'sendLiveGift', { sid: t0.ok.sid, gift: 'fireworks' });                  // live_gift -50 / host_earning +35
 await seedCoins(host, 100);                                                                // (outside the app: not in the ledger; the next entry starts from it)

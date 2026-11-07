@@ -203,19 +203,23 @@ const lv2 = await call('g1', 'listLive', {});
 step('7b. an ended session leaves the live list', !lv2.ok.sessions.some(s => s.sid === psid || s.sid === sid));
 
 // ------------------------------------------------------------------------------------------------ 8. payouts
+const noDetails = await call('host', 'requestPayout', {});
+const runId = String(Date.now()).slice(-6), PAN = `${runId.slice(0, 4).replace(/./g, c => 'ABCDEFGHIJ'[c])}Q${runId.slice(-4)}Z`;
+await call('host', 'saveHostKyc', { name: 'Riya Sharma', pan: PAN, method: 'upi', upi: `riya${stamp}@upi` });
+step('8-. a payout needs the host’s payout details first', noDetails.err === 'functions/failed-precondition' && /PAN/.test(noDetails.msg), noDetails.msg);
 await seedHostCoins(hostUid, 299);
-const p0 = await call('host', 'requestPayout', { details: 'riya@upi' });
+const p0 = await call('host', 'requestPayout', {});
 step('8a. a payout below 300 earned coins is refused and says why', p0.err === 'functions/failed-precondition' && /300/.test(p0.msg), p0.msg);
 await seedHostCoins(hostUid, 800);
-const p1 = await call('host', 'requestPayout', { details: 'x' });
-const p2 = await call('host', 'requestPayout', { details: 'riya@upi (Riya Sharma)' });
+const p2 = await call('host', 'requestPayout', {});
 const hw5 = await read(`${base}/private/data/hostWallet/${hostUid}`);
-step('8b. a payout needs payment details; a valid request moves all earned coins to "pending" and shows the rupee value', p1.err === 'functions/invalid-argument' && p2.ok?.coins === 800 && p2.ok.paise === 800 * 75 && hw5.coins === 0 && hw5.pending === 800, JSON.stringify([p2.ok, hw5]));
+step('8b. a valid request moves all earned coins to "pending" and shows the rupee value', p2.ok?.coins === 800 && p2.ok.paise === 800 * 75 && hw5.coins === 0 && hw5.pending === 800, JSON.stringify([p2.ok, hw5]));
 const my2 = await call('host', 'myHost', {});
 step('8c. the host dashboard shows the waiting payout', my2.ok.payouts[0]?.status === 'requested' && my2.ok.pendingCoins === 800 && my2.ok.coins === 0);
 const adm = await call('boss', 'adminHosts', { action: 'list' });
 const pay = adm.ok.payouts.find(p => p.id === p2.ok.id);
-step('8d. the admin sees the payout with the host’s payment details and the amount in rupees', pay?.details === 'riya@upi (Riya Sharma)' && pay.paise === 60000 && pay.status === 'requested');
+step('8d. the admin sees the payout with the host’s saved payout account, name and the amount in rupees', pay?.details === `UPI riya${stamp}@upi` && pay.payName === 'Riya Sharma' && pay.paise === 60000 && pay.status === 'requested');
+await call('boss', 'adminHosts', { action: 'kycVerify', uid: hostUid });
 const pp0 = await call('boss', 'adminHosts', { action: 'payoutPaid', id: pay.id, reference: '' });
 const pp1 = await call('g1', 'adminHosts', { action: 'payoutPaid', id: pay.id, reference: 'UPI123' });
 const pp2 = await call('boss', 'adminHosts', { action: 'payoutPaid', id: pay.id, reference: 'UPI1234567890' });
@@ -223,7 +227,7 @@ const pp3 = await call('boss', 'adminHosts', { action: 'payoutPaid', id: pay.id,
 const hw6 = await read(`${base}/private/data/hostWallet/${hostUid}`);
 step('8e. marking it paid needs a payment reference and an admin; it works once; the host balance shows it as paid out', pp0.err === 'functions/invalid-argument' && pp1.err === 'functions/permission-denied' && pp2.ok && pp3.err === 'functions/failed-precondition' && hw6.pending === 0 && hw6.paidOut === 800, JSON.stringify(hw6));
 await seedHostCoins(hostUid, 700);
-const q1 = await call('host', 'requestPayout', { details: 'riya@upi' });
+const q1 = await call('host', 'requestPayout', {});
 const rj1 = await call('boss', 'adminHosts', { action: 'payoutReject', id: q1.ok.id, note: 'name mismatch' });
 const hw7 = await read(`${base}/private/data/hostWallet/${hostUid}`);
 step('8f. a rejected payout gives the coins back to the host', rj1.ok && hw7.coins === 700 && hw7.pending === 0);

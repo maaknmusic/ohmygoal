@@ -28,6 +28,10 @@ const before = (await read(`${base}/private/data/stats/${day}`)) || {};
 const hA = `host-a-${stamp}`, hB = `host-b-${stamp}`, sid = `AdminHostsLive${stamp}`.slice(0, 30);
 await put(`${base}/private/data/hosts/${hA}`, { status: 'active', name: `Riya ${stamp}`, email: `riya${stamp}@example.com`, lastLiveAt: stamp - 5000, firstLiveAt: stamp - 90000 });
 await put(`${base}/private/data/hostWallet/${hA}`, { coins: 300, pending: 800, paidOut: 100, lifetime: 1200 });
+// Riya's payout details were checked (a payout can only be marked paid then: functions/payoutrules.js)
+await fetch(FS + `${base}/private/data/hosts/${hA}?updateMask.fieldPaths=kyc`, { method: 'PATCH', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: { kyc: { mapValue: { fields: {
+  name: typed('Riya Sharma'), pan: typed('ABCDE1234F'), method: typed('upi'), upi: typed(`riya${stamp}@upi`), status: typed('verified'), submittedAt: typed(Date.now() - 86400000), verifiedBy: typed('boss@example.com'),
+} } } } }) });
 await put(`${base}/private/data/hosts/${hB}`, { status: 'suspended', name: `Sam ${stamp}`, email: `sam${stamp}@example.com`, lastLiveAt: stamp - 99999 });
 await put(`${base}/private/data/hostWallet/${hB}`, { coins: 10, pending: 0, paidOut: 0, lifetime: 10 });
 await put(`${base}/public/data/groups/${sid}`, { topic: 'live', live: true, status: 'live', hostUid: hA, hostName: `Riya ${stamp}`, title: `Night talk ${stamp}`, mode: 'voice', cap: 8, kind: 'public', fee: 0, maxGuests: 7, created: Date.now(), endsAt: Date.now() + 3 * 3600000 });
@@ -62,6 +66,7 @@ step('1c. the usage table has Today, 7 days and 30 days with income, owed to hos
 step('1d. the explanation says how income and cost are worked out', /49-coin start fees plus your 30%/.test(await text('#hostsBody')) && /per person per hour/.test(await text('#hostsBody')));
 step('2a. the live session is listed with its title, host and an End button', new RegExp(`Night talk ${stamp}`).test(await text('#hostsBody')) && await p.locator('#hostsBody button:has-text("End this session")').count() >= 1);
 step('3a. hosts are listed with status, earnings in coins and rupees, and what is waiting', (await text('#hostsBody')).includes(`Riya ${stamp}`) && (await text('#hostsBody')).includes(`Sam ${stamp}`) && /300 coins · ₹225/.test(await text('#hostsBody')) && /800 coins · ₹600/.test(await text('#hostsBody')));
+step('4a0. the host row shows the checked payout details: legal name, PAN, where to pay, verified', /Legal name\s*Riya Sharma/.test(await text('#hostsBody')) && /ABCDE1234F/.test(await text('#hostsBody')) && /Verified by boss@example\.com/.test(await text('#hostsBody')));
 step('4a. the payout shows who to pay, how much, and where', (await text('#hostsBody')).includes(`riya${stamp}@upi (Riya Sharma)`) && /₹600/.test(await text('#hostsBody')) && /To pay/.test(await text('#hostsBody')));
 
 // end the live session
