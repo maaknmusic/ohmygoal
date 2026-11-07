@@ -3726,9 +3726,12 @@ el.callAccept.onclick = async () => {
 // =====================================================================
 // Online count
 // =====================================================================
+// The pill keeps its place from the first paint but stays invisible until the real number is known, and shows only when it is
+// 3 or more: no placeholder text that changes, and nothing under it moves.
 function showOnlinePill(n) {
-    el.onlineCount.classList.toggle('hidden', !n);
-    document.getElementById('onlineLabel').textContent = !n ? 'Free · no sign-up' : n === 1 ? 'person online now' : 'people online now';
+    const pill = document.getElementById('onlinePill');
+    if (n) document.getElementById('onlineLabel').textContent = n === 1 ? 'person online now' : 'people online now';
+    pill.classList.toggle('late', !n);
 }
 async function refreshOnline() {
     if (!S.transport) return;
@@ -3740,8 +3743,6 @@ async function refreshOnline() {
         // The top bar always shows how many people are online. The big pill on the start page waits until the number means something.
         el.onlineChip.classList.remove('hidden', 'late');
         el.onlineChip.title = n === 1 ? 'Just you so far. Share the link to bring friends.' : `${text} people online now`;
-        // The big pill on the start page shows the number once it means something (3 or more); until then it keeps its place
-        // with a plain line, so the headline under it never jumps.
         showOnlinePill(n >= 3 ? n : 0);
     } catch (e) {
         console.warn('online count failed', e);
