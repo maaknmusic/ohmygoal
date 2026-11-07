@@ -58,7 +58,7 @@ export function splitCoins(total) {
 
 /**
  * How `total` coins spent from `wallet` (a wallet document's data, before the spend) are shared. Only the part paid with BOUGHT coins earns
- * the host anything: free coins (the daily bonus, coins received as a gift) are spent first (see afterSpend) and go to the platform, so free
+ * the host anything: bought coins are spent first (see afterSpend); any part paid with free coins (the daily bonus, coins received as a gift) goes to the platform, so free
  * coins collected on many accounts can never be turned into a payout. `bought` is how many bought coins the payment used.
  */
 export function earningSplit(wallet, total) {

@@ -34,11 +34,11 @@ export function coinGiftSplit(amount) {
 }
 
 /**
- * A wallet after `n` coins are spent. Free coins (daily bonus, received gifts) are used up first, so the coins that were bought, which
- * are the only ones that can be gifted, last as long as possible: bought = min(bought, coins left).
+ * A wallet after `n` coins are spent. Bought coins are used first; free coins (daily bonus, received gifts, admin coins) only pay for
+ * what the bought coins do not cover. So a host earns from every bought coin a person spends on them (earningSplit in live.js).
  */
 export function afterSpend(wallet, n) {
     const coins = whole(wallet?.coins);
-    const left = Math.max(0, coins - whole(n));        // callers check the balance first; this just never goes below zero
-    return { coins: left, bought: Math.min(Math.min(whole(wallet?.bought), coins), left) };
+    const spent = Math.min(whole(n), coins);           // callers check the balance first; this just never goes below zero
+    return { coins: coins - spent, bought: Math.max(0, Math.min(whole(wallet?.bought), coins) - spent) };
 }

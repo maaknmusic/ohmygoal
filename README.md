@@ -152,7 +152,7 @@ On the **Group rooms** screen, the **Live sessions** tab lists who is live now. 
 
 **Payout safety.** Earnings are held for 7 days before they can be paid out (`HOLD_DAYS` in `functions/live.js`), so refunds and chargebacks arrive first. When Razorpay reports a refund (`refund.processed`) or a chargeback (`payment.dispute.created`), `functions/reversals.js` takes back what the payment bought (the coins still in the wallet, or the Premium days) and pauses payouts for every host that buyer paid in the last 30 days; **Admin → Hosts** shows the pause, and **Allow payouts again** clears it once you have checked. Each payout request also lists who the host's last 30 days of earnings came from, with warnings when one person gave most of it or used the same IP address or device as the host. **Turn on the two webhook events** in Razorpay → Webhooks (next to `order.paid`), or refunds and chargebacks are not seen.
 
-**Only bought coins earn hosts money.** Free coins (the daily bonus, coins received as a gift, coins an admin adds) are spent first, and the part of a gift or private fee paid with them goes to the platform (`earningSplit` in `functions/live.js`). Otherwise free coins collected on many accounts could be gifted to one host and cashed out.
+**Only bought coins earn hosts money.** Bought coins are spent first; free coins (the daily bonus, coins received as a gift, coins an admin adds) only pay for what is left, and the part of a gift or private fee paid with them goes to the platform (`earningSplit` in `functions/live.js`). Otherwise free coins collected on many accounts could be gifted to one host and cashed out.
 
 A session ends when the host ends it or leaves, after 3 hours, or when the host has been gone for 3 minutes. A host can run 12 sessions a day.
 
@@ -168,7 +168,7 @@ A session ends when the host ends it or leaves, after 3 hours, or when the host 
 
 Anyone signed in with Google can gift **coins they bought** to the person they are with: in a one-to-one chat (Gifts tab → **Send coins**) or in the same live session (a person's ⋯ menu → **Gift coins…**). The platform keeps **30%** and the other person receives **70%** (rounded down) as coins they can **spend** (gifts, private sessions). They cannot be cashed out, and they cannot be gifted again, so there are no chains. The screen shows what the other person will get before you confirm. The rules live in `functions/gifts.js` and `functions/coingifts.js`:
 
-- **Only bought coins** can be gifted. The wallet keeps a `bought` count next to `coins`: a coin pack adds to both, and spending uses free coins (daily bonus, received gifts) first so bought coins stay giftable as long as possible. Coins from before this feature count as free; an admin's coin adjustments never create giftable coins.
+- **Only bought coins** can be gifted. The wallet keeps a `bought` count next to `coins`: a coin pack adds to both, and spending uses bought coins first (so hosts earn from them), then free coins (daily bonus, received gifts). Coins from before this feature count as free; an admin's coin adjustments never create giftable coins.
 - 10 to 500 coins a gift, **1,000 coins a day** and **20 gifts an hour** per account.
 - You can only gift someone you are with right now (an open one-to-one chat, or both inside the same running live session). Nobody can send coins to a stranger by id or email.
 - Both people need a Google account.

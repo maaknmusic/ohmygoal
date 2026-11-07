@@ -82,21 +82,23 @@ test('sessionIsLive: running only while not ended, inside its time limit, and th
     for (const bad of [null, undefined, {}, 'x']) assert.equal(sessionIsLive(bad, now, now), false);
 });
 
-test('earningSplit: the host earns 70% only of the part paid with bought coins; free coins go to the platform', () => {
+test('earningSplit: the host earns 70% only of the part paid with bought coins (spent first); free coins go to the platform', () => {
     // all bought: the normal 70/30
     assert.deepEqual(earningSplit({ coins: 500, bought: 500 }, 200), { host: 140, platform: 60, bought: 200 });
     // only free coins (daily bonus, received gifts, admin top-ups): the host earns nothing
     assert.deepEqual(earningSplit({ coins: 300 }, 200), { host: 0, platform: 200, bought: 0 });
     assert.deepEqual(earningSplit({ coins: 50, bought: 0 }, 5), { host: 0, platform: 5, bought: 0 });
-    // free coins are spent first: 2 free + 3 bought for a 5-coin rose, 70% of 3 rounded down
-    assert.deepEqual(earningSplit({ coins: 102, bought: 100 }, 5), { host: 2, platform: 3, bought: 3 });
+    // bought coins are spent first: a 5-coin rose from 100 bought + 2 free is all bought
+    assert.deepEqual(earningSplit({ coins: 102, bought: 100 }, 5), { host: 3, platform: 2, bought: 5 });
+    // not enough bought coins: 3 bought + 2 free for a 5-coin rose, 70% of 3 rounded down
+    assert.deepEqual(earningSplit({ coins: 10, bought: 3 }, 5), { host: 2, platform: 3, bought: 3 });
     // a stale `bought` larger than the balance counts only what is really there
     assert.deepEqual(earningSplit({ coins: 10, bought: 999 }, 10), { host: 7, platform: 3, bought: 10 });
     for (let coins = 0; coins <= 60; coins++) for (let bought = 0; bought <= coins; bought++) for (const total of [1, 5, 10, 50]) {
         if (total > coins) continue;
         const s = earningSplit({ coins, bought }, total);
         assert.equal(s.host + s.platform, total);
-        assert.equal(s.bought, Math.max(0, bought - (coins - total)), `${coins}/${bought}/${total}`);
+        assert.equal(s.bought, Math.min(bought, total), `${coins}/${bought}/${total}`);
         assert.equal(s.host, splitCoins(s.bought).host);
     }
     for (const bad of [undefined, null, {}, { coins: 'x', bought: -3 }]) assert.deepEqual(earningSplit(bad, 5), { host: 0, platform: 5, bought: 0 });

@@ -26,11 +26,11 @@ test('coinGiftSplit: the recipient gets 70% rounded down, the platform the rest,
     for (const bad of [-5, NaN, 'x', null, undefined, 2.5, {}]) assert.deepEqual(coinGiftSplit(bad), { recipient: 0, platform: 0 }, String(bad));
 });
 
-test('afterSpend: free coins are used first, so bought coins stay giftable as long as possible', () => {
+test('afterSpend: bought coins are used first, free coins only pay for the rest', () => {
     assert.deepEqual(afterSpend({ coins: 100, bought: 100 }, 30), { coins: 70, bought: 70 });        // all bought: spending reduces both
-    assert.deepEqual(afterSpend({ coins: 100, bought: 40 }, 30), { coins: 70, bought: 40 });         // 60 free: the spend comes from the free coins
-    assert.deepEqual(afterSpend({ coins: 100, bought: 40 }, 60), { coins: 40, bought: 40 });
-    assert.deepEqual(afterSpend({ coins: 100, bought: 40 }, 80), { coins: 20, bought: 20 });         // free coins used up, bought coins start to go
+    assert.deepEqual(afterSpend({ coins: 100, bought: 40 }, 30), { coins: 70, bought: 10 });         // the spend comes from the bought coins
+    assert.deepEqual(afterSpend({ coins: 100, bought: 40 }, 40), { coins: 60, bought: 0 });
+    assert.deepEqual(afterSpend({ coins: 100, bought: 40 }, 80), { coins: 20, bought: 0 });          // bought coins used up, free coins pay the rest
     assert.deepEqual(afterSpend({ coins: 100, bought: 40 }, 100), { coins: 0, bought: 0 });
     assert.deepEqual(afterSpend({ coins: 50 }, 10), { coins: 40, bought: 0 });                       // old wallets have no "bought": nothing giftable
 });
@@ -45,7 +45,7 @@ test('afterSpend never lets bought exceed coins, and copes with nonsense', () =>
     for (let coins = 0; coins <= 60; coins += 7) for (let bought = 0; bought <= coins; bought += 5) for (let n = 0; n <= coins; n += 3) {
         const r = afterSpend({ coins, bought }, n);
         assert.equal(r.coins, coins - n);
-        assert.ok(r.bought <= bought && r.bought <= r.coins && r.bought >= Math.max(0, bought - n));
+        assert.equal(r.bought, Math.max(0, bought - n));
     }
 });
 

@@ -136,9 +136,9 @@ step('6a. getWallet shows how many coins can be gifted', gb.ok?.giftable === 100
 await wallet(asha, 100, 40);                              // 60 free + 40 bought
 await put(`${base}/public/data/rooms/${rid('ab')}`, { mode: 'text' });
 await putRoom(rid('ab'), asha, bilal, Date.now());
-await call('asha', 'sendGift', { roomId: rid('ab'), gift: 'rocket' });       // 20 coins, paid from the free ones first
+await call('asha', 'sendGift', { roomId: rid('ab'), gift: 'rocket' });       // 20 coins, paid from the bought ones first
 const ws = await read(`${base}/private/data/wallet/${asha}`);
-step('6b. spending a 20-coin gift uses free coins first: coins 80, bought stays 40', ws.coins === 80 && ws.bought === 40, JSON.stringify(ws));
+step('6b. spending a 20-coin gift uses bought coins first: coins 80, bought 20', ws.coins === 80 && ws.bought === 20, JSON.stringify(ws));
 
 // ---- 6c. inside a live session: both people must be in the room, right now
 const sid = rid('live').slice(0, 20);
