@@ -147,7 +147,7 @@ step('5g. an anonymous (not Google) account cannot send gifts', anonGift.err ===
 const gifts3 = (await read(`${base}/private/data/hostWallet/${hostUid}`)).coins;
 step('5h. the host balance is exactly the sum of 70% shares: 3 + 35 + 30 roses × 3', gifts3 === 3 + 35 + 90, String(gifts3));
 
-// free coins (daily bonus, received gifts) are spent first and earn the host nothing; only the bought part is shared 70/30
+// bought coins are spent first and shared 70/30; free coins (daily bonus, received gifts) pay for the rest and earn the host nothing
 await seedCoins(g1, 22, 10);
 const before5i = (await read(`${base}/private/data/hostWallet/${hostUid}`)).coins;
 const fr1 = await call('g1', 'sendLiveGift', { sid, gift: 'cake' });
@@ -156,9 +156,9 @@ const fr2 = await call('g1', 'sendLiveGift', { sid, gift: 'cake' });
 const after5i = (await read(`${base}/private/data/hostWallet/${hostUid}`)).coins;
 const w5i = await read(`${base}/private/data/wallet/${g1}`);
 const led5i = (await list(`${base}/private/data/hostLedger`)).filter(l => l.sid === sid && l.gift === 'cake').sort((a, b) => a.at - b.at);
-step('5i. free coins earn the host nothing: a cake from 22 coins (12 free, 10 bought) uses free coins and earns 0, the next uses 2 free + 8 bought and earns 5 (70% of 8)',
-  fr1.ok?.coins === 12 && fr2.ok?.coins === 2 && mid5i === before5i && after5i === before5i + 5 && w5i.coins === 2 && w5i.bought === 2
-  && led5i.length === 2 && led5i[0].hostShare === 0 && led5i[0].boughtCoins === 0 && led5i[0].platformShare === 10 && led5i[1].hostShare === 5 && led5i[1].boughtCoins === 8 && led5i[1].platformShare === 5,
+step('5i. bought coins are spent first: a cake from 22 coins (10 bought, 12 free) uses the 10 bought coins and earns 7, the next uses free coins and earns 0',
+  fr1.ok?.coins === 12 && fr2.ok?.coins === 2 && mid5i === before5i + 7 && after5i === before5i + 7 && w5i.coins === 2 && w5i.bought === 0
+  && led5i.length === 2 && led5i[0].hostShare === 7 && led5i[0].boughtCoins === 10 && led5i[0].platformShare === 3 && led5i[1].hostShare === 0 && led5i[1].boughtCoins === 0 && led5i[1].platformShare === 10,
   JSON.stringify([before5i, mid5i, after5i, w5i, led5i.map(l => [l.hostShare, l.boughtCoins, l.platformShare])]));
 
 // ------------------------------------------------------------------------------------------------ 6. private sessions
@@ -251,7 +251,7 @@ const hrow = adm2.hosts.find(x => x.uid === hostUid);
 step('9d. the admin list shows the host with name, status and earnings, and what is live now', hrow?.name === 'Riya Live' && hrow.status === 'active' && hrow.coins === 700 && adm2.live.some(x => x.sid === again.ok.sid && x.hostName === 'Riya Live') && adm2.liveNow >= 1, JSON.stringify(hrow));
 const u1 = adm2.usage.today;
 const dd = k => u1[k] - u0[k];
-step('9e. the usage numbers for the admin: starts, fees, private seats, gifts, the 70/30 split, sessions ended', dd('liveStarts') === 5 && dd('liveFreeStarts') === 1 && dd('liveFeeCoins') === 196 && dd('privateJoins') === 2 && dd('privateCoins') === 400 && dd('liveGifts') === 33 + 2 && dd('hostShareCoins') === 280 + 131 + 5 && dd('platformShareCoins') === 120 + 79 + 15 && dd('liveEnded') === 4 && dd('liveMinutes') >= 0 && dd('liveParticipantMinutes') >= 0, JSON.stringify(Object.fromEntries(Object.keys(u1).map(k => [k, dd(k)]))));
+step('9e. the usage numbers for the admin: starts, fees, private seats, gifts, the 70/30 split, sessions ended', dd('liveStarts') === 5 && dd('liveFreeStarts') === 1 && dd('liveFeeCoins') === 196 && dd('privateJoins') === 2 && dd('privateCoins') === 400 && dd('liveGifts') === 33 + 2 && dd('hostShareCoins') === 280 + 131 + 7 && dd('platformShareCoins') === 120 + 79 + 13 && dd('liveEnded') === 4 && dd('liveMinutes') >= 0 && dd('liveParticipantMinutes') >= 0, JSON.stringify(Object.fromEntries(Object.keys(u1).map(k => [k, dd(k)]))));
 const endNow = await call('boss', 'adminHosts', { action: 'end', sid: again.ok.sid });
 const ended = await read(`${base}/public/data/groups/${again.ok.sid}`);
 step('9f. an admin can end any live session', endNow.ok && ended.status === 'ended' && ended.endReason === 'admin');
