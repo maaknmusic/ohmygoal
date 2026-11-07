@@ -736,6 +736,7 @@ export default {
     "Your earnings": "Ваш заработок",
     "You earn {}% of every gift and private-session fee. We pay you by UPI or bank transfer on request (from {} earned coins).": "Вы получаете {}% от каждого подарка и платы за закрытый эфир. Выплата по запросу через UPI или банковским переводом (от {} заработанных монет).",
     "Only coins that people bought count. Gifts and seats paid with free coins earn nothing.": "Учитываются только купленные монеты. Подарки и места, оплаченные бесплатными монетами, ничего не приносят.",
+    "Advertisement": "Реклама",
     "Before your first chat": "Перед первым чатом",
     "Never undress or do anything intimate on camera. A stranger can record their screen, even though we never record chats.": "Никогда не раздевайтесь и не делайте ничего интимного на камеру. Незнакомец может записать свой экран, хотя мы никогда не записываем чаты.",
     "Blackmail scams start with someone friendly who asks you to undress or to move to a private video call, then threatens to share a recording unless you pay.": "Шантаж начинается с дружелюбного человека, который просит вас раздеться или перейти в личный видеозвонок, а потом угрожает распространить запись, если вы не заплатите.",

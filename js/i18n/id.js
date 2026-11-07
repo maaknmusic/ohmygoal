@@ -736,6 +736,7 @@ export default {
     "Your earnings": "Pendapatan Anda",
     "You earn {}% of every gift and private-session fee. We pay you by UPI or bank transfer on request (from {} earned coins).": "Anda mendapat {}% dari setiap hadiah dan biaya sesi privat. Kami membayar lewat UPI atau transfer bank sesuai permintaan (mulai {} koin yang diperoleh).",
     "Only coins that people bought count. Gifts and seats paid with free coins earn nothing.": "Hanya koin yang dibeli orang yang dihitung. Hadiah dan kursi yang dibayar dengan koin gratis tidak menghasilkan apa pun.",
+    "Advertisement": "Iklan",
     "Before your first chat": "Sebelum chat pertamamu",
     "Never undress or do anything intimate on camera. A stranger can record their screen, even though we never record chats.": "Jangan pernah membuka baju atau melakukan hal intim di depan kamera. Orang asing bisa merekam layarnya, meski kami tidak pernah merekam chat.",
     "Blackmail scams start with someone friendly who asks you to undress or to move to a private video call, then threatens to share a recording unless you pay.": "Penipuan pemerasan dimulai dari orang ramah yang memintamu membuka baju atau pindah ke panggilan video pribadi, lalu mengancam menyebarkan rekaman kalau kamu tidak membayar.",

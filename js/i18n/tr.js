@@ -736,6 +736,7 @@ export default {
     "Your earnings": "Kazancın",
     "You earn {}% of every gift and private-session fee. We pay you by UPI or bank transfer on request (from {} earned coins).": "Her hediyenin ve özel oturum ücretinin %{} kısmını kazanırsın. İstek üzerine UPI veya banka havalesiyle ödeme yaparız ({} kazanılmış jetondan itibaren).",
     "Only coins that people bought count. Gifts and seats paid with free coins earn nothing.": "Yalnızca insanların satın aldığı jetonlar sayılır. Ücretsiz jetonlarla ödenen hediyeler ve yerler kazanç getirmez.",
+    "Advertisement": "Reklam",
     "Before your first chat": "İlk sohbetinden önce",
     "Never undress or do anything intimate on camera. A stranger can record their screen, even though we never record chats.": "Kamerada asla soyunma ya da mahrem bir şey yapma. Biz sohbetleri asla kaydetmesek de bir yabancı ekranını kaydedebilir.",
     "Blackmail scams start with someone friendly who asks you to undress or to move to a private video call, then threatens to share a recording unless you pay.": "Şantaj dolandırıcılıkları, senden soyunmanı ya da özel bir görüntülü aramaya geçmeni isteyen samimi biriyle başlar; sonra ödeme yapmazsan kaydı yaymakla tehdit eder.",

@@ -238,6 +238,18 @@ The page also shows **your IP as the server sees it**. Check that it matches you
 2. Create a JSON key for it.
 3. In GitHub, add the key as the repository secret **FIREBASE_SERVICE_ACCOUNT**.
 
+## Ads (Google AdSense)
+Two ad places, built and switched off: below the start box on the welcome page, and a small 320×100 banner at the top of the
+chat panel while looking for someone and between chats (not on the video stage, where it would cover the call buttons). Never during a chat, never for Premium members (nothing loads until the Premium state is known),
+never in the local demo. The AdSense script loads once, only when an ad is shown (`js/ads.js`).
+
+To switch on, once AdSense has approved the site:
+1. In `config.js`, set `ads.client` to your publisher id (`ca-pub-…`) and `ads.slots.home` / `ads.slots.waiting` to the ids of two
+   display ad units (AdSense → Ads → By ad unit → Display ads; the `data-ad-slot` number).
+2. Replace the comment in `ads.txt` with the line AdSense gives you.
+3. In AdSense → Privacy & messaging, turn on the consent message for Europe (EEA, UK, Switzerland). No code change is needed.
+4. Deploy. The Privacy Policy (`legal.html`) already describes the ads.
+
 ## Busy days (thousands online at once)
 Video and voice go directly between the two people (or through the Cloudflare relay), never through our servers. What grows with
 the crowd is matching, the "people online" number, the daily counters and the server functions:

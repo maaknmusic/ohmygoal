@@ -736,6 +736,7 @@ export default {
     "Your earnings": "أرباحك",
     "You earn {}% of every gift and private-session fee. We pay you by UPI or bank transfer on request (from {} earned coins).": "تكسب {}% من كل هدية ومن رسوم كل جلسة خاصة. ندفع لك عبر UPI أو تحويل مصرفي عند الطلب (ابتداءً من {} عملة مكتسبة).",
     "Only coins that people bought count. Gifts and seats paid with free coins earn nothing.": "تُحتسب فقط العملات التي اشتراها الناس. الهدايا والمقاعد المدفوعة بعملات مجانية لا تكسبك شيئًا.",
+    "Advertisement": "إعلان",
     "Before your first chat": "قبل محادثتك الأولى",
     "Never undress or do anything intimate on camera. A stranger can record their screen, even though we never record chats.": "لا تخلع ملابسك ولا تفعل أي شيء حميم أمام الكاميرا. يمكن لشخص غريب أن يسجّل شاشته، مع أننا لا نسجّل المحادثات أبدًا.",
     "Blackmail scams start with someone friendly who asks you to undress or to move to a private video call, then threatens to share a recording unless you pay.": "تبدأ عمليات الابتزاز بشخص ودود يطلب منك خلع ملابسك أو الانتقال إلى مكالمة فيديو خاصة، ثم يهدد بنشر تسجيل ما لم تدفع.",

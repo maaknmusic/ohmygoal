@@ -736,6 +736,7 @@ export default {
     "Your earnings": "Tus ganancias",
     "You earn {}% of every gift and private-session fee. We pay you by UPI or bank transfer on request (from {} earned coins).": "Ganas el {} % de cada regalo y de cada cuota de sesión privada. Te pagamos por UPI o transferencia bancaria cuando lo pidas (a partir de {} monedas ganadas).",
     "Only coins that people bought count. Gifts and seats paid with free coins earn nothing.": "Solo cuentan las monedas que la gente compró. Los regalos y plazas pagados con monedas gratis no generan ganancias.",
+    "Advertisement": "Publicidad",
     "Before your first chat": "Antes de tu primer chat",
     "Never undress or do anything intimate on camera. A stranger can record their screen, even though we never record chats.": "Nunca te desnudes ni hagas nada íntimo ante la cámara. Un desconocido puede grabar su pantalla, aunque nosotros nunca grabamos los chats.",
     "Blackmail scams start with someone friendly who asks you to undress or to move to a private video call, then threatens to share a recording unless you pay.": "Las estafas de chantaje empiezan con alguien amable que te pide desnudarte o pasar a una videollamada privada, y luego amenaza con difundir una grabación si no pagas.",

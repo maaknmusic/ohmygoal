@@ -29,6 +29,7 @@ import { createEngine, createDeviceProvider, parseChatMessage } from './translat
 import { createLiveTranslate } from './livetranslate.js';
 import { ProfileSync, firestoreIo, googleIdentity } from './profile.js';
 import { getApproxCell, parseLocMessage, locMessage, distanceBetweenCells, describeDistance } from './location.js';
+import { createAds } from './ads.js';
 
 // =====================================================================
 // Config
@@ -183,6 +184,10 @@ const PREMIUM_CFG = { enabled: true, functionsRegion: 'asia-south1', plans: [], 
 // Note: firestore.rules also enforce the filters, so turning Premium off needs a rules change too.
 const premiumExpected = !!firebaseConfig && PREMIUM_CFG.enabled;
 const isPremium = () => (premium ? premium.active : !premiumExpected);
+// Ads (js/ads.js): off until config.js ads.client is set; never for Premium members, never in the local demo.
+let premiumReady = false;
+const ads = createAds({ cfg: CFG.ads, boxes: { home: $('adHome'), waiting: $('adWaiting') }, live: Boolean(firebaseConfig) });
+if (firebaseConfig && !PREMIUM_CFG.enabled) ads.update({ premiumKnown: true, premium: false });   // no Premium on this site: nobody is ad-free
 // What free users get in the effects panel; everything else is Premium.
 const FREE_FX = { background: ['none', 'blur'], mask: ['none', 'shades'], filter: ['none', 'beauty'] };
 const fxLocked = (kind, id) => !isPremium() && !FREE_FX[kind].includes(id);
@@ -747,6 +752,7 @@ function setPhase(phase, info = {}) {
     el.overlayChips.classList.toggle('hidden', !(phase === 'searching' && S.interests.length));
     if (phase === 'searching') el.overlayChips.replaceChildren(...S.interests.map(t => h('span', '', '#' + t)));
     if (phase === 'searching') startTips(); else stopTips();
+    ads.show('waiting', phase === 'searching' || phase === 'ended');   // only while waiting, never during a chat (top of the chat panel)
     el.quality.classList.toggle('hidden', !live || S.mode === 'text');
     el.statusDot.className = 'status-dot ' + (live ? 'on' : phase === 'ended' ? '' : 'wait');
     disarmSkip();
@@ -3144,6 +3150,8 @@ function initFriends() {
         premium = new Premium(S.transport, friends, PREMIUM_CFG);
         premium.onChange(renderPremium);
         premium.waitReady().then(() => {
+            premiumReady = true;
+            ads.update({ premiumKnown: true, premium: isPremium() });
             const a = ACCENTS.find(x => x.id === currentAccent());
             // Show the free colour, but keep the saved choice: the Premium answer may just be slow.
             if (a && !a.free && !isPremium()) applyAccent('rani', { save: false });
@@ -3171,6 +3179,7 @@ let purchasing = false;
 
 function renderPremium() {
     const pro = isPremium();
+    ads.update({ premiumKnown: premiumReady, premium: pro });
     document.body.classList.toggle('is-premium', pro);
     el.premiumBtn.classList.toggle('on', pro);
     el.premiumBtnText.textContent = pro ? 'Premium' : 'Go Premium';

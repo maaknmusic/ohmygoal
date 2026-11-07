@@ -106,4 +106,5 @@ export default {
     "Chat for a minute to start a streak.": "స్ట్రీక్ ప్రారంభించడానికి ఒక నిమిషం చాట్ చేయండి.",
     "Slow down a little 🙂": "కొంచెం నెమ్మదిగా 🙂",
     "Open chat": "ఓపెన్ చాట్",
+    "Advertisement": "ప్రకటన",
 };

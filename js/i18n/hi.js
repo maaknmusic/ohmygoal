@@ -736,6 +736,7 @@ export default {
     "Your earnings": "आपकी कमाई",
     "You earn {}% of every gift and private-session fee. We pay you by UPI or bank transfer on request (from {} earned coins).": "आप हर गिफ़्ट और निजी सेशन की फ़ीस का {}% कमाते हैं। माँगने पर हम आपको UPI या बैंक ट्रांसफ़र से भुगतान करते हैं ({} कमाए सिक्कों से शुरू)।",
     "Only coins that people bought count. Gifts and seats paid with free coins earn nothing.": "सिर्फ़ ख़रीदे गए सिक्के गिने जाते हैं। मुफ़्त सिक्कों से दिए गए गिफ़्ट और सीटों से कोई कमाई नहीं होती।",
+    "Advertisement": "विज्ञापन",
     "Before your first chat": "पहली चैट से पहले",
     "Never undress or do anything intimate on camera. A stranger can record their screen, even though we never record chats.": "कैमरे पर कभी कपड़े न उतारें और कुछ भी अंतरंग न करें। हम चैट रिकॉर्ड नहीं करते, फिर भी कोई अजनबी अपनी स्क्रीन रिकॉर्ड कर सकता है।",
     "Blackmail scams start with someone friendly who asks you to undress or to move to a private video call, then threatens to share a recording unless you pay.": "ब्लैकमेल स्कैम किसी दोस्ताना व्यक्ति से शुरू होते हैं जो आपसे कपड़े उतारने या प्राइवेट वीडियो कॉल पर आने को कहता है, फिर पैसे न देने पर रिकॉर्डिंग फैलाने की धमकी देता है।",

@@ -19,6 +19,10 @@ window.APP_CONFIG = {
     // Firebase App Check (bot protection). Paste the Fraud Defense (reCAPTCHA Enterprise) SITE key here (it is public). Leave '' to keep it off.
     // See README "Bots and App Check" for creating the key and turning enforcement on.
     appCheck: { siteKey: '6LcXsfwtAAAAAMDnzwl7hRzi5wsdYskC5zCkNMiq' },
+    // Ads (Google AdSense), off while `client` is ''. When AdSense approves the site, paste the publisher id (ca-pub-...) and the
+    // id of one display ad unit per place (Ads -> By ad unit -> Display ads; the data-ad-slot number). Also put AdSense's line in
+    // ads.txt. Premium members never see ads. See README "Ads".
+    ads: { client: '', slots: { home: '', waiting: '' } },
     // STUN only here. The relay (Cloudflare TURN) credentials are short-lived and come from the turnCredentials Cloud
     // Function (key stored in Secret Manager via deploy.sh), so nothing relay-related is public in this file.
     iceServers: [

@@ -250,6 +250,9 @@
 #welcome .lp-trust .lp-i { width: 16px; height: 16px; margin-top: 1px; color: var(--success); }
 #welcome .lp-legal { display: flex; justify-content: center; gap: 8px; margin-top: -4px; font-size: 12.5px; color: var(--faint); }
 #welcome .lp-legal a { color: var(--muted); text-underline-offset: 3px; }
+/* Ad below the start box (js/ads.js) */
+#welcome .ad-box { width: 100%; max-width: 728px; margin: 12px auto 0; }
+#welcome .ad-box .ad-slot { min-height: 90px; overflow: hidden; }
 #welcome .demo-note { margin: 0; padding: 10px 12px; border-radius: 12px; font-size: 12.5px; line-height: 1.45; color: var(--warning); background: color-mix(in srgb, var(--warning) 11%, transparent); border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent); }
 
 /* ----- Hero mockup (decorative). Everything is sized from --u so it scales with its container. ----- */
