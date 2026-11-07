@@ -5,6 +5,7 @@ Read `README.md` first (files, deploy, privacy design). Tests: `tests/README.md`
 
 ## State
 - `main` holds the v2 redesign (new UI, games, voice, themes, likes, approximate distance, relay-only IP hiding, tightened rules), group rooms, Live sessions with host payouts, coin gifting between users, and interface languages (see below).
+- **Address:** the live site is **https://ohmygoal.app** (confirmed working, deployed and loading). The old `ohmygoal.web.app` still answers but `js/move-domain.js` sends visitors to the new address. DNS lives in Cloudflare and those records must stay **DNS-only** (grey cloud). `ohmygoal.app` and `www.ohmygoal.app` must stay in Firebase Auth → Authorized domains and in the reCAPTCHA key's domains.
 - Production needs `bash deploy.sh` (functions, then rules, then hosting) from Google Cloud Shell after every merge.
 - All test suites passed on the last run: unit (~1,300), UI (v2, hardening, distance, failclosed), emulator (fixes, friends, bans 58, premium 22, privacy, likes 52).
 
