@@ -157,7 +157,7 @@ export function createGroupUi(ctx) {
             const kick = h('button', '', 'Remove from session'); kick.type = 'button';
             kick.onclick = async () => {
                 closeMenu();
-                if (!confirm(`Remove ${meta.nick} from this session? They can’t come back.`)) return;
+                if (!confirm(ctx.t ? ctx.t(`Remove ${meta.nick} from this session? They can’t come back.`) : `Remove ${meta.nick} from this session? They can’t come back.`)) return;
                 try { await room.backend.call('kickLive', { sid: room.live.sid, uid: id }); ctx.toast(`${meta.nick} was removed.`); } catch (e) { ctx.toast(e.message || 'That didn’t work.', true); }
             };
             menu.append(kick);
@@ -374,7 +374,7 @@ export function createGroupUi(ctx) {
     document.addEventListener('click', e => { const pop = $('gGiftPop'); if (!pop.classList.contains('hidden') && !pop.contains(e.target) && !$('gGift').contains(e.target)) pop.classList.add('hidden'); });
     $('gEnd').onclick = async () => {
         if (!room?.live?.host) return;
-        if (!confirm('End this session for everyone?')) return;
+        if (!confirm(ctx.t ? ctx.t('End this session for everyone?') : 'End this session for everyone?')) return;
         try { await room.backend.call('endLive', { sid: room.live.sid }); } catch (e) { ctx.toast(e.message || 'That didn’t work.', true); return; }
         leave();
     };

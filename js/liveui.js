@@ -19,15 +19,18 @@ export function createLiveUi({ pane, ctx, enter }) {
     let opened = false;
     let busy = false;
     const api = () => (backend ||= ctx.makeBackend());
+    /** The translation of a text built in code (confirm boxes, dropdown labels, messages from the server); English when there is none. */
+    const T = text => (ctx.t ? ctx.t(text) : text);
 
-    const fail = e => ctx.toast(e?.code === 'online-only' || /permission-denied|failed-precondition|invalid-argument|already-exists|resource-exhausted|not-found/.test(e?.code || '') ? (e.message || 'That didn’t work.') : 'That didn’t work. Try again.', true);
+    const fail = e => ctx.toast(T(e?.code === 'online-only' || /permission-denied|failed-precondition|invalid-argument|already-exists|resource-exhausted|not-found/.test(e?.code || '') ? (e.message || 'That didn’t work.') : 'That didn’t work. Try again.'), true);
 
     let meKey = '';
     /** @param {boolean} [quiet] the 15-second refresh: update the list of sessions only, and leave a form someone may be typing in alone */
+    let again = null;           // a refresh asked for while one was running: do it right after, so the screen never stays stale
     async function load(quiet = false) {
-        if (busy) return;
+        if (busy) { again = { quiet: (again ? again.quiet : true) && quiet }; return; }
         busy = true;
-        let hostChanged = !quiet;
+        let hostChanged = false;          // the host form is re-drawn only when the host's own data changed, so a refresh never wipes what is being typed
         try {
             const out = await api().call('listLive');
             sessions = out.sessions || [];
@@ -41,11 +44,12 @@ export function createLiveUi({ pane, ctx, enter }) {
             ctx.coins?.refresh();
         } catch (e) {
             sessions = [];
-            if (e?.code === 'online-only') { pane.replaceChildren(card('Live sessions', 'Live sessions are available on the online version of the site.')); busy = false; return; }
+            if (e?.code === 'online-only') { pane.replaceChildren(card('Live sessions', 'Live sessions are available on the online version of the site.')); busy = false; again = null; return; }
             console.warn('live list', e);
         }
         busy = false;
         if (hostChanged || !built) render(); else renderList();
+        if (again) { const next = again; again = null; load(next.quiet); }
     }
 
     function card(title, text) {
@@ -77,7 +81,7 @@ export function createLiveUi({ pane, ctx, enter }) {
             join.onclick = async () => {
                 if (s.kind === 'private') {
                     if (!ctx.signedIn() && !(await ctx.signIn())) return;
-                    if (!confirm(`Join “${s.title}” for ${s.fee} coins? The coins go to the host and are not refunded.`)) return;
+                    if (!confirm(T(`Join “${s.title}” for ${s.fee} coins? The coins go to the host and are not refunded.`))) return;
                 }
                 go(s, join);
             };
@@ -145,11 +149,11 @@ export function createLiveUi({ pane, ctx, enter }) {
         const problem = h('small', 'live-problem');
         title.oninput = () => { problem.textContent = title.value.trim() ? titleProblem(title.value) : ''; };
         const mode = h('select', 'input'); mode.id = 'liveMode';
-        mode.append(new Option('Voice (up to 8 people)', 'voice'), new Option('Video (up to 4 people)', 'video'));
+        mode.append(new Option(T('Voice (up to 8 people)'), 'voice'), new Option(T('Video (up to 4 people)'), 'video'));
         const kind = h('select', 'input'); kind.id = 'liveKind';
-        kind.append(new Option('Public: anyone can join, free', 'public'), new Option(`Private: guests pay ${PRIVATE_FEE} coins`, 'private'));
+        kind.append(new Option(T('Public: anyone can join, free'), 'public'), new Option(T(`Private: guests pay ${PRIVATE_FEE} coins`), 'private'));
         const guests = h('select', 'input'); guests.id = 'liveGuests';
-        const fillGuests = () => { const max = mode.value === 'video' ? 3 : 7; guests.replaceChildren(...Array.from({ length: max }, (_, i) => new Option(i === 0 ? '1 guest (one to one)' : `${i + 1} guests`, String(i + 1)))); };
+        const fillGuests = () => { const max = mode.value === 'video' ? 3 : 7; guests.replaceChildren(...Array.from({ length: max }, (_, i) => new Option(T(i === 0 ? '1 guest (one to one)' : `${i + 1} guests`), String(i + 1)))); };
         fillGuests();
         const guestsRow = field('Guests in a private session', guests);
         const sync = () => { guestsRow.classList.toggle('hidden', kind.value !== 'private'); };
@@ -198,7 +202,7 @@ export function createLiveUi({ pane, ctx, enter }) {
 
     function hostSection() {
         if (!ctx.signedIn()) {
-            const c = card('Host a live session', `Anyone can host: sign in with Google, then go live for ${LIVE_START_FEE} coins. You can also join private sessions and send gifts once you’re signed in.`);
+            const c = card('Host a live session', 'Anyone can host: sign in with Google and go live. Your first session is free. You can also join private sessions and send gifts once you’re signed in.');
             const b = h('button', 'btn btn-primary btn-sm', 'Sign in with Google'); b.type = 'button'; b.onclick = async () => { if (await ctx.signIn()) load(); };
             c.append(b);
             return [c];
