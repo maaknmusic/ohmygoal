@@ -69,7 +69,7 @@ await H.waitForSelector('#liveTitle', { timeout: 25000 })
 const pane = await H.textContent('#livePane');
 step('1b. after signing in there is no application: the Go live form is right there, with the first session free and the 70% share', /no application needed/.test(pane) && /first session is free/.test(pane) && /Go live · first session free/.test(pane) && /70%/.test(pane) && /Your earnings/.test(pane) && !/Become a host/.test(pane));
 const hostUid = await uidOfEmail(hostEmail);
-await seed(`${base}/private/data/wallet/${hostUid}`, { coins: 600 });
+await seed(`${base}/private/data/wallet/${hostUid}`, { coins: 600, bought: 600 });
 step('1c. the host name defaults to the nickname', (await H.inputValue('#liveName')) === 'Hosty');
 await H.fill('#liveTitle', 'call 9876543210');
 await H.click('#livePane button:has-text("Go live")');
@@ -100,7 +100,7 @@ step('3e. both see each other (two tiles); the guest sees the host tile marked "
 // ------------------------------------------------------------------ 4. a gift
 const guestUid = await uidOfEmail(guestEmail);
 step('4a. (setup) the guest has a Google account', Boolean(guestUid));
-await seed(`${base}/private/data/wallet/${guestUid}`, { coins: 100 });
+await seed(`${base}/private/data/wallet/${guestUid}`, { coins: 100, bought: 100 });
 await G.click('#gGift');
 await G.waitForSelector('#gGiftPop:not(.hidden) #gGiftGrid button', { timeout: 10000 });
 const gifts = await G.locator('#gGiftGrid button').count();
@@ -121,8 +121,8 @@ await H.waitForSelector('#groupLobby:not(.hidden)', { timeout: 10000 });
 step('5b. the host is back at the lobby too', true);
 
 // ------------------------------------------------------------------ 6. a private session
-await seed(`${base}/private/data/wallet/${guestUid}`, { coins: 300 });
-await seed(`${base}/private/data/wallet/${hostUid}`, { coins: 300 });
+await seed(`${base}/private/data/wallet/${guestUid}`, { coins: 300, bought: 300 });
+await seed(`${base}/private/data/wallet/${hostUid}`, { coins: 300, bought: 300 });
 await H.click('#livePane button:has-text("Refresh")');
 await H.waitForFunction(() => /300 coins/.test(document.querySelector('#livePane .coin-chip')?.textContent || ''), null, { timeout: 15000 });   // the page has re-drawn with the new balance
 await H.waitForSelector('#liveTitle', { timeout: 15000 });

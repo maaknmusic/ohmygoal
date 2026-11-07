@@ -735,6 +735,7 @@ export default {
     "Who can join": "Siapa yang bisa bergabung",
     "Your earnings": "Pendapatan Anda",
     "You earn {}% of every gift and private-session fee. We pay you by UPI or bank transfer on request (from {} earned coins).": "Anda mendapat {}% dari setiap hadiah dan biaya sesi privat. Kami membayar lewat UPI atau transfer bank sesuai permintaan (mulai {} koin yang diperoleh).",
+    "Only coins that people bought count. Gifts and seats paid with free coins earn nothing.": "Hanya koin yang dibeli orang yang dihitung. Hadiah dan kursi yang dibayar dengan koin gratis tidak menghasilkan apa pun.",
     "Ready to pay out": "Siap dicairkan",
     "Payout in progress": "Pencairan sedang diproses",
     "Paid to you": "Sudah dibayarkan kepada Anda",

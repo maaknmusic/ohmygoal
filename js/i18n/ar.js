@@ -735,6 +735,7 @@ export default {
     "Who can join": "من يمكنه الانضمام",
     "Your earnings": "أرباحك",
     "You earn {}% of every gift and private-session fee. We pay you by UPI or bank transfer on request (from {} earned coins).": "تكسب {}% من كل هدية ومن رسوم كل جلسة خاصة. ندفع لك عبر UPI أو تحويل مصرفي عند الطلب (ابتداءً من {} عملة مكتسبة).",
+    "Only coins that people bought count. Gifts and seats paid with free coins earn nothing.": "تُحتسب فقط العملات التي اشتراها الناس. الهدايا والمقاعد المدفوعة بعملات مجانية لا تكسبك شيئًا.",
     "Ready to pay out": "جاهز للدفع",
     "Payout in progress": "الدفع قيد التنفيذ",
     "Paid to you": "المدفوع لك",

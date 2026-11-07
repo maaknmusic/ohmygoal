@@ -53,7 +53,7 @@ window.APP_CONFIG = {
         email: '',      // support email, e.g. 'support@yourdomain.com'
         phone: '',
         address: '',    // city, state, country
-        policiesUpdated: '22 October 2026',
+        policiesUpdated: '7 November 2026',
     },
 
     // Premium = signed in with Google + a pass bought through Razorpay (verified by the Cloud Functions

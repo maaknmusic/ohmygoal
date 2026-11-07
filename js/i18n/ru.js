@@ -735,6 +735,7 @@ export default {
     "Who can join": "Кто может войти",
     "Your earnings": "Ваш заработок",
     "You earn {}% of every gift and private-session fee. We pay you by UPI or bank transfer on request (from {} earned coins).": "Вы получаете {}% от каждого подарка и платы за закрытый эфир. Выплата по запросу через UPI или банковским переводом (от {} заработанных монет).",
+    "Only coins that people bought count. Gifts and seats paid with free coins earn nothing.": "Учитываются только купленные монеты. Подарки и места, оплаченные бесплатными монетами, ничего не приносят.",
     "Ready to pay out": "Готово к выплате",
     "Payout in progress": "Выплата в процессе",
     "Paid to you": "Выплачено вам",
