@@ -141,6 +141,8 @@ On the **Group rooms** screen, the **Live sessions** tab lists who is live now. 
 | Join a **private** session (the host sets 1 to 7 guests) | **200 coins** per guest, once per session (re-joining is free) | 70% of the bought coins to the host, the rest to the platform |
 | A gift to the host | the gift's coin price (5 to 50) | 70% of the bought coins to the host (rounded down), the rest to the platform |
 
+**Payout safety.** Earnings are held for 7 days before they can be paid out (`HOLD_DAYS` in `functions/live.js`), so refunds and chargebacks arrive first. When Razorpay reports a refund (`refund.processed`) or a chargeback (`payment.dispute.created`), `functions/reversals.js` takes back what the payment bought (the coins still in the wallet, or the Premium days) and pauses payouts for every host that buyer paid in the last 30 days; **Admin → Hosts** shows the pause, and **Allow payouts again** clears it once you have checked. Each payout request also lists who the host's last 30 days of earnings came from, with warnings when one person gave most of it or used the same IP address or device as the host. **Turn on the two webhook events** in Razorpay → Webhooks (next to `order.paid`), or refunds and chargebacks are not seen.
+
 **Only bought coins earn hosts money.** Free coins (the daily bonus, coins received as a gift, coins an admin adds) are spent first, and the part of a gift or private fee paid with them goes to the platform (`earningSplit` in `functions/live.js`). Otherwise free coins collected on many accounts could be gifted to one host and cashed out.
 
 A session ends when the host ends it or leaves, after 3 hours, or when the host has been gone for 3 minutes. A host can run 12 sessions a day.

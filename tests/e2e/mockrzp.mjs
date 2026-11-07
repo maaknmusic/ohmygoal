@@ -2,7 +2,7 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 const SECRET = 'test_key_secret';
-const orders = new Map(), payments = new Map();
+const orders = new Map(), payments = new Map(), disputes = new Map();
 let n = 0, cfIssued = 0, vertexCalls = 0, vertexLast = null;
 const send = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' }); res.end(JSON.stringify(obj)); };
 http.createServer((req, res) => {
@@ -75,6 +75,20 @@ http.createServer((req, res) => {
       payments.set(p.id, p);
       const signature = crypto.createHmac('sha256', SECRET).update(o.id + '|' + p.id).digest('hex');
       return send(res, 200, { razorpay_order_id: o.id, razorpay_payment_id: p.id, razorpay_signature: signature, payment: p });
+    }
+    if (req.method === 'GET' && (m = url.match(/^\/v1\/disputes\/([^/]+)$/))) {
+      const d = disputes.get(decodeURIComponent(m[1])); return d ? send(res, 200, d) : send(res, 404, { error: { description: 'no dispute' } });
+    }
+    // Test-only: refund part or all of a payment (the amount refunded adds up), or open a chargeback on it.
+    if (req.method === 'POST' && url === '/test/refund') {
+      const p = payments.get(json.payment_id); if (!p) return send(res, 404, { error: 'no payment' });
+      p.amount_refunded = (p.amount_refunded || 0) + (json.amount ?? p.amount); if (p.amount_refunded >= p.amount) p.status = 'refunded';
+      return send(res, 200, { refund: { id: 'rfnd_' + (++n) + Date.now(), entity: 'refund', payment_id: p.id, amount: json.amount ?? p.amount }, payment: p });
+    }
+    if (req.method === 'POST' && url === '/test/dispute') {
+      const p = payments.get(json.payment_id); if (!p) return send(res, 404, { error: 'no payment' });
+      const d = { id: 'disp_' + (++n) + Date.now(), entity: 'dispute', payment_id: p.id, amount: p.amount, status: 'open' };
+      disputes.set(d.id, d); return send(res, 200, d);
     }
     send(res, 404, { error: 'not found ' + url });
   });

@@ -31,16 +31,18 @@ export function createHosts({ $, h, toast, button, empty, kv, when, short, fn })
     function hostItem(x) {
         const item = h('div', 'item');
         const head = h('div', 'item-head');
-        head.append(h('span', 'pill ' + (x.status === 'active' ? 'approved' : 'rejected'), x.status === 'active' ? 'Active' : 'Suspended'), h('b', '', x.name || short(x.uid)), x.lastLiveAt ? h('span', '', `last live ${when(x.lastLiveAt)}`) : h('span'));
+        head.append(h('span', 'pill ' + (x.status === 'active' ? 'approved' : 'rejected'), x.status === 'active' ? 'Active' : 'Suspended'), ...(x.payoutHold ? [h('span', 'pill rejected', 'Payouts paused')] : []), h('b', '', x.name || short(x.uid)), x.lastLiveAt ? h('span', '', `last live ${when(x.lastLiveAt)}`) : h('span'));
         const owed = x.coins * data.coinPaise;
         item.append(head, kv([
-            ['Owed to host', `${x.coins} coins · ${rupees(owed)}`], ['Payout pending', x.pending ? `${x.pending} coins · ${rupees(x.pending * data.coinPaise)}` : ''],
+            ['Owed to host', `${x.coins} coins · ${rupees(owed)}`], ['On hold (last 7 days)', x.held ? `${x.held} coins` : ''],
+            ['Payouts paused', x.payoutHold ? `${x.payoutHold.reason} (${when(x.payoutHold.at)}; buyer ${short(x.payoutHold.buyerUid || '')})` : ''], ['Payout pending', x.pending ? `${x.pending} coins · ${rupees(x.pending * data.coinPaise)}` : ''],
             ['Paid out', x.paidOut ? `${x.paidOut} coins · ${rupees(x.paidOut * data.coinPaise)}` : ''], ['Earned in total', `${x.lifetime} coins`], ['Google e-mail', x.email], ['User', short(x.uid), x.uid],
         ]));
         const actions = h('div', 'actions');
         const note = h('input', 'input'); note.placeholder = 'Reason (optional)'; note.maxLength = 200;
         if (x.status === 'active') actions.append(note, button('Suspend', 'btn btn-danger btn-sm', b => { if (confirm(`Suspend ${x.name}? Their live session ends and they cannot host until you reinstate them.`)) act(b, 'decide', { uid: x.uid, decision: 'suspend', note: note.value }, `${x.name} is suspended.`); }));
         else actions.append(note, button('Reinstate', 'btn btn-primary btn-sm', b => act(b, 'decide', { uid: x.uid, decision: 'reinstate', note: note.value }, `${x.name} can host again.`)));
+        if (x.payoutHold) actions.append(button('Allow payouts again', 'btn btn-ghost btn-sm', b => { if (confirm(`Allow ${x.name} to ask for payouts again? Do this only after checking where their earnings came from.`)) act(b, 'clearHold', { uid: x.uid, note: note.value }, `${x.name} can ask for payouts again.`); }));
         item.appendChild(actions);
         return item;
     }
@@ -49,7 +51,16 @@ export function createHosts({ $, h, toast, button, empty, kv, when, short, fn })
         const item = h('div', 'item');
         const head = h('div', 'item-head');
         head.append(h('span', 'pill ' + (p.status === 'requested' ? 'open' : p.status === 'paid' ? 'approved' : 'rejected'), p.status === 'requested' ? 'To pay' : p.status === 'paid' ? 'Paid' : 'Rejected'), h('b', '', `${nameOf(p.uid)} · ${rupees(p.paise)}`), h('span', '', `${p.coins} coins · asked ${when(p.at)}`));
-        item.append(head, kv([['Pay to', p.details], ['Reference', p.status === 'paid' ? p.reference : ''], ['Handled by', p.status !== 'requested' ? p.paidBy : ''], ['Handled', p.status !== 'requested' ? when(p.paidAt) : '']]));
+        const host = data.hosts.find(x => x.uid === p.uid);
+        const warn = [...(host?.payoutHold ? ['payouts are paused for this host: ' + host.payoutHold.reason] : []), ...(p.risk?.warnings || [])];
+        if (p.status === 'requested' && warn.length) {
+            const w = h('p', 'help');
+            w.style.color = 'var(--danger, #dc2626)';
+            w.textContent = 'Check before paying: ' + warn.join('; ') + '.';
+            item.append(w);
+        }
+        const givers = p.risk?.top?.length ? p.risk.top.map(g => `${short(g.uid)} ${g.pct}%${g.sameIp ? ' (same IP)' : ''}${g.sameDevice ? ' (same device)' : ''}`).join(', ') : '';
+        item.append(head, kv([['Pay to', p.details], ['Earned from (30 days)', p.status === 'requested' ? givers : ''], ['Reference', p.status === 'paid' ? p.reference : ''], ['Handled by', p.status !== 'requested' ? p.paidBy : ''], ['Handled', p.status !== 'requested' ? when(p.paidAt) : '']]));
         if (p.status === 'requested') {
             const ref = h('input', 'input'); ref.placeholder = 'UPI / bank reference of your payment'; ref.maxLength = 80;
             const actions = h('div', 'actions');

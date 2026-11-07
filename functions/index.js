@@ -16,6 +16,7 @@ import { defineSecret, defineString } from 'firebase-functions/params';
 import { db, APP_ID, callOpts } from './common.js';
 import { COIN_PACKS } from './gifts.js';
 import { addCoinsTx, walletDoc } from './wallet.js';
+import { reverseOrder } from './reversals.js';
 
 // Gifting bought coins to the person you are with (the platform keeps 30%).
 export { giftCoins } from './coingifts.js';
@@ -303,6 +304,29 @@ export const razorpayWebhook = onRequest({ secrets: [RAZORPAY_WEBHOOK_SECRET, RA
         return;
     }
     const event = req.body?.event;
+    if (event === 'refund.processed' || event === 'payment.dispute.created') {
+        // Money went back to the buyer: take back what the payment bought (see reversals.js). Checked with Razorpay's API first.
+        try {
+            const reason = event === 'refund.processed' ? 'refund' : 'dispute';
+            let paymentId;
+            if (reason === 'refund') paymentId = req.body?.payload?.refund?.entity?.payment_id;
+            else {
+                const disputeId = String(req.body?.payload?.dispute?.entity?.id || '');
+                if (!/^[A-Za-z0-9_]{5,60}$/.test(disputeId)) { res.status(200).send('ignored'); return; }
+                paymentId = (await razorpay(`/v1/disputes/${encodeURIComponent(disputeId)}`)).payment_id;
+            }
+            if (typeof paymentId !== 'string' || !/^[A-Za-z0-9_]{5,60}$/.test(paymentId)) { res.status(200).send('ignored'); return; }
+            const p = await razorpay(`/v1/payments/${encodeURIComponent(paymentId)}`);
+            if (!p?.order_id || (reason === 'refund' && !(p.amount_refunded > 0))) { res.status(200).send('not confirmed'); return; }
+            const done = await reverseOrder(p.order_id, { reason, refunded: p.amount_refunded, paymentId });
+            res.status(200).send(done ? 'reversed' : 'nothing to reverse');
+        } catch (e) {
+            if (e instanceof HttpsError && e.code !== 'unavailable') { logger.warn('Reversal not confirmed', { event, reason: e.message }); res.status(200).send('not confirmed'); return; }
+            logger.error('Reversal failed', e);
+            res.status(500).send('error'); // Razorpay retries
+        }
+        return;
+    }
     const payment = req.body?.payload?.payment?.entity;
     if (!['order.paid', 'payment.captured'].includes(event) || !payment?.order_id) {
         res.status(200).send('ignored');

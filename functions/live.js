@@ -15,6 +15,7 @@
 //   livePaid/{sid}_{uid}   a guest already paid for that private session (re-joining is free)
 // =====================================================================
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { FieldValue } from 'firebase-admin/firestore';
 import { db, publicCol, publicDoc, privateCol, privateDoc, callOpts } from './common.js';
 import { ADMIN_EMAILS, requireAdmin } from './moderation.js';
 import { bump, istDay, statsRef } from './stats.js';
@@ -26,6 +27,7 @@ export const PRIVATE_FEE = 200;             // coins each guest pays to join a p
 export const HOST_SHARE_PCT = 70;           // share of every gift and private fee that the host earns
 export const COIN_VALUE_PAISE = 75;         // what one earned coin is worth when you pay the host (₹0.75)
 export const MIN_PAYOUT_COINS = 300;        // smallest payout a host can ask for (about ₹225)
+export const HOLD_DAYS = 7;                  // earnings can be paid out this many days after they were earned, so a refund or chargeback shows up first
 export const MAX_SESSION_MS = 3 * 3600000;  // a session closes by itself after this
 export const STARTS_PER_DAY = 12;
 /** Rough running cost of one person in a live room for one hour, in paise (database writes and reads, plus an allowance for the video relay). Only used for the admin usage panel. */
@@ -61,6 +63,26 @@ export function earningSplit(wallet, total) {
     const bought = afterSpend(wallet, 0).bought - afterSpend(wallet, t).bought;
     const host = splitCoins(bought).host;
     return { host, platform: t - host, bought };
+}
+
+/**
+ * Coins earned in the last HOLD_DAYS Indian days, which cannot be paid out yet. `recent` is the host wallet's map of day -> coins earned
+ * that day (kept by creditHost). Never more than the balance, so a payout or a refund taken out of the balance is respected.
+ */
+export function heldCoins(recent, balance, now) {
+    const from = istDay(now - (HOLD_DAYS - 1) * DAY);
+    let held = 0;
+    if (recent && typeof recent === 'object') for (const [day, n] of Object.entries(recent)) if (day >= from && Number.isInteger(n) && n > 0) held += n;
+    return Math.min(held, wholeCoins(balance));
+}
+
+/** The host wallet's `recent` map after `share` more coins were earned now: today's bucket grows, buckets older than the hold are dropped. */
+export function recentAfter(recent, share, now) {
+    const from = istDay(now - (HOLD_DAYS - 1) * DAY), today = istDay(now);
+    const out = {};
+    if (recent && typeof recent === 'object') for (const [day, n] of Object.entries(recent)) if (day >= from && Number.isInteger(n) && n > 0) out[day] = n;
+    if (wholeCoins(share)) out[today] = (out[today] || 0) + wholeCoins(share);
+    return out;
 }
 
 /** Earned coins in paise (₹1 = 100). */
@@ -121,7 +143,8 @@ function creditHost(t, hostUid, hw, share, entry, now) {
     const cur = hw || {};
     t.set(hostWalletRef(hostUid), {
         coins: asInt(cur.coins) + share, lifetime: asInt(cur.lifetime) + share, pending: asInt(cur.pending), paidOut: asInt(cur.paidOut),
-    }, { merge: true });
+        recent: recentAfter(cur.recent, share, now),
+    }, { mergeFields: ['coins', 'lifetime', 'pending', 'paidOut', 'recent'] });
     t.set(privateCol('hostLedger').doc(), { hostUid, ...entry, hostShare: share, at: now });
 }
 
@@ -172,8 +195,10 @@ export const myHost = onCall(callOpts(), async request => {
     const now = Date.now();
     const active = live.docs.find(d => sessionIsLive(d.data(), now, now)); // a session still inside its time limit
     const coins = asInt(wallet.coins);
+    const held = heldCoins(wallet.recent, coins, now);
     return {
         status: host.status === 'suspended' ? 'suspended' : 'active', name: host.name || '',
+        heldCoins: held, payableCoins: coins - held, holdDays: HOLD_DAYS, payoutsPaused: Boolean(host.payoutHold),
         coins, pendingCoins: asInt(wallet.pending), paidOutCoins: asInt(wallet.paidOut), lifetimeCoins: asInt(wallet.lifetime),
         paise: coinsToPaise(coins), coinPaise: COIN_VALUE_PAISE, minPayoutCoins: MIN_PAYOUT_COINS,
         startFee: LIVE_START_FEE, privateFee: PRIVATE_FEE, sharePct: HOST_SHARE_PCT,
@@ -374,18 +399,25 @@ export const sendLiveGift = onCall(callOpts(), async request => {
 
 export const requestPayout = onCall(callOpts(), async request => {
     const uid = requireGoogle(request);
-    await hostGate(uid);
+    const host = await hostGate(uid);
+    if (host.payoutHold) throw new HttpsError('failed-precondition', 'Payouts are paused for your account while we check a refunded or disputed payment. Contact us if you have questions.');
     const details = cleanText(request.data?.details, 120);
     if (details.length < 5) throw new HttpsError('invalid-argument', 'Tell us where to pay you: your UPI ID or bank account details.');
     const now = Date.now();
     const id = privateCol('payouts').doc().id;
     const out = await db.runTransaction(async t => {
         const w = (await t.get(hostWalletRef(uid))).data() || {};
-        const coins = asInt(w.coins);
-        if (coins < MIN_PAYOUT_COINS) throw new HttpsError('failed-precondition', `You can ask for a payout from ${MIN_PAYOUT_COINS} earned coins. You have ${coins}.`);
+        const balance = asInt(w.coins);
+        const held = heldCoins(w.recent, balance, now);
+        const coins = balance - held;      // what was earned more than HOLD_DAYS days ago
+        if (coins < MIN_PAYOUT_COINS) {
+            throw new HttpsError('failed-precondition', held
+                ? `You can ask for a payout from ${MIN_PAYOUT_COINS} coins. ${coins} of your coins can be paid now; ${held} earned in the last ${HOLD_DAYS} days are on hold until then.`
+                : `You can ask for a payout from ${MIN_PAYOUT_COINS} earned coins. You have ${coins}.`);
+        }
         const open = await t.get(privateCol('payouts').where('uid', '==', uid).where('status', '==', 'requested').limit(1));
         if (!open.empty) throw new HttpsError('already-exists', 'You already have a payout waiting.');
-        t.set(hostWalletRef(uid), { coins: 0, pending: asInt(w.pending) + coins }, { merge: true });
+        t.set(hostWalletRef(uid), { coins: held, pending: asInt(w.pending) + coins }, { merge: true });
         t.set(privateDoc(`payouts/${id}`), { uid, coins, paise: coinsToPaise(coins), details, status: 'requested', at: now, name: '' });
         return { coins, paise: coinsToPaise(coins) };
     });
@@ -393,6 +425,35 @@ export const requestPayout = onCall(callOpts(), async request => {
 });
 
 // ---------------------------------------------------------------- admin
+
+/**
+ * Warning signs for a payout request, shown to the admin before paying: who the host's earnings of the last 30 days came from, and whether
+ * a big giver used the same network (IP address) or device as the host (one person gifting to their own second account, often with a stolen
+ * card). Only signs: the admin decides.
+ */
+export async function payoutRisk(hostUid, now) {
+    const led = await privateCol('hostLedger').where('hostUid', '==', hostUid).limit(2000).get();
+    const by = new Map();
+    let total = 0;
+    for (const d of led.docs) {
+        const e = d.data();
+        if (typeof e.at !== 'number' || e.at < now - 30 * DAY || !asInt(e.hostShare)) continue;
+        total += e.hostShare;
+        by.set(e.fromUid, (by.get(e.fromUid) || 0) + e.hostShare);
+    }
+    const top = [...by.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const clients = top.length ? await db.getAll(privateDoc(`clients/${hostUid}`), ...top.map(([u]) => privateDoc(`clients/${u}`))) : [];
+    const me = clients[0]?.data() || {};
+    const givers = top.map(([uid, coins], i) => {
+        const c = clients[i + 1]?.data() || {};
+        return { uid, coins, pct: total ? Math.round((coins * 100) / total) : 0, sameIp: Boolean(me.ip && c.ip === me.ip), sameDevice: Boolean(me.fp && c.fp === me.fp) };
+    });
+    const warnings = [];
+    if (givers[0] && givers[0].pct >= 60 && total >= 100) warnings.push(`${givers[0].pct}% of the last 30 days' earnings came from one person`);
+    if (givers.some(g => g.sameIp)) warnings.push('a giver used the same IP address as the host');
+    if (givers.some(g => g.sameDevice)) warnings.push('a giver used the same device as the host');
+    return { earned30: total, givers: givers.length, top: givers, warnings };
+}
 
 export const adminHosts = onCall(callOpts({ secrets: [ADMIN_EMAILS], timeoutSeconds: 60 }), async request => {
     const email = requireAdmin(request);
@@ -413,14 +474,14 @@ export const adminHosts = onCall(callOpts({ secrets: [ADMIN_EMAILS], timeoutSeco
             const wmap = new Map(wallets.map(w => [w.ref.id, w.data() || {}]));
             const rows = hosts.docs.map(d => {
                 const h = d.data(), w = wmap.get(d.id) || {};
-                return { uid: d.id, status: h.status === 'suspended' ? 'suspended' : 'active', name: h.name || '', email: h.email || '', firstLiveAt: h.firstLiveAt || 0, lastLiveAt: h.lastLiveAt || 0, note: h.note || '', coins: asInt(w.coins), pending: asInt(w.pending), paidOut: asInt(w.paidOut), lifetime: asInt(w.lifetime) };
+                return { uid: d.id, status: h.status === 'suspended' ? 'suspended' : 'active', payoutHold: h.payoutHold || null, held: heldCoins(w.recent, asInt(w.coins), now), name: h.name || '', email: h.email || '', firstLiveAt: h.firstLiveAt || 0, lastLiveAt: h.lastLiveAt || 0, note: h.note || '', coins: asInt(w.coins), pending: asInt(w.pending), paidOut: asInt(w.paidOut), lifetime: asInt(w.lifetime) };
             }).sort((a, b) => b.lastLiveAt - a.lastLiveAt);
             const FIELDS = ['liveStarts', 'liveFeeCoins', 'privateJoins', 'privateCoins', 'liveGifts', 'liveGiftCoins', 'hostShareCoins', 'platformShareCoins', 'liveEnded', 'liveMinutes', 'liveParticipantMinutes', 'liveFreeStarts', 'coinGifts', 'coinGiftCoins'];
             const sum = (from, to) => Object.fromEntries(FIELDS.map(f => [f, statDocs.slice(from, to).reduce((a, d) => a + asInt(d.data()?.[f]), 0)]));
             const sessions = live.docs.filter(d => sessionIsLive(d.data(), now, now)).map(d => ({ sid: d.id, title: d.data().title, hostName: d.data().hostName, mode: d.data().mode, kind: d.data().kind, created: d.data().created }));
             return {
                 hosts: rows, coinPaise: COIN_VALUE_PAISE, minPayoutCoins: MIN_PAYOUT_COINS, infraPaise: INFRA_PAISE_PER_PARTICIPANT_HOUR,
-                payouts: pays.docs.map(d => ({ id: d.id, ...d.data() })),
+                payouts: await Promise.all(pays.docs.map(async d => ({ id: d.id, ...d.data(), ...(d.data().status === 'requested' ? { risk: await payoutRisk(d.data().uid, now) } : {}) }))),
                 live: sessions, liveNow: sessions.length,
                 usage: { today: sum(29, 30), d7: sum(23, 30), d30: sum(0, 30) },
             };
@@ -440,6 +501,14 @@ export const adminHosts = onCall(callOpts({ secrets: [ADMIN_EMAILS], timeoutSeco
             }
             await log(`host-${decision}`, { uid, note: note() });
             return { ok: true, status: decision === 'suspend' ? 'suspended' : 'active' };
+        }
+        case 'clearHold': {
+            const uid = uidOf();
+            const ref = privateDoc(`hosts/${uid}`);
+            if (!(await ref.get()).data()?.payoutHold) throw new HttpsError('failed-precondition', 'Payouts are not paused for that host.');
+            await ref.update({ payoutHold: FieldValue.delete() });
+            await log('host-clear-hold', { uid, note: note() });
+            return { ok: true };
         }
         case 'payoutPaid': case 'payoutReject': {
             const id = request.data?.id;
