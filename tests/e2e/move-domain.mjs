@@ -13,7 +13,7 @@ const step = (n, ok, x = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : '
 
 /** The old address serves the real files; the new address behaves as `newHost` says. */
 async function open(newHost, url) {
-  const ctx = await browser.newContext({ serviceWorkers: 'block' });
+  const ctx = await browser.newContext({ serviceWorkers: 'block' }); await ctx.addInitScript(() => { try { localStorage.setItem('ac.safetyBrief', 'true'); } catch { /* storage off */ } });   // first-chat safety sheet: tests/e2e/safety-brief.mjs
   const hits = [];
   await ctx.route(/jsdelivr|country\.is|fonts\.g/, r => r.abort());
   await ctx.route('https://ohmygoal.web.app/**', r => {
@@ -49,7 +49,7 @@ const settle = p => p.waitForTimeout(1800);
   step('6. the admin page is never moved', p.url() === 'https://ohmygoal.web.app/admin.html' && hits.length === 0, p.url()); await ctx.close(); }
 { const { p, ctx, hits } = await open('ok', 'https://ohmygoal.web.app/'); await settle(p);
   step('7. the probe asks only for the site icon (nothing private is sent)', hits.length >= 1 && hits.every(h => h === '/icons/icon-192.png' || h === '/'), hits.join(',')); await ctx.close(); }
-{ const ctx = await browser.newContext({ serviceWorkers: 'block' });
+{ const ctx = await browser.newContext({ serviceWorkers: 'block' }); await ctx.addInitScript(() => { try { localStorage.setItem('ac.safetyBrief', 'true'); } catch { /* storage off */ } });   // first-chat safety sheet: tests/e2e/safety-brief.mjs
   await ctx.route('**/config.js', r => r.fulfill({ body: cfg, contentType: 'text/javascript' }));
   await ctx.route(/jsdelivr|country\.is|fonts\.g/, r => r.abort());
   const p = await ctx.newPage(); await p.goto('http://localhost:8765/index.html'); await p.waitForSelector('#startBtn'); await settle(p);

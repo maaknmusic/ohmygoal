@@ -26,7 +26,7 @@ const FRAME_HOOK = () => {
 };
 
 async function setup({ mode = 'text', viewport = { width: 1280, height: 800 }, locale = 'en-US', init = null, colorScheme = 'dark' } = {}) {
-  const ctx = await browser.newContext({ permissions: ['camera', 'microphone'], serviceWorkers: 'block', viewport, locale, colorScheme });
+  const ctx = await browser.newContext({ permissions: ['camera', 'microphone'], serviceWorkers: 'block', viewport, locale, colorScheme }); await ctx.addInitScript(() => { try { localStorage.setItem('ac.safetyBrief', 'true'); } catch { /* storage off */ } });   // first-chat safety sheet: tests/e2e/safety-brief.mjs
   await ctx.route('**/config.js', r => r.fulfill({ body: cfg, contentType: 'text/javascript' }));
   await ctx.route('**/js/app.js', r => r.fulfill({ body: appSrc, contentType: 'text/javascript' }));
   await ctx.route(/jsdelivr|country\.is|fonts\.g/, r => r.abort());

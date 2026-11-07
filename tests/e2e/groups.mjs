@@ -8,7 +8,7 @@ const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream',
 const errors = [];
 let failures = 0;
 const step = (n, ok, extra = '') => { if (!ok) failures++; console.log(`${ok ? 'PASS' : 'FAIL'} ${n} ${extra}`); };
-const ctx = await browser.newContext({ permissions: ['camera', 'microphone'], serviceWorkers: 'block', viewport: { width: 1280, height: 900 } });
+const ctx = await browser.newContext({ permissions: ['camera', 'microphone'], serviceWorkers: 'block', viewport: { width: 1280, height: 900 } }); await ctx.addInitScript(() => { try { localStorage.setItem('ac.safetyBrief', 'true'); } catch { /* storage off */ } });   // first-chat safety sheet: tests/e2e/safety-brief.mjs
 await ctx.route('**/config.js', r => r.fulfill({ body: cfg, contentType: 'text/javascript' }));
 await ctx.route('**/js/app.js', r => r.fulfill({ body: appSrc, contentType: 'text/javascript' }));
 await ctx.route(/jsdelivr|country\.is|fonts\.g/, r => r.abort());

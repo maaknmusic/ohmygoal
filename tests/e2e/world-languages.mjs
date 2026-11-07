@@ -9,7 +9,7 @@ const codes = ['es', 'pt', 'ar', 'id', 'tr', 'ru', 'fr', 'de'];
 let bad = 0; const step = (n, ok, x = '') => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 'FAIL'} ${n} ${x}`); };
 for (const [label, vp] of [['phone', { width: 360, height: 740 }], ['desktop', { width: 1280, height: 800 }]]) {
   for (const code of codes) {
-    const ctx = await b.newContext({ serviceWorkers: 'block', viewport: vp, locale: code });
+    const ctx = await b.newContext({ serviceWorkers: 'block', viewport: vp, locale: code }); await ctx.addInitScript(() => { try { localStorage.setItem('ac.safetyBrief', 'true'); } catch { /* storage off */ } });   // first-chat safety sheet: tests/e2e/safety-brief.mjs
     await ctx.route('**/config.js', r => r.fulfill({ body: cfg, contentType: 'text/javascript' }));
     await ctx.route(/jsdelivr|country\.is|fonts\.g/, r => r.abort());
     const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));

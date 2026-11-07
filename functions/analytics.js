@@ -12,6 +12,7 @@ import { ADMIN_EMAILS, requireAdmin } from './moderation.js';
 import { istDay, statsRef } from './stats.js';
 import { MAX_COINS } from './gifts.js';
 import { record, firstBreak } from './ledger.js';
+import { unblockBuyer } from './buyerrules.js';
 
 const DAY = 86400000;
 const UID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
@@ -166,11 +167,11 @@ async function lookup(q) {
     try { user = query.includes('@') ? await getAuth().getUserByEmail(query.toLowerCase()) : UID.test(query) ? await getAuth().getUser(query) : null; } catch { user = null; }
     if (!user) return { found: false };
     const uid = user.uid, now = Date.now();
-    const [ent, wallet, rep, orderSnap, banSnap, reportSnap, logSnap, txSnap] = await Promise.all([
+    const [ent, wallet, rep, orderSnap, banSnap, reportSnap, logSnap, txSnap, block] = await Promise.all([
         publicDoc(`entitlements/${uid}`).get(), privateDoc(`wallet/${uid}`).get(), publicDoc(`reputation/${uid}`).get(),
         privateCol('orders').where('uid', '==', uid).limit(30).get(), privateCol('bans').where('uid', '==', uid).limit(30).get(),
         publicCol('reports').where('reported', '==', uid).limit(30).get(), privateCol('adminLog').where('details.uid', '==', uid).limit(30).get(),
-        privateCol('transactions').where('uid', '==', uid).limit(2000).get(),
+        privateCol('transactions').where('uid', '==', uid).limit(2000).get(), privateDoc(`buyerBlocks/${uid}`).get(),
     ]);
     const tx = txSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.at - b.at);
     return {
@@ -184,6 +185,7 @@ async function lookup(q) {
         reportsAbout: reportSnap.docs.map(d => d.data()).map(r => ({ reason: r.reason, ts: r.ts?.toMillis?.() || 0 })).sort((a, b) => b.ts - a.ts),
         log: logSnap.docs.map(d => d.data()).sort((a, b) => b.at - a.at).map(l => ({ at: l.at, by: l.by, what: l.what, details: l.details })),
         // every transaction of this person, newest first, and whether the history adds up step by step
+        buyingBlocked: block.exists ? { reason: block.data().reason, at: block.data().at, orderId: block.data().orderId || '' } : null,
         transactions: tx.slice().reverse(), transactionsCapped: txSnap.size >= 2000, ledgerBreak: firstBreak(tx),
     };
 }
@@ -231,6 +233,12 @@ export const adminAnalytics = onCall(callOpts({ secrets: [ADMIN_EMAILS], timeout
                 record(t, { at: now, type: 'admin_premium', uid, days: -Math.max(0, Math.round((cur - now) / DAY)), by: email, note: note() || 'revoked' });
             });
             await log('revokePremium', { uid, note: note() });
+            return { ok: true };
+        }
+        case 'unblockBuyer': {
+            const uid = target();
+            await unblockBuyer(uid);
+            await log('unblockBuyer', { uid, note: note() });
             return { ok: true };
         }
         case 'adjustCoins': {

@@ -5,7 +5,7 @@ const { chromium } = createRequire(process.env.NODE_PATH + '/')('playwright');
 const cfg = fs.readFileSync('/home/user/ohmygoal/config.js', 'utf8').replace(/firebase: \{[\s\S]*?\n    \},/, 'firebase: null,');
 const b = await chromium.launch(); let bad = 0;
 for (const w of [320, 360, 390]) for (const code of ['en', 'hi', 'es', 'pt', 'ar', 'id', 'tr', 'ru', 'fr', 'de']) {
-  const ctx = await b.newContext({ serviceWorkers: 'block', viewport: { width: w, height: 700 }, locale: code });
+  const ctx = await b.newContext({ serviceWorkers: 'block', viewport: { width: w, height: 700 }, locale: code }); await ctx.addInitScript(() => { try { localStorage.setItem('ac.safetyBrief', 'true'); } catch { /* storage off */ } });   // first-chat safety sheet: tests/e2e/safety-brief.mjs
   await ctx.route('**/config.js', r => r.fulfill({ body: cfg, contentType: 'text/javascript' }));
   await ctx.route(/jsdelivr|country\.is|fonts\.g/, r => r.abort());
   const p = await ctx.newPage(); await p.goto('http://localhost:8765/index.html'); await p.waitForSelector('#startBtn'); await p.waitForTimeout(400);

@@ -11,7 +11,7 @@ const step = (n, ok, extra = '') => { if (!ok) failures++; console.log(`${ok ? '
 const MUMBAI = { latitude: 19.076, longitude: 72.8777 }, DELHI = { latitude: 28.6139, longitude: 77.209 }, PUNE = { latitude: 18.5204, longitude: 73.8567 };
 
 async function setup(geo = MUMBAI, permissions = ['camera', 'microphone', 'geolocation']) {
-  const ctx = await browser.newContext({ permissions, geolocation: geo, serviceWorkers: 'block', viewport: { width: 1280, height: 800 } });
+  const ctx = await browser.newContext({ permissions, geolocation: geo, serviceWorkers: 'block', viewport: { width: 1280, height: 800 } }); await ctx.addInitScript(() => { try { localStorage.setItem('ac.safetyBrief', 'true'); } catch { /* storage off */ } });   // first-chat safety sheet: tests/e2e/safety-brief.mjs
   await ctx.route('**/config.js', r => r.fulfill({ body: cfg, contentType: 'text/javascript' }));
   await ctx.route('**/js/app.js', r => r.fulfill({ body: appSrc, contentType: 'text/javascript' }));
   await ctx.route(/jsdelivr|country\.is|fonts\.g/, r => r.abort());

@@ -25,7 +25,7 @@ const probe = (W) => {
 };
 
 async function page(W, { url = 'index.html', routes = true } = {}) {
-  const ctx = await b.newContext({ permissions: ['camera', 'microphone'], serviceWorkers: 'block', viewport: { width: W, height: 780 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+  const ctx = await b.newContext({ permissions: ['camera', 'microphone'], serviceWorkers: 'block', viewport: { width: W, height: 780 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }); await ctx.addInitScript(() => { try { localStorage.setItem('ac.safetyBrief', 'true'); } catch { /* storage off */ } });   // first-chat safety sheet: tests/e2e/safety-brief.mjs
   await ctx.route('**/config.js', r => r.fulfill({ body: cfg, contentType: 'text/javascript' }));
   await ctx.route('https://www.gstatic.com/firebasejs/11.6.1/*', r => r.fulfill({ body: fs.readFileSync(FB + r.request().url().split('/').pop()), contentType: 'text/javascript' }));
   await ctx.route(/jsdelivr|country\.is|fonts\.g/, r => r.abort());

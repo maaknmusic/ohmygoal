@@ -37,7 +37,7 @@ export function createLiveUi({ pane, ctx, enter }) {
             if (ctx.signedIn()) {
                 let next = null;
                 try { next = await api().call('myHost'); } catch { next = null; }
-                const key = JSON.stringify([next?.status, next?.coins, next?.heldCoins, next?.payoutsPaused, next?.pendingCoins, next?.paidOutCoins, next?.activeSid, next?.payouts?.length, true]);
+                const key = JSON.stringify([next?.status, next?.coins, next?.heldCoins, next?.payoutsPaused, next?.kyc?.status, next?.kyc?.payTo, next?.capLeftPaise, next?.pendingCoins, next?.paidOutCoins, next?.activeSid, next?.payouts?.length, true]);
                 if (key !== meKey) { hostChanged = true; meKey = key; }
                 me = next;
             } else { if (me !== null || meKey !== 'out') hostChanged = true; me = null; meKey = 'out'; }
@@ -183,18 +183,20 @@ export function createLiveUi({ pane, ctx, enter }) {
         const payable = Number.isInteger(me.payableCoins) ? me.payableCoins : me.coins, held = me.heldCoins || 0;
         tiles.append(tile('Ready to pay out', `${payable} coins`, rupees(payable * me.coinPaise)), tile(`On hold (${me.holdDays || 7} days)`, `${held} coins`, rupees(held * me.coinPaise)), tile('Payout in progress', `${me.pendingCoins} coins`, rupees(me.pendingCoins * me.coinPaise)), tile('Paid to you', `${me.paidOutCoins} coins`, rupees(me.paidOutCoins * me.coinPaise)));
         c.append(tiles);
-        const details = input('payDetails', { maxLength: 120, placeholder: 'Your UPI ID or bank account details' });
         const ask = h('button', 'btn btn-primary btn-sm', 'Ask for a payout'); ask.type = 'button';
-        ask.disabled = payable < MIN_PAYOUT_COINS || me.payoutsPaused;
+        const kycOk = me.kyc && me.kyc.status !== 'rejected';
+        ask.disabled = payable < MIN_PAYOUT_COINS || me.payoutsPaused || !kycOk;
         ask.onclick = async () => {
             ask.disabled = true;
-            try { const r = await api().call('requestPayout', { details: details.value }); ctx.toast(`Payout requested: ${rupees(r.paise)}. We’ll pay you and mark it done here.`); await load(); }
+            try { const r = await api().call('requestPayout', {}); ctx.toast(`Payout requested: ${rupees(r.paise)}. We’ll pay you and mark it done here.`); await load(); }
             catch (e) { fail(e); ask.disabled = false; }
         };
         if (held) c.append(h('p', 'hint', `Coins you earn can be paid out ${me.holdDays || 7} days later, so refunds and chargebacks show up first.`));
+        if (me.capLeftPaise != null) c.append(h('p', 'hint', `New hosts can be paid up to ₹10,000 in 30 days. Left now: ${rupees(me.capLeftPaise)}.`));
         if (me.payoutsPaused) c.append(h('p', 'hint', 'Payouts are paused for your account while we check a refunded or disputed payment. Contact us if you have questions.'));
+        else if (!kycOk) c.append(h('p', 'hint', 'Add your payout details below before your first payout.'));
         else if (payable < MIN_PAYOUT_COINS) c.append(h('p', 'hint', `You can ask for a payout from ${MIN_PAYOUT_COINS} coins. You have ${payable}.`));
-        c.append(field('Pay me at', details, 'Only the admins see this.'), ask);
+        c.append(kycBox(), ask);
         if (me.payouts?.length) {
             const list = h('div', 'live-history');
             list.append(h('b', '', 'Payouts'));
@@ -202,6 +204,40 @@ export function createLiveUi({ pane, ctx, enter }) {
             c.append(list);
         }
         return c;
+    }
+
+    /** Who the host is and where to pay them (functions/payoutrules.js). Checked by an admin before the first payout is paid. */
+    function kycBox() {
+        const box = h('div', 'live-kyc');
+        const k = me.kyc;
+        box.append(h('b', '', 'Payout details'));
+        if (k) {
+            const status = k.status === 'verified' ? 'Checked ✓' : k.status === 'rejected' ? 'Please fix: ' + (k.note || 'the details do not match') : 'Waiting for our check';
+            box.append(h('p', 'hint', `${k.name} · PAN ${k.pan} · ${k.payTo} · ${status}`));
+        }
+        box.append(h('p', 'hint', 'Your name must be as on your PAN card, and the UPI ID or bank account must be in the same name. Each PAN and payout account can be used by one host account only. Only our admins see these details.'));
+        const name = input('kycName', { maxLength: 80, placeholder: 'Full name as on PAN' }); if (k?.name) name.value = k.name;
+        const pan = input('kycPan', { maxLength: 10, placeholder: 'PAN, like ABCDE1234F' }); pan.style.textTransform = 'uppercase';
+        const method = h('select', 'input'); method.id = 'kycMethod';
+        method.append(new Option(T('UPI'), 'upi'), new Option(T('Bank transfer'), 'bank'));
+        if (k?.method) method.value = k.method;
+        const upi = input('kycUpi', { maxLength: 112, placeholder: 'yourname@okaxis' });
+        const account = input('kycAccount', { maxLength: 18, placeholder: 'Account number', inputMode: 'numeric' });
+        const ifsc = input('kycIfsc', { maxLength: 11, placeholder: 'IFSC, like HDFC0001234' }); ifsc.style.textTransform = 'uppercase';
+        const upiRow = field('UPI ID', upi), accRow = field('Bank account number', account), ifscRow = field('IFSC', ifsc);
+        const sync = () => { upiRow.classList.toggle('hidden', method.value !== 'upi'); accRow.classList.toggle('hidden', method.value !== 'bank'); ifscRow.classList.toggle('hidden', method.value !== 'bank'); };
+        method.onchange = sync; sync();
+        const save = h('button', 'btn btn-ghost btn-sm', k ? 'Update payout details' : 'Save payout details'); save.type = 'button';
+        save.onclick = async () => {
+            save.disabled = true;
+            try { await api().call('saveHostKyc', { name: name.value, pan: pan.value, method: method.value, upi: upi.value, account: account.value, ifsc: ifsc.value }); ctx.toast('Payout details saved. We’ll check them before your first payout.'); await load(); }
+            catch (e) { fail(e); save.disabled = false; }
+        };
+        const form = h('details', 'live-kyc-form');
+        form.open = !k || k.status === 'rejected';
+        form.append(h('summary', '', k ? 'Change payout details' : 'Add payout details'), field('Full name', name), field('PAN', pan), field('Paid by', method), upiRow, accRow, ifscRow, save);
+        box.append(form);
+        return box;
     }
 
     function hostSection() {

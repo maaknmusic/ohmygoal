@@ -22,13 +22,15 @@ import { bump, istDay, statsRef } from './stats.js';
 import { cleanNick, cleanAvatar, CAPS, STALE_MS } from './groups.js';
 import { GIFTS, GIFT_HOURLY_CAP, afterSpend } from './gifts.js';
 import { record } from './ledger.js';
+import { HOLD_DAYS, MAX_HOLD_DAYS, holdDaysFor, capLeftPaise, cleanKyc, kycKeys, payTo, kycForHost } from './payoutrules.js';
 
 export const LIVE_START_FEE = 49;           // coins a host pays to open a session (kept by the platform)
 export const PRIVATE_FEE = 200;             // coins each guest pays to join a private session
 export const HOST_SHARE_PCT = 70;           // share of every gift and private fee that the host earns
 export const COIN_VALUE_PAISE = 75;         // what one earned coin is worth when you pay the host (₹0.75)
 export const MIN_PAYOUT_COINS = 300;        // smallest payout a host can ask for (about ₹225)
-export const HOLD_DAYS = 7;                  // earnings can be paid out this many days after they were earned, so a refund or chargeback shows up first
+const MONTHLY_CAP_RUPEES = 10000;             // payoutrules.js MONTHLY_PAYOUT_CAP_PAISE, for messages
+export { HOLD_DAYS } from './payoutrules.js';
 export const MAX_SESSION_MS = 3 * 3600000;  // a session closes by itself after this
 export const STARTS_PER_DAY = 12;
 /** Rough running cost of one person in a live room for one hour, in paise (database writes and reads, plus an allowance for the video relay). Only used for the admin usage panel. */
@@ -67,19 +69,20 @@ export function earningSplit(wallet, total) {
 }
 
 /**
- * Coins earned in the last HOLD_DAYS Indian days, which cannot be paid out yet. `recent` is the host wallet's map of day -> coins earned
- * that day (kept by creditHost). Never more than the balance, so a payout or a refund taken out of the balance is respected.
+ * Coins earned in the last `days` Indian days (HOLD_DAYS, longer for new hosts: payoutrules.js), which cannot be paid out yet. `recent` is
+ * the host wallet's map of day -> coins earned that day (kept by creditHost). Never more than the balance, so a payout or a refund taken
+ * out of the balance is respected.
  */
-export function heldCoins(recent, balance, now) {
-    const from = istDay(now - (HOLD_DAYS - 1) * DAY);
+export function heldCoins(recent, balance, now, days = HOLD_DAYS) {
+    const from = istDay(now - (days - 1) * DAY);
     let held = 0;
     if (recent && typeof recent === 'object') for (const [day, n] of Object.entries(recent)) if (day >= from && Number.isInteger(n) && n > 0) held += n;
     return Math.min(held, wholeCoins(balance));
 }
 
-/** The host wallet's `recent` map after `share` more coins were earned now: today's bucket grows, buckets older than the hold are dropped. */
+/** The host wallet's `recent` map after `share` more coins were earned now: today's bucket grows, buckets older than the longest hold are dropped. */
 export function recentAfter(recent, share, now) {
-    const from = istDay(now - (HOLD_DAYS - 1) * DAY), today = istDay(now);
+    const from = istDay(now - (MAX_HOLD_DAYS - 1) * DAY), today = istDay(now);
     const out = {};
     if (recent && typeof recent === 'object') for (const [day, n] of Object.entries(recent)) if (day >= from && Number.isInteger(n) && n > 0) out[day] = n;
     if (wholeCoins(share)) out[today] = (out[today] || 0) + wholeCoins(share);
@@ -197,10 +200,13 @@ export const myHost = onCall(callOpts(), async request => {
     const now = Date.now();
     const active = live.docs.find(d => sessionIsLive(d.data(), now, now)); // a session still inside its time limit
     const coins = asInt(wallet.coins);
-    const held = heldCoins(wallet.recent, coins, now);
+    const holdDays = holdDaysFor(host, now);
+    const held = heldCoins(wallet.recent, coins, now, holdDays);
+    const capLeft = capLeftPaise(host, pays.docs.map(d => d.data()), now);
     return {
         status: host.status === 'suspended' ? 'suspended' : 'active', name: host.name || '',
-        heldCoins: held, payableCoins: coins - held, holdDays: HOLD_DAYS, payoutsPaused: Boolean(host.payoutHold),
+        heldCoins: held, payableCoins: coins - held, holdDays, payoutsPaused: Boolean(host.payoutHold),
+        kyc: kycForHost(host.kyc), trusted: host.trusted === true, capLeftPaise: Number.isFinite(capLeft) ? capLeft : null,
         coins, pendingCoins: asInt(wallet.pending), paidOutCoins: asInt(wallet.paidOut), lifetimeCoins: asInt(wallet.lifetime),
         paise: coinsToPaise(coins), coinPaise: COIN_VALUE_PAISE, minPayoutCoins: MIN_PAYOUT_COINS,
         startFee: LIVE_START_FEE, privateFee: PRIVATE_FEE, sharePct: HOST_SHARE_PCT,
@@ -408,28 +414,60 @@ export const requestPayout = onCall(callOpts(), async request => {
     const uid = requireGoogle(request);
     const host = await hostGate(uid);
     if (host.payoutHold) throw new HttpsError('failed-precondition', 'Payouts are paused for your account while we check a refunded or disputed payment. Contact us if you have questions.');
-    const details = cleanText(request.data?.details, 120);
-    if (details.length < 5) throw new HttpsError('invalid-argument', 'Tell us where to pay you: your UPI ID or bank account details.');
+    if (!host.kyc || host.kyc.status === 'rejected') throw new HttpsError('failed-precondition', 'Add your name, PAN and payout account first (Your earnings → Payout details).');
     const now = Date.now();
     const id = privateCol('payouts').doc().id;
+    const holdDays = holdDaysFor(host, now);
     const out = await db.runTransaction(async t => {
-        const w = (await t.get(hostWalletRef(uid))).data() || {};
+        const [ws, mine] = await Promise.all([t.get(hostWalletRef(uid)), t.get(privateCol('payouts').where('uid', '==', uid).limit(100))]);
+        const w = ws.data() || {};
         const balance = asInt(w.coins);
-        const held = heldCoins(w.recent, balance, now);
-        const coins = balance - held;      // what was earned more than HOLD_DAYS days ago
-        if (coins < MIN_PAYOUT_COINS) {
+        const held = heldCoins(w.recent, balance, now, holdDays);
+        const payable = balance - held;      // what was earned more than holdDays days ago
+        if (payable < MIN_PAYOUT_COINS) {
             throw new HttpsError('failed-precondition', held
-                ? `You can ask for a payout from ${MIN_PAYOUT_COINS} coins. ${coins} of your coins can be paid now; ${held} earned in the last ${HOLD_DAYS} days are on hold until then.`
-                : `You can ask for a payout from ${MIN_PAYOUT_COINS} earned coins. You have ${coins}.`);
+                ? `You can ask for a payout from ${MIN_PAYOUT_COINS} coins. ${payable} of your coins can be paid now; ${held} earned in the last ${holdDays} days are on hold until then.`
+                : `You can ask for a payout from ${MIN_PAYOUT_COINS} earned coins. You have ${payable}.`);
         }
-        const open = await t.get(privateCol('payouts').where('uid', '==', uid).where('status', '==', 'requested').limit(1));
-        if (!open.empty) throw new HttpsError('already-exists', 'You already have a payout waiting.');
-        t.set(hostWalletRef(uid), { coins: held, pending: asInt(w.pending) + coins }, { merge: true });
-        record(t, { at: now, type: 'payout_requested', uid, earned: -coins, earnedBalance: held, paise: coinsToPaise(coins), ref: id });
-        t.set(privateDoc(`payouts/${id}`), { uid, coins, paise: coinsToPaise(coins), details, status: 'requested', at: now, name: '' });
+        if (mine.docs.some(d => d.data().status === 'requested')) throw new HttpsError('already-exists', 'You already have a payout waiting.');
+        const capLeft = capLeftPaise(host, mine.docs.map(d => d.data()), now);
+        const coins = Math.min(payable, Number.isFinite(capLeft) ? Math.floor(capLeft / COIN_VALUE_PAISE) : payable);
+        if (coins < MIN_PAYOUT_COINS) throw new HttpsError('failed-precondition', `You have reached the payout limit for new hosts (₹${MONTHLY_CAP_RUPEES.toLocaleString('en-IN')} in 30 days). The rest can be paid out later.`);
+        t.set(hostWalletRef(uid), { coins: balance - coins, pending: asInt(w.pending) + coins }, { merge: true });
+        record(t, { at: now, type: 'payout_requested', uid, earned: -coins, earnedBalance: balance - coins, paise: coinsToPaise(coins), ref: id, note: payTo(host.kyc) });
+        t.set(privateDoc(`payouts/${id}`), { uid, coins, paise: coinsToPaise(coins), details: payTo(host.kyc), payName: host.kyc.name, status: 'requested', at: now, name: host.name || '' });
         return { coins, paise: coinsToPaise(coins) };
     });
     return { id, ...out };
+});
+
+/**
+ * A host saves who they are and where to be paid (payoutrules.js). The PAN and the payout account must not belong to another host. Saving
+ * new details sets them back to "waiting for a check", and the change date is shown to the admin next to payout requests.
+ */
+export const saveHostKyc = onCall(callOpts(), async request => {
+    const uid = requireGoogle(request);
+    await hostGate(uid);
+    const c = cleanKyc(request.data);
+    if (!c.ok) throw new HttpsError('invalid-argument', c.error);
+    const now = Date.now();
+    const keys = kycKeys(c.kyc);
+    await db.runTransaction(async t => {
+        const hRef = privateDoc(`hosts/${uid}`);
+        const [h, ...idx] = await Promise.all([t.get(hRef), ...keys.map(k => t.get(privateDoc(`kycIndex/${k.key}`)))]);
+        for (let i = 0; i < keys.length; i++) {
+            const owner = idx[i].data()?.uid;
+            if (owner && owner !== uid) throw new HttpsError('already-exists', `That ${keys[i].kind} is already used by another account. Each person can have one host account.`);
+        }
+        const old = h.data()?.kyc;
+        // free the old payout account (a PAN stays with the first account that used it)
+        if (old?.pan) for (const k of kycKeys(old)) if (k.kind !== 'PAN' && !keys.some(n => n.key === k.key)) t.delete(privateDoc(`kycIndex/${k.key}`));
+        for (const k of keys) t.set(privateDoc(`kycIndex/${k.key}`), { uid, kind: k.kind, at: now });
+        const same = old && old.name === c.kyc.name && old.pan === c.kyc.pan && payTo(old) === payTo(c.kyc) && old.account === c.kyc.account;
+        if (same) return;
+        t.set(hRef, { kyc: { ...c.kyc, status: 'submitted', submittedAt: now, changedAt: old ? now : 0 } }, { mergeFields: ['kyc'] });
+    });
+    return { ok: true, kyc: kycForHost({ ...c.kyc, status: 'submitted' }) };
 });
 
 // ---------------------------------------------------------------- admin
@@ -450,13 +488,17 @@ export async function payoutRisk(hostUid, now) {
         by.set(e.fromUid, (by.get(e.fromUid) || 0) + e.hostShare);
     }
     const top = [...by.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-    const clients = top.length ? await db.getAll(privateDoc(`clients/${hostUid}`), ...top.map(([u]) => privateDoc(`clients/${u}`))) : [];
+    const clients = await db.getAll(privateDoc(`clients/${hostUid}`), ...top.map(([u]) => privateDoc(`clients/${u}`)));   // the host's own record always
     const me = clients[0]?.data() || {};
     const givers = top.map(([uid, coins], i) => {
         const c = clients[i + 1]?.data() || {};
         return { uid, coins, pct: total ? Math.round((coins * 100) / total) : 0, sameIp: Boolean(me.ip && c.ip === me.ip), sameDevice: Boolean(me.fp && c.fp === me.fp) };
     });
     const warnings = [];
+    const host = (await privateDoc(`hosts/${hostUid}`).get()).data() || {};
+    const daysAgo = t => Math.max(0, Math.floor((now - t) / DAY));
+    if (host.kyc?.changedAt && now - host.kyc.changedAt < 7 * DAY) warnings.push(`the payout account was changed ${daysAgo(host.kyc.changedAt)} day(s) ago`);
+    if (me.fpChangedAt && now - me.fpChangedAt < 7 * DAY) warnings.push(`the host started using a different device ${daysAgo(me.fpChangedAt)} day(s) ago`);
     if (givers[0] && givers[0].pct >= 60 && total >= 100) warnings.push(`${givers[0].pct}% of the last 30 days' earnings came from one person`);
     if (givers.some(g => g.sameIp)) warnings.push('a giver used the same IP address as the host');
     if (givers.some(g => g.sameDevice)) warnings.push('a giver used the same device as the host');
@@ -482,7 +524,8 @@ export const adminHosts = onCall(callOpts({ secrets: [ADMIN_EMAILS], timeoutSeco
             const wmap = new Map(wallets.map(w => [w.ref.id, w.data() || {}]));
             const rows = hosts.docs.map(d => {
                 const h = d.data(), w = wmap.get(d.id) || {};
-                return { uid: d.id, status: h.status === 'suspended' ? 'suspended' : 'active', payoutHold: h.payoutHold || null, held: heldCoins(w.recent, asInt(w.coins), now), name: h.name || '', email: h.email || '', firstLiveAt: h.firstLiveAt || 0, lastLiveAt: h.lastLiveAt || 0, note: h.note || '', coins: asInt(w.coins), pending: asInt(w.pending), paidOut: asInt(w.paidOut), lifetime: asInt(w.lifetime) };
+                return { uid: d.id, status: h.status === 'suspended' ? 'suspended' : 'active', payoutHold: h.payoutHold || null, held: heldCoins(w.recent, asInt(w.coins), now, holdDaysFor(h, now)), holdDays: holdDaysFor(h, now), trusted: h.trusted === true,
+                    kyc: h.kyc ? { name: h.kyc.name, pan: h.kyc.pan, method: h.kyc.method, payTo: payTo(h.kyc), status: h.kyc.status || 'submitted', submittedAt: h.kyc.submittedAt || 0, changedAt: h.kyc.changedAt || 0, verifiedBy: h.kyc.verifiedBy || '', note: h.kyc.note || '' } : null, name: h.name || '', email: h.email || '', firstLiveAt: h.firstLiveAt || 0, lastLiveAt: h.lastLiveAt || 0, note: h.note || '', coins: asInt(w.coins), pending: asInt(w.pending), paidOut: asInt(w.paidOut), lifetime: asInt(w.lifetime) };
             }).sort((a, b) => b.lastLiveAt - a.lastLiveAt);
             const FIELDS = ['liveStarts', 'liveFeeCoins', 'privateJoins', 'privateCoins', 'liveGifts', 'liveGiftCoins', 'hostShareCoins', 'platformShareCoins', 'liveEnded', 'liveMinutes', 'liveParticipantMinutes', 'liveFreeStarts', 'coinGifts', 'coinGiftCoins'];
             const sum = (from, to) => Object.fromEntries(FIELDS.map(f => [f, statDocs.slice(from, to).reduce((a, d) => a + asInt(d.data()?.[f]), 0)]));
@@ -510,6 +553,22 @@ export const adminHosts = onCall(callOpts({ secrets: [ADMIN_EMAILS], timeoutSeco
             await log(`host-${decision}`, { uid, note: note() });
             return { ok: true, status: decision === 'suspend' ? 'suspended' : 'active' };
         }
+        case 'kycVerify': case 'kycReject': {
+            const uid = uidOf();
+            const ref = privateDoc(`hosts/${uid}`);
+            const k = (await ref.get()).data()?.kyc;
+            if (!k) throw new HttpsError('failed-precondition', 'That host has not given payout details yet.');
+            if (action === 'kycReject' && !note()) throw new HttpsError('invalid-argument', 'Write what is wrong, so the host can fix it.');
+            await ref.set({ kyc: { ...k, status: action === 'kycVerify' ? 'verified' : 'rejected', verifiedAt: now, verifiedBy: email, note: note() } }, { mergeFields: ['kyc'] });
+            await log(action === 'kycVerify' ? 'host-kyc-verified' : 'host-kyc-rejected', { uid, note: note() });
+            return { ok: true };
+        }
+        case 'trust': case 'untrust': {
+            const uid = uidOf();
+            await privateDoc(`hosts/${uid}`).set({ trusted: action === 'trust' }, { merge: true });
+            await log(`host-${action}`, { uid, note: note() });
+            return { ok: true };
+        }
         case 'clearHold': {
             const uid = uidOf();
             const ref = privateDoc(`hosts/${uid}`);
@@ -528,6 +587,9 @@ export const adminHosts = onCall(callOpts({ secrets: [ADMIN_EMAILS], timeoutSeco
                 const p = (await t.get(ref)).data();
                 if (!p) throw new HttpsError('not-found', 'Unknown payout.');
                 if (p.status !== 'requested') throw new HttpsError('failed-precondition', 'That payout was already handled.');
+                if (action === 'payoutPaid' && (await t.get(privateDoc(`hosts/${p.uid}`))).data()?.kyc?.status !== 'verified') {
+                    throw new HttpsError('failed-precondition', 'Check and verify this host’s name, PAN and payout account first (Hosts → the host → Verify).');
+                }
                 const w = (await t.get(hostWalletRef(p.uid))).data() || {};
                 if (action === 'payoutPaid') {
                     t.set(hostWalletRef(p.uid), { pending: Math.max(0, asInt(w.pending) - p.coins), paidOut: asInt(w.paidOut) + p.coins }, { merge: true });

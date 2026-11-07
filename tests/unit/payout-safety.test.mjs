@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { HOLD_DAYS, heldCoins, recentAfter } from '/home/user/ohmygoal/functions/live.js';
+import { MAX_HOLD_DAYS } from '/home/user/ohmygoal/functions/payoutrules.js';
 import { coinsDue, walletAfterTakeBack } from '/home/user/ohmygoal/functions/reversals.js';
 
 const DAY = 86400000;
@@ -16,11 +17,13 @@ test('earnings are held for 7 Indian days, today included', () => {
     for (const bad of [undefined, null, 'x', { [ist(now)]: -5 }, { [ist(now)]: 'lots' }]) assert.equal(heldCoins(bad, 500, now), 0);
 });
 
-test('recentAfter adds to today and drops days older than the hold', () => {
-    const r = recentAfter({ [ist(now - 10 * DAY)]: 7, [ist(now - 2 * DAY)]: 3, [ist(now)]: 4 }, 10, now);
+test('recentAfter adds to today and drops days older than the longest hold (14 days for new hosts)', () => {
+    assert.equal(MAX_HOLD_DAYS, 14);
+    assert.equal(heldCoins({ [ist(now - 10 * DAY)]: 9 }, 100, now, 14), 9);
+    const r = recentAfter({ [ist(now - 20 * DAY)]: 7, [ist(now - 2 * DAY)]: 3, [ist(now)]: 4 }, 10, now);
     assert.deepEqual(r, { [ist(now - 2 * DAY)]: 3, [ist(now)]: 14 });
     assert.deepEqual(recentAfter(undefined, 0, now), {});
-    assert.ok(Object.keys(recentAfter(Object.fromEntries(Array.from({ length: 60 }, (_, i) => [ist(now - i * DAY), 1])), 1, now)).length <= HOLD_DAYS, 'the map stays small');
+    assert.ok(Object.keys(recentAfter(Object.fromEntries(Array.from({ length: 60 }, (_, i) => [ist(now - i * DAY), 1])), 1, now)).length <= MAX_HOLD_DAYS, 'the map stays small');
 });
 
 test('coinsDue: a refund takes back coins in proportion, rounded up, never more than the pack', () => {

@@ -2935,6 +2935,7 @@ el.ageCheck.checked = store.get('ageConfirmed', false);
 const refreshStart = () => { el.startBtn.disabled = !S.transport; };
 el.ageCheck.onchange = () => { store.set('ageConfirmed', el.ageCheck.checked); refreshStart(); };
 
+$('safeFirstOk').onclick = () => { store.set('safetyBrief', true); closeSheet($('safeFirstSheet')); el.startBtn.click(); };
 el.startBtn.onclick = async () => {
     if (!el.ageCheck.checked) {
         // Nudge instead of leaving a dead, disabled button.
@@ -2950,6 +2951,8 @@ el.startBtn.onclick = async () => {
         openSheet(el.roomSheet);
         return;
     }
+    // once, before the first voice or video chat: how blackmail (sextortion) scams start and what to do
+    if (S.mode !== 'text' && !store.get('safetyBrief', false)) { openSheet($('safeFirstSheet')); return; }
     S.nick = sanitizeHandle(el.nickInput.value) || generateHandle();
     el.nickInput.value = S.nick;
     store.set('nick', S.nick);

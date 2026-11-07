@@ -190,7 +190,11 @@ async function refreshAccess(id) {
     const pass = publicDoc(`access/${id.uid}`);
     if (full) await pass.delete().catch(() => {});
     else await pass.set({ until: Date.now() + ACCESS_PASS_MS, videoBanUntil });
-    await privateDoc(`clients/${id.uid}`).set({ ip: id.ip, fp: id.fp, lastSeen: Date.now() }, { merge: true });
+    // remember when this account started using another device: shown to the admin next to a host's payout request (live.js payoutRisk)
+    const cRef = privateDoc(`clients/${id.uid}`);
+    const before = (await cRef.get()).data();
+    const moved = before?.fp && id.fp && before.fp !== id.fp ? { prevFp: before.fp, fpChangedAt: Date.now() } : {};
+    await cRef.set({ ip: id.ip, fp: id.fp, lastSeen: Date.now(), ...moved }, { merge: true });
     return {
         allowed: !full,
         // A ban found through a shared IP or device but issued to another account does not reveal that person's reason or note.

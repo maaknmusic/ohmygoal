@@ -42,6 +42,18 @@ export function createHosts({ $, h, toast, button, empty, kv, when, short, fn })
         const note = h('input', 'input'); note.placeholder = 'Reason (optional)'; note.maxLength = 200;
         if (x.status === 'active') actions.append(note, button('Suspend', 'btn btn-danger btn-sm', b => { if (confirm(`Suspend ${x.name}? Their live session ends and they cannot host until you reinstate them.`)) act(b, 'decide', { uid: x.uid, decision: 'suspend', note: note.value }, `${x.name} is suspended.`); }));
         else actions.append(note, button('Reinstate', 'btn btn-primary btn-sm', b => act(b, 'decide', { uid: x.uid, decision: 'reinstate', note: note.value }, `${x.name} can host again.`)));
+        if (x.kyc) {
+            const k = x.kyc;
+            const kv2 = kv([['Legal name', k.name], ['PAN', k.pan], ['Paid to', k.payTo],
+                ['Details status', k.status === 'verified' ? `Verified by ${k.verifiedBy}` : k.status === 'rejected' ? `Rejected: ${k.note}` : 'Waiting for your check'],
+                ['Details changed', k.changedAt ? when(k.changedAt) : ''], ['Hold / limit', `${x.holdDays} days · ${x.trusted ? 'trusted: no monthly limit' : '₹10,000 per 30 days'}`]]);
+            item.insertBefore(kv2, actions.parentNode ? actions : null);
+            if (k.status !== 'verified') actions.append(button('Verify details', 'btn btn-primary btn-sm', b => { if (confirm(`Verify ${k.name}? Check first that the name matches the PAN, and that the ${k.method === 'upi' ? 'UPI ID shows this name in your UPI app' : 'bank account is in this name'}.`)) act(b, 'kycVerify', { uid: x.uid, note: note.value }, 'Details verified.'); }));
+            if (k.status !== 'rejected') actions.append(button('Reject details', 'btn btn-ghost btn-sm', b => { if (!note.value.trim()) { toast('Write in the reason box what the host must fix.', true); return; } act(b, 'kycReject', { uid: x.uid, note: note.value }, 'Details rejected. The host sees your reason.'); }));
+        } else item.append(h('p', 'help', 'No payout details yet.'));
+        actions.append(x.trusted
+            ? button('Remove trusted', 'btn btn-ghost btn-sm', b => act(b, 'untrust', { uid: x.uid, note: note.value }, `${x.name} is no longer trusted: 14-day hold for new hosts and ₹10,000 per 30 days apply.`))
+            : button('Mark trusted', 'btn btn-ghost btn-sm', b => { if (confirm(`Mark ${x.name} as trusted? Their earnings are held 7 days and there is no monthly payout limit.`)) act(b, 'trust', { uid: x.uid, note: note.value }, `${x.name} is trusted.`); }));
         if (x.payoutHold) actions.append(button('Allow payouts again', 'btn btn-ghost btn-sm', b => { if (confirm(`Allow ${x.name} to ask for payouts again? Do this only after checking where their earnings came from.`)) act(b, 'clearHold', { uid: x.uid, note: note.value }, `${x.name} can ask for payouts again.`); }));
         item.appendChild(actions);
         return item;
@@ -52,7 +64,8 @@ export function createHosts({ $, h, toast, button, empty, kv, when, short, fn })
         const head = h('div', 'item-head');
         head.append(h('span', 'pill ' + (p.status === 'requested' ? 'open' : p.status === 'paid' ? 'approved' : 'rejected'), p.status === 'requested' ? 'To pay' : p.status === 'paid' ? 'Paid' : 'Rejected'), h('b', '', `${nameOf(p.uid)} · ${rupees(p.paise)}`), h('span', '', `${p.coins} coins · asked ${when(p.at)}`));
         const host = data.hosts.find(x => x.uid === p.uid);
-        const warn = [...(host?.payoutHold ? ['payouts are paused for this host: ' + host.payoutHold.reason] : []), ...(p.risk?.warnings || [])];
+        const warn = [...(host?.kyc?.status !== 'verified' ? ['the host’s name, PAN and payout account are not verified yet (verify them in the host’s row first)'] : []),
+            ...(host?.payoutHold ? ['payouts are paused for this host: ' + host.payoutHold.reason] : []), ...(p.risk?.warnings || [])];
         if (p.status === 'requested' && warn.length) {
             const w = h('p', 'help');
             w.style.color = 'var(--danger, #dc2626)';
@@ -60,7 +73,7 @@ export function createHosts({ $, h, toast, button, empty, kv, when, short, fn })
             item.append(w);
         }
         const givers = p.risk?.top?.length ? p.risk.top.map(g => `${short(g.uid)} ${g.pct}%${g.sameIp ? ' (same IP)' : ''}${g.sameDevice ? ' (same device)' : ''}`).join(', ') : '';
-        item.append(head, kv([['Pay to', p.details], ['Earned from (30 days)', p.status === 'requested' ? givers : ''], ['Reference', p.status === 'paid' ? p.reference : ''], ['Handled by', p.status !== 'requested' ? p.paidBy : ''], ['Handled', p.status !== 'requested' ? when(p.paidAt) : '']]));
+        item.append(head, kv([['Pay to', p.details], ['Name', p.payName || ''], ['Earned from (30 days)', p.status === 'requested' ? givers : ''], ['Reference', p.status === 'paid' ? p.reference : ''], ['Handled by', p.status !== 'requested' ? p.paidBy : ''], ['Handled', p.status !== 'requested' ? when(p.paidAt) : '']]));
         if (p.status === 'requested') {
             const ref = h('input', 'input'); ref.placeholder = 'UPI / bank reference of your payment'; ref.maxLength = 80;
             const actions = h('div', 'actions');

@@ -85,7 +85,7 @@ const toastLog = []; // every toast text, in order
 
 /** One browser "device". token = the fake Google identity this device can sign in with. */
 async function device(name, { lang = '', token = null, viewport = { width: 1280, height: 800 } } = {}) {
-  const ctx = await browser.newContext({ permissions: ['camera', 'microphone'], serviceWorkers: 'block', viewport });
+  const ctx = await browser.newContext({ permissions: ['camera', 'microphone'], serviceWorkers: 'block', viewport }); await ctx.addInitScript(() => { try { localStorage.setItem('ac.safetyBrief', 'true'); } catch { /* storage off */ } });   // first-chat safety sheet: tests/e2e/safety-brief.mjs
   const calls = [];
   await ctx.route('http://127.0.0.1:5001/**', r => { calls.push(r.request().url()); return r.continue({ headers: { ...r.request().headers(), 'x-forwarded-for': MAIN_IP } }); });
   await ctx.route('**/config.js', r => r.fulfill({ body: cfg, contentType: 'text/javascript' }));

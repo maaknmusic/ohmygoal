@@ -9,6 +9,7 @@ import { logger } from 'firebase-functions/v2';
 import { db, privateCol, privateDoc, publicDoc } from './common.js';
 import { walletDoc } from './wallet.js';
 import { record } from './ledger.js';
+import { blockBuyer } from './buyerrules.js';
 
 const DAY = 86400000;
 const whole = v => (Number.isInteger(v) && v > 0 ? v : 0);
@@ -77,6 +78,8 @@ export async function reverseOrder(orderId, { reason, refunded, paymentId }) {
             await privateDoc(`hosts/${h}`).set({ payoutHold: { reason: `a ${reason === 'dispute' ? 'disputed' : 'refunded'} payment by a person who paid this host`, orderId, buyerUid: res.uid, at: now } }, { merge: true });
         }
     }
+    // a chargeback: no more buying from this account or the device it last used (an admin can lift it)
+    if (reason === 'dispute') await blockBuyer(res.uid, 'chargeback', orderId, now);
     await privateCol('adminLog').add({ at: now, by: 'razorpay', what: `payment-${reason}`, details: { orderId, paymentId: paymentId || '', ...res, pausedHosts: paused } });
     logger.info('Order reversed', { orderId, reason, ...res, pausedHosts: paused.length });
     return { ...res, pausedHosts: paused };

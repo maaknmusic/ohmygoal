@@ -18,11 +18,12 @@ import { COIN_PACKS } from './gifts.js';
 import { addCoinsTx, walletDoc } from './wallet.js';
 import { reverseOrder } from './reversals.js';
 import { record } from './ledger.js';
+import { buyerGate } from './buyerrules.js';
 
 // Gifting bought coins to the person you are with (the platform keeps 30%).
 export { giftCoins } from './coingifts.js';
 // Live sessions: hosts, paid private sessions, gifts to the host, payouts and the admin side.
-export { myHost, startLive, joinLive, endLive, kickLive, listLive, sendLiveGift, requestPayout, adminHosts } from './live.js';
+export { myHost, startLive, joinLive, endLive, kickLive, listLive, sendLiveGift, requestPayout, saveHostKyc, adminHosts } from './live.js';
 // Bans, access passes, unban requests and the admin API.
 export { checkAccess, reportViolation, requestUnban, admin } from './moderation.js';
 // "Good vibe" likes after a chat.
@@ -194,6 +195,7 @@ export const createOrder = onCall(callOpts({ secrets: [RAZORPAY_KEY_ID, RAZORPAY
     const planId = request.data?.plan;
     const plan = Object.hasOwn(PLANS, planId) ? PLANS[planId] : null;
     if (!plan) throw new HttpsError('invalid-argument', 'Unknown plan.');
+    await buyerGate(uid, plan.amount);
     await takeOrderSlot(uid);
 
     const order = await razorpay('/v1/orders', {
@@ -223,6 +225,7 @@ async function createCoinOrder(request) {
     const id = request.data.coins;
     const pack = typeof id === 'string' && Object.hasOwn(COIN_PACKS, id) ? COIN_PACKS[id] : null;
     if (!pack) throw new HttpsError('invalid-argument', 'Unknown coin pack.');
+    await buyerGate(uid, pack.amount);
     await takeOrderSlot(uid);
     const order = await razorpay('/v1/orders', {
         method: 'POST',
@@ -241,6 +244,7 @@ async function createTipOrder(request) {
         throw new HttpsError('invalid-argument', `A tip must be a whole number of rupees between ₹${TIP_MIN_RUPEES} and ₹${TIP_MAX_RUPEES}.`);
     }
     const amount = rupees * 100;
+    await buyerGate(uid, amount);
     await takeOrderSlot(uid);
     const order = await razorpay('/v1/orders', {
         method: 'POST',

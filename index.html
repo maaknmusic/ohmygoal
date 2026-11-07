@@ -1101,9 +1101,25 @@
                     <li><b>Your IP address</b> can be seen by the person you chat with, as in any peer-to-peer call. Premium members can hide it (Menu → Hide my IP address).</li>
                     <li><b>Your video is never recorded.</b> It is encrypted and goes only to your partner (directly, or through a relay that cannot read it). Partner video stays blurred until our on-device check passes.</li>
                     <li><b>Asked for photos or threatened?</b> Stop replying, block, and report. In India call <b>1930</b> (cybercrime helpline) or visit <a href="https://cybercrime.gov.in" target="_blank" rel="noopener">cybercrime.gov.in</a>.</li>
+                    <li>Being blackmailed? Don’t pay: paying never stops it. Keep screenshots of the profile and messages, block and report here, then call 1930 or report at cybercrime.gov.in. You are not in trouble for reporting.</li>
                 </ul>
                 <p class="hint">We never sell unbans or verification. Appeals are free.</p>
             </div>
+        </div>
+    </div>
+
+    <!-- Shown once, before the first voice or video chat: the sextortion pattern and what to do (js/app.js) -->
+    <div id="safeFirstSheet" class="sheet-bg hidden" role="dialog" aria-modal="true" aria-labelledby="safeFirstTitle">
+        <div class="sheet">
+            <div class="sheet-head"><h3 id="safeFirstTitle">Before your first chat</h3><button class="icon-btn" data-sheet-close aria-label="Close"><i class="icon" data-icon="x"></i></button></div>
+            <div class="sheet-body">
+                <ul class="safety-list">
+                    <li>Never undress or do anything intimate on camera. A stranger can record their screen, even though we never record chats.</li>
+                    <li>Blackmail scams start with someone friendly who asks you to undress or to move to a private video call, then threatens to share a recording unless you pay.</li>
+                    <li>If someone threatens you: don’t pay, because paying never ends it. Keep screenshots, block and report them here, then call 1930 or report at cybercrime.gov.in.</li>
+                </ul>
+            </div>
+            <div class="sheet-foot"><button type="button" class="btn btn-primary" id="safeFirstOk">I understand, start chatting</button></div>
         </div>
     </div>
 

@@ -295,6 +295,10 @@ export function createAnalytics({ $, h, toast, button, empty, kv, when, short, f
             field(' ', button('Change coins', 'btn btn-ghost', b => run(b, 'adjustCoins', { delta: Number(delta.value) }, 'Coins changed.'))),
         );
         const more = h('div', 'actions');
+        if (r.buyingBlocked) {
+            card.append(h('p', 'help', `⚠ Payments are blocked for this person and their device since ${when(r.buyingBlocked.at)} (${r.buyingBlocked.reason}).`));
+            more.append(button('Allow payments again', 'btn btn-ghost btn-sm', b => { if (confirm('Allow this person to pay again?')) run(b, 'unblockBuyer', {}, 'Payments allowed again.'); }));
+        }
         if (r.premiumActive) more.append(button('End Premium now', 'btn btn-danger btn-sm', b => { if (confirm('End Premium now for this person?')) run(b, 'revokePremium', {}, 'Premium ended.'); }));
         more.append(button('Ban for 24 hours', 'btn btn-danger btn-sm', async b => {
             if (!confirm('Ban this person from all chat for 24 hours?')) return;
