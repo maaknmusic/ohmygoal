@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { queueKey } from '../../js/transport.js';
-import { addCounters, HOT, SHARDS } from '../../functions/stats.js';
+import { addCounters, HOT, SHARDS, mustSaveOnline, ONLINE_REFRESH_MS, ONLINE_STALE_MS } from '../../functions/stats.js';
 import { MAX_INSTANCES, BUSY } from '../../functions/common.js';
 
 const root = new URL('../../', import.meta.url);
@@ -54,4 +54,17 @@ test('function ceilings: room for a crowd, more for the functions every visitor 
         assert.match(read(`functions/${file}.js`), new RegExp(`export const ${name} = onCall\\(callOpts\\((\\{ \\.\\.\\.)?BUSY`), name);
     }
     assert.match(read('functions/index.js'), /countOnline/);
+});
+
+test('the online count is only rewritten when it changed, or before pages would treat it as old', () => {
+    const now = 1_000_000_000;
+    assert.equal(mustSaveOnline(null, 5, now), true);
+    assert.equal(mustSaveOnline({ count: 5, at: now - 60000 }, 5, now), false);
+    assert.equal(mustSaveOnline({ count: 5, at: now - 60000 }, 6, now), true);
+    assert.equal(mustSaveOnline({ count: 5, at: now - ONLINE_REFRESH_MS }, 5, now), true);
+    assert.equal(mustSaveOnline({ count: 5 }, 5, now), true);
+    // the scheduler runs every minute: a refresh is always written well before pages give up on the count
+    assert.ok(ONLINE_REFRESH_MS + 2 * 60000 <= ONLINE_STALE_MS);
+    assert.match(readFileSync(new URL('../../js/transport.js', import.meta.url), 'utf8'), /Math\.abs\(Date\.now\(\) - c\.at\) < 6 \* 60000/);
+    assert.equal(ONLINE_STALE_MS, 6 * 60000);
 });

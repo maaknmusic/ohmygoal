@@ -1022,6 +1022,8 @@ async function connect({ roomId, role, bus, partnerId, friend = null }) {
                 if (pc.remoteDescription) await pc.addIceCandidate(data);
                 else sess.pendingCandidates.push(data);
             } else if (type === 'bye') {
+                // in Quick rounds the other side's clock may reach zero a moment before ours: that is the round ending, not them leaving
+                if (sess.round && sess.round.endsAt - Date.now() < 3000) { roundOver(); return; }
                 partnerLeft(sess.friend && S.phase === 'connecting' ? `${sess.friend.name} declined` : leftText(sess));
             }
         } catch (e) {
@@ -1422,9 +1424,13 @@ el.endPauseBtn.onclick = () => {
 };
 
 // Quick rounds: a countdown per chat. Time is only added when BOTH people tap "+1 min".
+// When it runs out, say so plainly (and how to turn rounds off), so it never looks like a dropped connection.
+const ROUND_OVER_SUB = 'Quick rounds is on: each chat lasts 60 s unless you both tap “+1 min”. You can turn it off in the menu (☰).';
+function roundOver() { partnerLeft('⏱ Time’s up', ROUND_OVER_SUB); }
 function startRound(sess) {
     if (sess.round || sess.ended) return;
-    sess.round = { endsAt: Date.now() + ROUND_SECONDS * 1000, total: ROUND_SECONDS };
+    sess.round = { endsAt: Date.now() + ROUND_SECONDS * 1000, total: ROUND_SECONDS, warned: false };
+    sys('⏱ Quick rounds: 60 s per chat. You both tap “+1 min” to keep talking.');
     sess.myExtend = sess.partnerExtend = false;
     el.round.classList.remove('hidden');
     el.extendBtn.classList.remove('waiting');
@@ -1436,9 +1442,11 @@ function startRound(sess) {
         el.roundTime.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
         el.roundFill.style.width = `${Math.min(100, (left / sess.round.total) * 100)}%`;
         el.round.classList.toggle('low', left <= 10);
-        if (left === 0) {
-            startSearch('⏱ Time’s up!');
+        if (left <= 10 && left > 0 && !sess.round.warned) {
+            sess.round.warned = true;
+            sys('⏱ 10 seconds left. You both tap “+1 min” to keep talking.');
         }
+        if (left === 0) roundOver();
     };
     tick();
     sess.roundTimer = setInterval(tick, 1000);
@@ -1448,6 +1456,7 @@ function tryExtend(sess) {
     if (!sess.round || sess.ended) return;
     if (sess.myExtend && sess.partnerExtend) {
         sess.round.endsAt += 60000;
+        sess.round.warned = false;
         sess.round.total = Math.max(sess.round.total, Math.ceil((sess.round.endsAt - Date.now()) / 1000));
         sess.myExtend = sess.partnerExtend = false;
         el.extendBtn.classList.remove('waiting');

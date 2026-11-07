@@ -111,7 +111,7 @@ await putDoc(`${base}/public/data/counters/online`, { count: 4242, at: Date.now(
 const D = await device('Dara');
 await D.waitForTimeout(5000);
 const shown = Number((await D.textContent('#onlineChipCount')).replace(/\D/g, ''));
-step('4c. a count older than 3 minutes is ignored: the page counts the people online itself', shown >= 1 && shown !== 4242, String(shown));
+step('4c. a count older than 6 minutes is ignored: the page counts the people online itself', shown >= 1 && shown !== 4242, String(shown));
 
 // ---- 5. the once-a-minute count (functions/stats.js saveOnlineCount), run with the Admin SDK against the emulator
 const { execFileSync } = await import('child_process');
@@ -120,11 +120,13 @@ try {
   out5 = execFileSync('node', ['-e', `import('./stats.js').then(async m => { const { publicDoc } = await import('./common.js'); const now = Date.now();
     for (let i = 0; i < 3; i++) await publicDoc('presence/scale-' + now + '-' + i).set({ ts: now - i * 1000 });
     await publicDoc('presence/scale-old-' + now).set({ ts: now - 5 * 60000 });
-    const n = await m.saveOnlineCount(now); const s = (await m.onlineRef().get()).data();
-    console.log(JSON.stringify({ n, s, now })); process.exit(0); })`], { cwd: SP + '/emu/functions', env: { ...process.env, FIRESTORE_EMULATOR_HOST: '127.0.0.1:8080', GCLOUD_PROJECT: 'demo-ohmygoal', APP_ID: 'anon-connect' }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    const r1 = await m.saveOnlineCount(now); const s = (await m.onlineRef().get()).data();
+    const r2 = await m.saveOnlineCount(now + 30000); const s2 = (await m.onlineRef().get()).data();
+    console.log(JSON.stringify({ n: r1.count, saved1: r1.saved, s, now, r2, s2 })); process.exit(0); })`], { cwd: SP + '/emu/functions', env: { ...process.env, FIRESTORE_EMULATOR_HOST: '127.0.0.1:8080', GCLOUD_PROJECT: 'demo-ohmygoal', APP_ID: 'anon-connect' }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
 } catch (e) { out5 = String(e.stdout || e.message); }
 const r5 = (() => { try { return JSON.parse(out5.trim().split('\n').pop()); } catch { return null; } })();
-step('5. the server count includes everyone seen in the last 75 s (not older) and is saved for pages to read', r5 && r5.n >= 3 && r5.s?.count === r5.n && r5.s?.at === r5.now, out5.slice(0, 200));
+step('5a. the server count includes everyone seen in the last 75 s (not older) and is saved for pages to read', r5 && r5.n >= 3 && r5.saved1 && r5.s?.count === r5.n && r5.s?.at === r5.now, out5.slice(0, 300));
+step('5b. counting again half a minute later with the same number writes nothing', r5 && r5.r2?.saved === false && r5.r2?.count === r5.n && r5.s2?.at === r5.now, out5.slice(0, 300));
 
 console.log('LOGS:', logs.slice(0, 8));
 await browser.close();

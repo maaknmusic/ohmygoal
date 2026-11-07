@@ -191,6 +191,9 @@ body.is-premium .react-lock { display: none; }
 .round-bar { flex: 1; height: 6px; border-radius: 999px; background: var(--bg-2); overflow: hidden; }
 .round-bar > div { height: 100%; width: 100%; background: linear-gradient(90deg, var(--primary), color-mix(in srgb, var(--primary) 50%, #7c3aed)); transition: width 1s linear; }
 .round.low .round-bar > div { background: var(--danger); }
+.round.low #extendBtn:not(:disabled) { animation: extendPulse 1s ease-in-out infinite; }
+@keyframes extendPulse { 50% { transform: scale(1.08); box-shadow: 0 0 0 6px color-mix(in srgb, var(--primary) 25%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .round.low #extendBtn { animation: none; } }
 .round-time { font-weight: 800; font-variant-numeric: tabular-nums; min-width: 34px; }
 .round-note { color: var(--muted); font-size: 12px; }
 #extendBtn.waiting { background: var(--success); color: #04201c; }

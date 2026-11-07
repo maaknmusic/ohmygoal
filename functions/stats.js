@@ -76,11 +76,23 @@ export const onRoomCreated = onDocumentCreated('artifacts/anon-connect/public/da
 export const PRESENCE_WINDOW_MS = 75000;
 export const onlineRef = () => publicDoc('counters/online');
 
-/** Counts the people online now and saves the number. Returns it. */
+// The saved number is only rewritten when it changed, or every ONLINE_REFRESH_MS so pages can tell it is still being kept up to
+// date (they ignore a count older than ONLINE_STALE_MS and count by themselves). On a quiet day that is a few hundred writes, not 1,440.
+export const ONLINE_REFRESH_MS = 4 * 60000;
+export const ONLINE_STALE_MS = 6 * 60000;
+let lastSaved = null;   // { count, at } as last written by this instance (read from the database after a cold start)
+
+/** Whether a new count must be written, given what was saved last. */
+export const mustSaveOnline = (prev, count, now) => !prev || prev.count !== count || !(now - prev.at < ONLINE_REFRESH_MS);
+
+/** Counts the people online now and saves the number if it changed (or is getting old). Returns { count, saved }. */
 export async function saveOnlineCount(now = Date.now()) {
     const count = (await publicCol('presence').where('ts', '>', now - PRESENCE_WINDOW_MS).count().get()).data().count;
+    lastSaved ||= (await onlineRef().get()).data() || null;
+    if (!mustSaveOnline(lastSaved, count, now)) return { count, saved: false };
     await onlineRef().set({ count, at: now });
-    return count;
+    lastSaved = { count, at: now };
+    return { count, saved: true };
 }
 
 export const countOnline = onSchedule({ schedule: 'every 1 minutes', timeoutSeconds: 60, maxInstances: 1, retryCount: 0 }, async () => {

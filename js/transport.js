@@ -276,12 +276,13 @@ export async function createFirebaseTransport({ firebaseConfig, appId, initialAu
     beat();
     setInterval(beat, PRESENCE_BEAT_MS);
     document.addEventListener('visibilitychange', beat);
-    // The server counts once a minute (functions/stats.js countOnline): one document read. If that count is missing or old (the
-    // function is not deployed, or stopped), count here as before.
+    // The server counts once a minute (functions/stats.js countOnline): one document read. If that count is missing or older than
+    // 6 minutes (the function is not deployed, or stopped), count here as before.
     async function onlineCount() {
         try {
             const c = (await getDoc(doc(db, ...base, 'counters', 'online'))).data();
-            if (Number.isInteger(c?.count) && typeof c.at === 'number' && Math.abs(Date.now() - c.at) < 3 * 60000) return c.count;
+            // the server rewrites it when it changes, and at least every 4 minutes (functions/stats.js ONLINE_REFRESH_MS)
+            if (Number.isInteger(c?.count) && typeof c.at === 'number' && Math.abs(Date.now() - c.at) < 6 * 60000) return c.count;
         } catch { /* rules from before the counter: count here */ }
         const snap = await getCountFromServer(query(presenceCol, where('ts', '>', Date.now() - PRESENCE_WINDOW_MS)));
         return snap.data().count;

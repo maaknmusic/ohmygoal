@@ -258,7 +258,8 @@ the crowd is matching, the "people online" number, the daily counters and the se
   out instead of all reading and fighting over the same first entries, and people with filters are still seen. Entries without a
   place (pages loaded before this) are read when the window finds nobody.
 - **People online**: the `countOnline` function counts once a minute and saves the number in `counters/online`; pages read that one
-  document every minute. If it is missing or older than 3 minutes, the page counts by itself as before.
+  document every minute. The function only rewrites it when the number changed (or every 4 minutes), so a quiet day costs a few
+  hundred writes. If it is missing or older than 6 minutes, the page counts by itself as before.
 - **Daily counters** (`functions/stats.js`): the counters bumped for every chat, join and visitor are spread over 20 shard documents
   per day (`stats/<day>/shards/N`); the admin pages add them up (`readStats`).
 - **Function ceilings** (`functions/common.js`): up to 50 copies of each function, 150 for the ones every visitor calls (access check,
