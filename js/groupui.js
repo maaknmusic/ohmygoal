@@ -146,6 +146,11 @@ export function createGroupUi(ctx) {
         const blk = h('button', '', 'Block (mute and hide)'); blk.type = 'button';
         blk.onclick = () => { closeMenu(); blockPerson(id); };
         menu.append(rep, blk);
+        if (room.live && ctx.giftCoins) {
+            const gc = h('button', '', 'Gift coins…'); gc.type = 'button';
+            gc.onclick = () => { closeMenu(); ctx.giftCoins({ to: id, name: meta.nick, sid: room.live.sid }); };
+            menu.append(gc);
+        }
         if (room.live?.host) {
             const kick = h('button', '', 'Remove from session'); kick.type = 'button';
             kick.onclick = async () => {
@@ -305,6 +310,12 @@ export function createGroupUi(ctx) {
         list.scrollTop = list.scrollHeight;
     }
     function onGift(ev) {
+        if (room?.live && ev && ev.kind === 'coins' && Number.isInteger(ev.amount) && ev.amount > 0 && ev.amount <= 500 && (typeof ev.at !== 'number' || ev.at >= room.live.startedAt - 3000)) {
+            const from = typeof ev.nick === 'string' ? ev.nick.slice(0, 20) : 'Someone', to = typeof ev.toNick === 'string' ? ev.toNick.slice(0, 20) : 'someone';
+            addSystem(`${from} sent ${ev.amount} coins to ${to}`);
+            ctx.chime();
+            return;
+        }
         if (!room?.live || !ev || ev.kind !== 'gift') return;
         if (typeof ev.at === 'number' && ev.at < room.live.startedAt - 3000) return;   // gifts from before we came in
         const g = giftById(ev.gift);

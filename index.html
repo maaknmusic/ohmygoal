@@ -982,7 +982,7 @@
                         <span class="coin-chip hidden" id="coinChip" title="Your coins"></span>
                     </div>
                     <div class="sticker-grid" id="stickerGrid"></div>
-                    <div class="gift-foot hidden" id="giftFoot"><button type="button" class="btn btn-ghost btn-sm" id="getCoinsBtn">Get coins</button><span class="hint">Gifts are paid with coins. Free coins every day.</span></div>
+                    <div class="gift-foot hidden" id="giftFoot"><button type="button" class="btn btn-ghost btn-sm" id="getCoinsBtn">Get coins</button><span class="hint">Gifts are paid with coins. Free coins every day.</span><button type="button" class="btn btn-ghost btn-sm" id="sendCoinsBtn">Send coins</button></div>
                 </div>
             </div>
             <div class="kbd"><b>Enter</b> send · <b>Esc</b> next (press twice) · <b>Ctrl+M</b> mute</div>
@@ -1182,6 +1182,19 @@
     </div>
 
     <!-- Report -->
+    <div id="giftCoinsSheet" class="sheet-bg hidden" role="dialog" aria-modal="true" aria-labelledby="giftCoinsTitle">
+        <div class="sheet">
+            <div class="sheet-grab"></div>
+            <div class="sheet-head"><h3 id="giftCoinsTitle">Send coins</h3><button class="icon-btn" data-sheet-close aria-label="Close"><i class="icon" data-icon="x"></i></button></div>
+            <div class="sheet-body">
+                <p id="giftCoinsWho"></p>
+                <div class="coin-packs" id="giftCoinsChoices"></div>
+                <p class="hint" id="giftCoinsHint"></p>
+                <p class="hint">Only coins you bought can be sent. We keep 30% as a fee and the other person receives the rest as coins they can spend (not cash out or send on). Up to 1,000 coins a day. Sent coins can’t be taken back.</p>
+            </div>
+        </div>
+    </div>
+
     <div id="coinSheet" class="sheet-bg hidden" role="dialog" aria-modal="true" aria-labelledby="coinTitle">
         <div class="sheet">
             <div class="sheet-grab"></div>

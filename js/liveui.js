@@ -136,7 +136,8 @@ export function createLiveUi({ pane, ctx, enter }) {
     const input = (id, attrs = {}) => { const i = h('input', 'input'); i.id = id; Object.assign(i, attrs); i.autocomplete = 'off'; return i; };
 
     function goLiveForm() {
-        const c = card('Go live', `Anyone can host: no application needed. Going live costs ${LIVE_START_FEE} coins. Public sessions are free for guests; in a private session each guest pays ${PRIVATE_FEE} coins and you keep ${HOST_SHARE_PCT}% (${Math.floor(PRIVATE_FEE * HOST_SHARE_PCT / 100)} coins).`);
+        const free = me?.firstFree === true;
+        const c = card('Go live', `Anyone can host: no application needed. ${free ? `Your first session is free; after that going live costs ${LIVE_START_FEE} coins.` : `Going live costs ${LIVE_START_FEE} coins.`} Public sessions are free for guests; in a private session each guest pays ${PRIVATE_FEE} coins and you keep ${HOST_SHARE_PCT}% (${Math.floor(PRIVATE_FEE * HOST_SHARE_PCT / 100)} coins).`);
         const hostNameInput = input('liveName', { maxLength: 20, placeholder: 'The name people see' });
         hostNameInput.value = (me?.name || ctx.nick() || '').slice(0, 20);
         const title = input('liveTitle', { maxLength: MAX_TITLE, placeholder: 'e.g. Hindi song night' });
@@ -152,13 +153,13 @@ export function createLiveUi({ pane, ctx, enter }) {
         const guestsRow = field('Guests in a private session', guests);
         const sync = () => { guestsRow.classList.toggle('hidden', kind.value !== 'private'); };
         mode.onchange = () => { fillGuests(); }; kind.onchange = sync; sync();
-        const go = h('button', 'btn btn-primary', `Go live · ${LIVE_START_FEE} coins`); go.type = 'button';
+        const go = h('button', 'btn btn-primary', free ? 'Go live · first session free' : `Go live · ${LIVE_START_FEE} coins`); go.type = 'button';
         go.onclick = async () => {
             const bad = titleProblem(title.value);
             if (bad) { problem.textContent = bad; title.focus(); return; }
             go.disabled = true;
             await ctx.coins?.refresh();      // the balance shown may be old (coins added or spent on another device)
-            if (ctx.coins?.get() != null && ctx.coins.get() < LIVE_START_FEE) { ctx.toast(`Going live costs ${LIVE_START_FEE} coins. Add coins first.`, true); ctx.coins.openShop(); go.disabled = false; return; }
+            if (!free && ctx.coins?.get() != null && ctx.coins.get() < LIVE_START_FEE) { ctx.toast(`Going live costs ${LIVE_START_FEE} coins. Add coins first.`, true); ctx.coins.openShop(); go.disabled = false; return; }
             try {
                 const r = await api().call('startLive', { name: hostNameInput.value, avatar: ctx.avatar(), title: title.value, mode: mode.value, kind: kind.value, ...(kind.value === 'private' ? { maxGuests: Number(guests.value) } : {}) });
                 await enter({ sid: r.sid, mode: mode.value, title: title.value, kind: kind.value, host: true });

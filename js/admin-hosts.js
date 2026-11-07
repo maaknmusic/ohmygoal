@@ -81,6 +81,8 @@ export function createHosts({ $, h, toast, button, empty, kv, when, short, fn })
         table.append(thead, body);
         const wrap = h('div', 'table-wrap'); wrap.appendChild(table);
         c.append(wrap);
+        const u = data.usage.d30;
+        c.append(h('p', 'help', `Coin gifts between users, last 30 days: ${u.coinGifts} gifts, ${u.coinGiftCoins} coins sent, of which you kept ${Math.round(u.coinGiftCoins * 0.3)} (the 30% fee).`));
         return c;
     }
 

@@ -136,20 +136,32 @@ On the **Group rooms** screen, the **Live sessions** tab lists who is live now. 
 
 | | Price | Who gets it |
 |---|---|---|
-| Go live (a public or a private session) | **49 coins**, paid by the host | the platform |
+| Go live (a public or a private session) | **49 coins**, paid by the host; **each account's first session is free** | the platform |
 | Join a **public** session | free | |
 | Join a **private** session (the host sets 1 to 7 guests) | **200 coins** per guest, once per session (re-joining is free) | 70% to the host, 30% to the platform |
 | A gift to the host | the gift's coin price (5 to 50) | 70% to the host (rounded down), the rest to the platform |
 
 A session ends when the host ends it or leaves, after 3 hours, or when the host has been gone for 3 minutes. A host can run 12 sessions a day.
 
-**Payouts.** Each host has an earnings balance (coins). From **500 earned coins** they can ask for a payout and give a UPI ID or bank details; an earned coin is worth **₹0.75**. You pay by hand and record the reference in **Admin → Hosts → Payout requests**; rejecting a payout gives the coins back. Nothing is paid out automatically. Hosts are responsible for their own taxes; take advice on TDS, GST and KYC before paying real money out.
+**Payouts.** Each host has an earnings balance (coins). From **300 earned coins** (about ₹225) they can ask for a payout and give a UPI ID or bank details; an earned coin is worth **₹0.75**. You pay by hand and record the reference in **Admin → Hosts → Payout requests**; rejecting a payout gives the coins back. Nothing is paid out automatically. Hosts are responsible for their own taxes; take advice on TDS, GST and KYC before paying real money out.
 
 **Admin → Hosts** shows: a usage and margin table (sessions, live hours, people hours, private seats and gifts, your income, what you owe hosts, an *estimated* running cost, and the margin) for today, 7 and 30 days; what is live now with an **End this session** button; every host with their earnings and **Suspend / Reinstate**; and the payout requests. A suspended host's session ends at once and they cannot go live.
 
 **Where the numbers live.** The real prices and shares are in `functions/live.js` (`LIVE_START_FEE`, `PRIVATE_FEE`, `HOST_SHARE_PCT`, `COIN_VALUE_PAISE`, `MIN_PAYOUT_COINS`, `INFRA_PAISE_PER_PARTICIPANT_HOUR`); the browser's copy that only labels the screens is `js/live.js`, and a test keeps the two equal. All money moves on the server, in transactions; the browser never decides a price or a share. Host money is in the private tree (`hosts`, `hostWallet`, `hostLedger`, `payouts`, `livePaid`) that no browser can read.
 
 **Rough running cost** (my estimate from Google's published prices, not from your bill): about ₹1.35 for 8 people on voice for an hour, ₹2 to ₹3 for 4 on video, ₹8 at the very worst if everyone needed the relay all hour. 49 coins is about ₹34 to ₹40.
+
+## Gifting coins to another person
+
+Anyone signed in with Google can gift **coins they bought** to the person they are with: in a one-to-one chat (Gifts tab → **Send coins**) or in the same live session (a person's ⋯ menu → **Gift coins…**). The platform keeps **30%** and the other person receives **70%** (rounded down) as coins they can **spend** (gifts, private sessions). They cannot be cashed out, and they cannot be gifted again, so there are no chains. The screen shows what the other person will get before you confirm. The rules live in `functions/gifts.js` and `functions/coingifts.js`:
+
+- **Only bought coins** can be gifted. The wallet keeps a `bought` count next to `coins`: a coin pack adds to both, and spending uses free coins (daily bonus, received gifts) first so bought coins stay giftable as long as possible. Coins from before this feature count as free; an admin's coin adjustments never create giftable coins.
+- 10 to 500 coins a gift, **1,000 coins a day** and **20 gifts an hour** per account.
+- You can only gift someone you are with right now (an open one-to-one chat, or both inside the same running live session). Nobody can send coins to a stranger by id or email.
+- Both people need a Google account.
+- Every gift is written to a private log (`coinGiftLog`) and counted for **Admin → Hosts** (gifts, coins sent, your 30%).
+
+Not built, on purpose: cashing out received coins. Letting people turn gifts into money would let a stolen-card purchase be moved to an accomplice and paid out, and may count as a money-transfer service under Indian rules. If you add it later, add a holding period (for example 7 days) before payout and take advice first.
 
 ## Bots and App Check
 

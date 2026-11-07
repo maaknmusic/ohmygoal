@@ -67,7 +67,7 @@ await H.click('#livePane button:has-text("Sign in with Google")');
 await H.waitForSelector('#liveTitle', { timeout: 25000 })
   .catch(async e => { console.log('  pane:', (await H.textContent('#livePane')).slice(0, 300), '| toasts:', await toasts(H), '| errors:', errors.join(' | ').slice(0, 200)); throw e; });
 const pane = await H.textContent('#livePane');
-step('1b. after signing in there is no application: the Go live form is right there, with the 49-coin price and the 70% share', /no application needed/.test(pane) && /Go live · 49 coins/.test(pane) && /70%/.test(pane) && /Your earnings/.test(pane) && !/Become a host/.test(pane));
+step('1b. after signing in there is no application: the Go live form is right there, with the first session free and the 70% share', /no application needed/.test(pane) && /first session is free/.test(pane) && /Go live · first session free/.test(pane) && /70%/.test(pane) && /Your earnings/.test(pane) && !/Become a host/.test(pane));
 const hostUid = await uidOfEmail(hostEmail);
 await seed(`${base}/private/data/wallet/${hostUid}`, { coins: 600 });
 step('1c. the host name defaults to the nickname', (await H.inputValue('#liveName')) === 'Hosty');
@@ -82,7 +82,7 @@ await H.click('#livePane button:has-text("Go live")');
 await H.waitForSelector('#groupRoom:not(.hidden)', { timeout: 25000 })
   .catch(async e => { console.log('  toasts:', await toasts(H), '| pane:', (await H.textContent('#livePane')).slice(-300), '| errors:', errors.join(' | ').slice(0, 300)); throw e; });
 step('3a. going live opens the room: it shows the title, the End session button and no gift button', /Hindi song night/.test(await H.textContent('#groupTitle')) && await H.isVisible('#gEnd') && !(await H.isVisible('#gGift')));
-step('3b. the 49-coin start fee was taken', (await read(`${base}/private/data/wallet/${hostUid}`)).coins === 551);
+step('3b. the first session is free: nothing was taken', (await read(`${base}/private/data/wallet/${hostUid}`)).coins === 600);
 step('3c. the host’s own tile is marked "Host"', /Host/.test(await H.textContent('#groupGrid .g-tile.self')));
 
 await openLive(G);
@@ -135,6 +135,7 @@ await H.waitForSelector('#groupRoom:not(.hidden)', { timeout: 25000 })
 await G.click('#livePane button:has-text("Refresh")');
 await G.waitForSelector('#livePane .live-session:has-text("One to one chat")', { timeout: 20000 });
 const pc = await G.textContent('#livePane .live-session:has-text("One to one chat")');
+step('6-. the second session costs the 49 coins (300 - 49 = 251)', (await read(`${base}/private/data/wallet/${hostUid}`)).coins === 251);
 step('6a. a private session shows its price in the list and has no "Send a gift" shortcut', /Private · 200 coins/.test(pc) && /Join · 200 coins/.test(pc) && await G.locator('#livePane .live-session:has-text("One to one chat") button:has-text("Send a gift")').count() === 0, pc.slice(0, 140));
 await G.click('#livePane .live-session:has-text("One to one chat") button:has-text("Join · 200 coins")');
 await G.waitForSelector('#groupRoom:not(.hidden)', { timeout: 25000 });
@@ -158,7 +159,7 @@ step('6e. when the host leaves, the session ends for everyone', true);
 await H.click('#livePane button:has-text("Refresh")');
 await H.waitForSelector('#livePane .live-tile', { timeout: 15000 });
 const earn = await H.textContent('#livePane');
-step('7. the host’s earnings box shows 143 coins ready to pay out and the rupee value (₹107), and says payouts start from 500 coins', /143 coins/.test(earn) && /₹107/.test(earn) && /from 500 coins/.test(earn), earn.slice(earn.indexOf('Your earnings'), earn.indexOf('Your earnings') + 200));
+step('7. the host’s earnings box shows 143 coins ready to pay out and the rupee value (₹107), and says payouts start from 300 coins', /143 coins/.test(earn) && /₹107/.test(earn) && /from 300 coins/.test(earn), earn.slice(earn.indexOf('Your earnings'), earn.indexOf('Your earnings') + 200));
 
 step('8. no page errors', errors.length === 0, errors.join(' | ').slice(0, 300));
 await browser.close();

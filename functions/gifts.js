@@ -15,3 +15,30 @@ export const DAILY_COINS = 2;            // free coins once a day (Indian date)
 export const DAILY_COINS_PREMIUM = 5;
 export const GIFT_HOURLY_CAP = 30;       // gifts one account can send per hour
 export const MAX_COINS = 100000;
+
+// ---- Coins gifted from one person to another (functions/coingifts.js). Only coins that were BOUGHT can be gifted; the platform keeps
+// COIN_GIFT_PLATFORM_PCT of the amount and the rest reaches the other person as coins they can spend (not cash out, not re-gift).
+export const COIN_GIFT_MIN = 10;
+export const COIN_GIFT_MAX = 500;            // per gift
+export const COIN_GIFT_DAILY_CAP = 1000;     // coins one account can gift per Indian day
+export const COIN_GIFT_PER_HOUR = 20;        // gifts one account can send per hour
+export const COIN_GIFT_PLATFORM_PCT = 30;
+
+const whole = v => (Number.isInteger(v) && v > 0 ? v : 0);
+
+/** How a coin gift is shared: the platform keeps 30% (rounded up, so the recipient gets 70% rounded down) and no coin is lost or made. */
+export function coinGiftSplit(amount) {
+    const a = whole(amount);
+    const recipient = Math.floor((a * (100 - COIN_GIFT_PLATFORM_PCT)) / 100);
+    return { recipient, platform: a - recipient };
+}
+
+/**
+ * A wallet after `n` coins are spent. Free coins (daily bonus, received gifts) are used up first, so the coins that were bought, which
+ * are the only ones that can be gifted, last as long as possible: bought = min(bought, coins left).
+ */
+export function afterSpend(wallet, n) {
+    const coins = whole(wallet?.coins);
+    const left = Math.max(0, coins - whole(n));        // callers check the balance first; this just never goes below zero
+    return { coins: left, bought: Math.min(Math.min(whole(wallet?.bought), coins), left) };
+}

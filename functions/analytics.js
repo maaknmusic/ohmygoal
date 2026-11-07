@@ -223,9 +223,10 @@ export const adminAnalytics = onCall(callOpts({ secrets: [ADMIN_EMAILS], timeout
             if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 1000) throw new HttpsError('invalid-argument', 'Change coins by a whole number from -1000 to 1000.');
             const coins = await db.runTransaction(async t => {
                 const ref = privateDoc(`wallet/${uid}`);
-                const cur = (await t.get(ref)).data()?.coins;
+                const w = (await t.get(ref)).data() || {};
+                const cur = w.coins;
                 const next = Math.min(MAX_COINS, Math.max(0, (Number.isInteger(cur) ? cur : 0) + delta));
-                t.set(ref, { coins: next }, { merge: true });
+                t.set(ref, { coins: next, bought: Math.min(next, Number.isInteger(w.bought) ? w.bought : 0) }, { merge: true });   // coins an admin adds can be spent but not gifted
                 return next;
             });
             await log('adjustCoins', { uid, delta, note: note() });

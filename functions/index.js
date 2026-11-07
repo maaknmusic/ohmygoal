@@ -17,6 +17,8 @@ import { db, APP_ID, callOpts } from './common.js';
 import { COIN_PACKS } from './gifts.js';
 import { addCoinsTx, walletDoc } from './wallet.js';
 
+// Gifting bought coins to the person you are with (the platform keeps 30%).
+export { giftCoins } from './coingifts.js';
 // Live sessions: hosts, paid private sessions, gifts to the host, payouts and the admin side.
 export { myHost, startLive, joinLive, endLive, kickLive, listLive, sendLiveGift, requestPayout, adminHosts } from './live.js';
 // Bans, access passes, unban requests and the admin API.
@@ -140,7 +142,7 @@ async function grantOrder(orderId, paymentId) {
             // Coins are added exactly once per paid order.
             const wSnap = await t.get(walletDoc(order.uid));
             if (order.status !== 'paid') {
-                addCoinsTx(t, order.uid, wSnap.data()?.coins, order.coins);
+                addCoinsTx(t, order.uid, wSnap.data(), order.coins);
                 t.update(orderRef(orderId), { status: 'paid', paymentId, paidAt: Date.now() });
             }
             const after = Math.min(100000, (Number.isInteger(wSnap.data()?.coins) ? wSnap.data().coins : 0) + (order.status === 'paid' ? 0 : order.coins));
