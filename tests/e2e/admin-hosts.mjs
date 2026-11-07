@@ -66,7 +66,7 @@ step('1c. the usage table has Today, 7 days and 30 days with income, owed to hos
 step('1d. the explanation says how income and cost are worked out', /49-coin start fees plus your 30%/.test(await text('#hostsBody')) && /per person per hour/.test(await text('#hostsBody')));
 step('2a. the live session is listed with its title, host and an End button', new RegExp(`Night talk ${stamp}`).test(await text('#hostsBody')) && await p.locator('#hostsBody button:has-text("End this session")').count() >= 1);
 step('3a. hosts are listed with status, earnings in coins and rupees, and what is waiting', (await text('#hostsBody')).includes(`Riya ${stamp}`) && (await text('#hostsBody')).includes(`Sam ${stamp}`) && /300 coins · ₹225/.test(await text('#hostsBody')) && /800 coins · ₹600/.test(await text('#hostsBody')));
-step('4a0. the host row shows the checked payout details: legal name, PAN, where to pay, verified', /Legal name\s*Riya Sharma/.test(await text('#hostsBody')) && /ABCDE1234F/.test(await text('#hostsBody')) && /Verified by boss@example\.com/.test(await text('#hostsBody')));
+step('4a0. the host row shows the checked payout details: legal name, PAN, where to pay, verified', /Legal name:?\s*Riya Sharma/.test(await text('#hostsBody')) && /ABCDE1234F/.test(await text('#hostsBody')) && /Verified by boss@example\.com/.test(await text('#hostsBody')), await p.locator('#hostsBody .item', { hasText: `riya${stamp}@example.com` }).allTextContents());
 step('4a. the payout shows who to pay, how much, and where', (await text('#hostsBody')).includes(`riya${stamp}@upi (Riya Sharma)`) && /₹600/.test(await text('#hostsBody')) && /To pay/.test(await text('#hostsBody')));
 
 // end the live session
@@ -84,7 +84,7 @@ await p.waitForFunction(n => [...document.querySelectorAll('#hostsBody .item')].
 step('3c. reinstating makes them active again', (await read(`${base}/private/data/hosts/${hA}`)).status === 'active');
 
 // payout: a reference is required
-const pay = p.locator('#hostsBody .item', { hasText: `riya${stamp}@upi` });
+const pay = p.locator('#hostsBody .item', { hasText: `riya${stamp}@upi` }).filter({ hasText: 'To pay' });
 await pay.locator('button:has-text("Mark as paid")').click();
 step('4b. marking a payout paid without a reference is refused with a message', /reference of the payment/.test(await p.textContent('#toasts')) && (await read(`${base}/private/data/payouts/${payId}`)).status === 'requested');
 await pay.locator('input').fill(`UPI${stamp}`);
