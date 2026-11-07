@@ -157,6 +157,7 @@ step('6e. when the host leaves, the session ends for everyone', true);
 
 // ------------------------------------------------------------------ 7. the host sees earnings
 await H.click('#livePane button:has-text("Refresh")');
+await H.waitForFunction(() => /Ready to pay out\s*143 coins/.test(document.getElementById('livePane').textContent), null, { timeout: 15000 }).catch(() => {});
 await H.waitForSelector('#livePane .live-tile', { timeout: 15000 });
 const earn = await H.textContent('#livePane');
 step('7. the host’s earnings box shows 143 coins ready to pay out and the rupee value (₹107), and says payouts start from 300 coins', /143 coins/.test(earn) && /₹107/.test(earn) && /from 300 coins/.test(earn), earn.slice(earn.indexOf('Your earnings'), earn.indexOf('Your earnings') + 200));

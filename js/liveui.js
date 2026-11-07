@@ -26,10 +26,11 @@ export function createLiveUi({ pane, ctx, enter }) {
 
     let meKey = '';
     /** @param {boolean} [quiet] the 15-second refresh: update the list of sessions only, and leave a form someone may be typing in alone */
+    let again = null;           // a refresh asked for while one was running: do it right after, so the screen never stays stale
     async function load(quiet = false) {
-        if (busy) return;
+        if (busy) { again = { quiet: (again ? again.quiet : true) && quiet }; return; }
         busy = true;
-        let hostChanged = !quiet;
+        let hostChanged = false;          // the host form is re-drawn only when the host's own data changed, so a refresh never wipes what is being typed
         try {
             const out = await api().call('listLive');
             sessions = out.sessions || [];
@@ -43,11 +44,12 @@ export function createLiveUi({ pane, ctx, enter }) {
             ctx.coins?.refresh();
         } catch (e) {
             sessions = [];
-            if (e?.code === 'online-only') { pane.replaceChildren(card('Live sessions', 'Live sessions are available on the online version of the site.')); busy = false; return; }
+            if (e?.code === 'online-only') { pane.replaceChildren(card('Live sessions', 'Live sessions are available on the online version of the site.')); busy = false; again = null; return; }
             console.warn('live list', e);
         }
         busy = false;
         if (hostChanged || !built) render(); else renderList();
+        if (again) { const next = again; again = null; load(next.quiet); }
     }
 
     function card(title, text) {
