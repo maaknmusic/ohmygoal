@@ -38,7 +38,7 @@ export function createLiveUi({ pane, ctx, enter }) {
                 if (key !== meKey) { hostChanged = true; meKey = key; }
                 me = next;
             } else { if (me !== null || meKey !== 'out') hostChanged = true; me = null; meKey = 'out'; }
-            ctx.coins?.refresh();
+            await ctx.coins?.refresh();      // before drawing, so the coin chip below shows the new balance (refreshWallet never throws)
         } catch (e) {
             sessions = [];
             if (e?.code === 'online-only') { pane.replaceChildren(card('Live sessions', 'Live sessions are available on the online version of the site.')); busy = false; return; }
@@ -218,6 +218,9 @@ export function createLiveUi({ pane, ctx, enter }) {
     function render() {
         if (!opened) return;
         const keepGift = giftBox;
+        // a redraw (Refresh, or the 15-second refresh noticing a change) must not wipe what someone is typing in the forms below
+        const typed = ['liveName', 'liveTitle', 'liveMode', 'liveKind', 'liveGuests', 'payDetails'].map(id => [id, pane.querySelector('#' + id)?.value]).filter(([, v]) => v != null);
+        const focused = pane.contains(document.activeElement) ? document.activeElement.id : '';
         const head = h('div', 'live-bar');
         coinChip = h('span', 'coin-chip', ctx.coins?.get() == null ? '' : `${ctx.coins.get()} coins`);
         const get = h('button', 'btn btn-ghost btn-sm', 'Get coins'); get.type = 'button'; get.onclick = () => ctx.coins?.openShop();
@@ -229,6 +232,13 @@ export function createLiveUi({ pane, ctx, enter }) {
         pane.replaceChildren(...(keepGift ? [keepGift] : []), head, listBox, h('b', 'live-h2', 'Hosting'), hostBox);
         built = true;
         renderList();
+        for (const [id, v] of typed) {
+            const el = pane.querySelector('#' + id);
+            if (!el) continue;
+            el.value = v;
+            if (el.tagName === 'SELECT') el.onchange?.(); else el.oninput?.();   // mode refills the guest list, kind shows or hides it, title re-checks
+        }
+        if (focused) pane.querySelector('#' + focused)?.focus();
     }
 
     return {

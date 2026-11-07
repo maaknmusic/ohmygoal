@@ -123,12 +123,17 @@ step('5b. the host is back at the lobby too', true);
 // ------------------------------------------------------------------ 6. a private session
 await seed(`${base}/private/data/wallet/${guestUid}`, { coins: 300 });
 await seed(`${base}/private/data/wallet/${hostUid}`, { coins: 300 });
+await H.evaluate(() => { const t = document.getElementById('liveTitle'); if (t) t.dataset.old = '1'; });   // a load from going back to the lobby may still be running
 await H.click('#livePane button:has-text("Refresh")');
+await H.waitForSelector('#liveTitle:not([data-old])', { timeout: 15000 });   // the form was drawn again after the tap, so typing below is not wiped
 await H.waitForFunction(() => /300 coins/.test(document.querySelector('#livePane .coin-chip')?.textContent || ''), null, { timeout: 15000 });   // the page has re-drawn with the new balance
-await H.waitForSelector('#liveTitle', { timeout: 15000 });
 await H.fill('#liveTitle', 'One to one chat');
 await H.selectOption('#liveMode', 'voice');
 await H.selectOption('#liveKind', 'private');
+await H.evaluate(() => { document.getElementById('liveTitle').dataset.old = '1'; });
+await H.click('#livePane button:has-text("Refresh")');
+await H.waitForSelector('#liveTitle:not([data-old])', { timeout: 15000 });
+step('6+. Refresh redraws the page but keeps what the host typed in the Go live form', await H.inputValue('#liveTitle') === 'One to one chat' && await H.inputValue('#liveKind') === 'private' && await H.isVisible('#liveGuests'));
 await H.click('#livePane button:has-text("Go live")');
 await H.waitForSelector('#groupRoom:not(.hidden)', { timeout: 25000 })
   .catch(async e => { console.log('  toasts:', await toasts(H), '| pane:', (await H.textContent('#livePane')).slice(0, 200), '| title:', await H.inputValue('#liveTitle').catch(() => '?'), '| errors:', errors.join(' | ').slice(0, 300)); throw e; });
@@ -158,6 +163,7 @@ step('6e. when the host leaves, the session ends for everyone', true);
 // ------------------------------------------------------------------ 7. the host sees earnings
 await H.click('#livePane button:has-text("Refresh")');
 await H.waitForSelector('#livePane .live-tile', { timeout: 15000 });
+await H.waitForFunction(() => /143 coins/.test(document.getElementById('livePane').textContent), null, { timeout: 15000 }).catch(() => {});   // the old tile is still there until the refresh lands
 const earn = await H.textContent('#livePane');
 step('7. the host’s earnings box shows 143 coins ready to pay out and the rupee value (₹107), and says payouts start from 300 coins', /143 coins/.test(earn) && /₹107/.test(earn) && /from 300 coins/.test(earn), earn.slice(earn.indexOf('Your earnings'), earn.indexOf('Your earnings') + 200));
 
