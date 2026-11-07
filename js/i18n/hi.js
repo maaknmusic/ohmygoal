@@ -735,6 +735,7 @@ export default {
     "Who can join": "कौन जुड़ सकता है",
     "Your earnings": "आपकी कमाई",
     "You earn {}% of every gift and private-session fee. We pay you by UPI or bank transfer on request (from {} earned coins).": "आप हर गिफ़्ट और निजी सेशन की फ़ीस का {}% कमाते हैं। माँगने पर हम आपको UPI या बैंक ट्रांसफ़र से भुगतान करते हैं ({} कमाए सिक्कों से शुरू)।",
+    "Only coins that people bought count. Gifts and seats paid with free coins earn nothing.": "सिर्फ़ ख़रीदे गए सिक्के गिने जाते हैं। मुफ़्त सिक्कों से दिए गए गिफ़्ट और सीटों से कोई कमाई नहीं होती।",
     "Ready to pay out": "भुगतान के लिए तैयार",
     "Payout in progress": "भुगतान जारी है",
     "Paid to you": "आपको चुकाया गया",

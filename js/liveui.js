@@ -177,6 +177,7 @@ export function createLiveUi({ pane, ctx, enter }) {
 
     function earningsCard() {
         const c = card('Your earnings', `You earn ${HOST_SHARE_PCT}% of every gift and private-session fee. We pay you by UPI or bank transfer on request (from ${MIN_PAYOUT_COINS} earned coins).`);
+        c.append(h('p', 'hint', 'Only coins that people bought count. Gifts and seats paid with free coins earn nothing.'));   // functions/live.js earningSplit
         const tiles = h('div', 'live-tiles');
         const tile = (label, value, sub) => { const t = h('div', 'live-tile'); t.append(h('small', '', label), h('b', '', value)); if (sub) t.append(h('small', '', sub)); return t; };
         tiles.append(tile('Ready to pay out', `${me.coins} coins`, rupees(me.paise)), tile('Payout in progress', `${me.pendingCoins} coins`, rupees(me.pendingCoins * me.coinPaise)), tile('Paid to you', `${me.paidOutCoins} coins`, rupees(me.paidOutCoins * me.coinPaise)));

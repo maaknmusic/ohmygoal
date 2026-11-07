@@ -735,6 +735,7 @@ export default {
     "Who can join": "Kimler katılabilir",
     "Your earnings": "Kazancın",
     "You earn {}% of every gift and private-session fee. We pay you by UPI or bank transfer on request (from {} earned coins).": "Her hediyenin ve özel oturum ücretinin %{} kısmını kazanırsın. İstek üzerine UPI veya banka havalesiyle ödeme yaparız ({} kazanılmış jetondan itibaren).",
+    "Only coins that people bought count. Gifts and seats paid with free coins earn nothing.": "Yalnızca insanların satın aldığı jetonlar sayılır. Ücretsiz jetonlarla ödenen hediyeler ve yerler kazanç getirmez.",
     "Ready to pay out": "Ödemeye hazır",
     "Payout in progress": "Ödeme sürüyor",
     "Paid to you": "Sana ödenen",

@@ -1,7 +1,7 @@
 // Live sessions: the numbers (fees, the 70/30 split, payout value), what a title may contain, and when a session counts as running.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LIVE_START_FEE, PRIVATE_FEE, HOST_SHARE_PCT, COIN_VALUE_PAISE, MIN_PAYOUT_COINS, MAX_SESSION_MS, STARTS_PER_DAY, splitCoins, coinsToPaise, cleanText, cleanTitle, looksLikeContact, maxGuestsFor, sessionIsLive } from '/home/user/ohmygoal/functions/live.js';
+import { LIVE_START_FEE, PRIVATE_FEE, HOST_SHARE_PCT, COIN_VALUE_PAISE, MIN_PAYOUT_COINS, MAX_SESSION_MS, STARTS_PER_DAY, splitCoins, earningSplit, coinsToPaise, cleanText, cleanTitle, looksLikeContact, maxGuestsFor, sessionIsLive } from '/home/user/ohmygoal/functions/live.js';
 import { GIFTS } from '/home/user/ohmygoal/functions/gifts.js';
 import { CAPS } from '/home/user/ohmygoal/functions/groups.js';
 
@@ -80,4 +80,24 @@ test('sessionIsLive: running only while not ended, inside its time limit, and th
     assert.equal(sessionIsLive({ ...g, created: now - 3600000 }, now - 4 * 60000, now), false, 'host silent for over 3 minutes');
     assert.equal(sessionIsLive({ ...g, created: now - 3600000 }, now - 2 * 60000, now), true);
     for (const bad of [null, undefined, {}, 'x']) assert.equal(sessionIsLive(bad, now, now), false);
+});
+
+test('earningSplit: the host earns 70% only of the part paid with bought coins; free coins go to the platform', () => {
+    // all bought: the normal 70/30
+    assert.deepEqual(earningSplit({ coins: 500, bought: 500 }, 200), { host: 140, platform: 60, bought: 200 });
+    // only free coins (daily bonus, received gifts, admin top-ups): the host earns nothing
+    assert.deepEqual(earningSplit({ coins: 300 }, 200), { host: 0, platform: 200, bought: 0 });
+    assert.deepEqual(earningSplit({ coins: 50, bought: 0 }, 5), { host: 0, platform: 5, bought: 0 });
+    // free coins are spent first: 2 free + 3 bought for a 5-coin rose, 70% of 3 rounded down
+    assert.deepEqual(earningSplit({ coins: 102, bought: 100 }, 5), { host: 2, platform: 3, bought: 3 });
+    // a stale `bought` larger than the balance counts only what is really there
+    assert.deepEqual(earningSplit({ coins: 10, bought: 999 }, 10), { host: 7, platform: 3, bought: 10 });
+    for (let coins = 0; coins <= 60; coins++) for (let bought = 0; bought <= coins; bought++) for (const total of [1, 5, 10, 50]) {
+        if (total > coins) continue;
+        const s = earningSplit({ coins, bought }, total);
+        assert.equal(s.host + s.platform, total);
+        assert.equal(s.bought, Math.max(0, bought - (coins - total)), `${coins}/${bought}/${total}`);
+        assert.equal(s.host, splitCoins(s.bought).host);
+    }
+    for (const bad of [undefined, null, {}, { coins: 'x', bought: -3 }]) assert.deepEqual(earningSplit(bad, 5), { host: 0, platform: 5, bought: 0 });
 });

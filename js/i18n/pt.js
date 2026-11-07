@@ -735,6 +735,7 @@ export default {
     "Who can join": "Quem pode entrar",
     "Your earnings": "Seus ganhos",
     "You earn {}% of every gift and private-session fee. We pay you by UPI or bank transfer on request (from {} earned coins).": "Você ganha {}% de cada presente e de cada taxa de sessão privada. Pagamos por UPI ou transferência bancária sob pedido (a partir de {} moedas ganhas).",
+    "Only coins that people bought count. Gifts and seats paid with free coins earn nothing.": "Só contam as moedas que as pessoas compraram. Presentes e lugares pagos com moedas grátis não rendem nada.",
     "Ready to pay out": "Pronto para sacar",
     "Payout in progress": "Pagamento em andamento",
     "Paid to you": "Pago a você",

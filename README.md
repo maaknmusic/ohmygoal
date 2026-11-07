@@ -138,8 +138,10 @@ On the **Group rooms** screen, the **Live sessions** tab lists who is live now. 
 |---|---|---|
 | Go live (a public or a private session) | **49 coins**, paid by the host; **each account's first session is free** | the platform |
 | Join a **public** session | free | |
-| Join a **private** session (the host sets 1 to 7 guests) | **200 coins** per guest, once per session (re-joining is free) | 70% to the host, 30% to the platform |
-| A gift to the host | the gift's coin price (5 to 50) | 70% to the host (rounded down), the rest to the platform |
+| Join a **private** session (the host sets 1 to 7 guests) | **200 coins** per guest, once per session (re-joining is free) | 70% of the bought coins to the host, the rest to the platform |
+| A gift to the host | the gift's coin price (5 to 50) | 70% of the bought coins to the host (rounded down), the rest to the platform |
+
+**Only bought coins earn hosts money.** Free coins (the daily bonus, coins received as a gift, coins an admin adds) are spent first, and the part of a gift or private fee paid with them goes to the platform (`earningSplit` in `functions/live.js`). Otherwise free coins collected on many accounts could be gifted to one host and cashed out.
 
 A session ends when the host ends it or leaves, after 3 hours, or when the host has been gone for 3 minutes. A host can run 12 sessions a day.
 

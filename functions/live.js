@@ -51,6 +51,18 @@ export function splitCoins(total) {
     return { host, platform: t - host };
 }
 
+/**
+ * How `total` coins spent from `wallet` (a wallet document's data, before the spend) are shared. Only the part paid with BOUGHT coins earns
+ * the host anything: free coins (the daily bonus, coins received as a gift) are spent first (see afterSpend) and go to the platform, so free
+ * coins collected on many accounts can never be turned into a payout. `bought` is how many bought coins the payment used.
+ */
+export function earningSplit(wallet, total) {
+    const t = wholeCoins(total);
+    const bought = afterSpend(wallet, 0).bought - afterSpend(wallet, t).bought;
+    const host = splitCoins(bought).host;
+    return { host, platform: t - host, bought };
+}
+
 /** Earned coins in paise (₹1 = 100). */
 export const coinsToPaise = coins => wholeCoins(coins) * COIN_VALUE_PAISE;
 
@@ -250,25 +262,25 @@ export const joinLive = onCall(callOpts(), async request => {
             if (fresh.length >= g.cap) throw new HttpsError('resource-exhausted', 'This session is full.');
             if (g.kind === 'private' && !isHost && guests >= g.maxGuests) throw new HttpsError('resource-exhausted', 'This private session is full.');
         }
-        let charged = 0;
+        let charged = 0, hostShare = 0;
         if (g.kind === 'private' && !isHost && !paid.exists) {
             const coins = asInt(guestWallet.data()?.coins);
             if (coins < g.fee) throw new HttpsError('failed-precondition', `This private session costs ${g.fee} coins. You have ${coins}.`);
-            const { host: share, platform } = splitCoins(g.fee);
+            const { host: share, platform, bought } = earningSplit(guestWallet.data(), g.fee);
             t.set(walletRef(uid), afterSpend(guestWallet.data(), g.fee), { merge: true });
-            creditHost(t, g.hostUid, hostWallet.data(), share, { type: 'private', fromUid: uid, sid, total: g.fee, platformShare: platform }, now);
+            creditHost(t, g.hostUid, hostWallet.data(), share, { type: 'private', fromUid: uid, sid, total: g.fee, boughtCoins: bought, platformShare: platform }, now);
             t.set(privateDoc(`livePaid/${sid}_${uid}`), { uid, sid, coins: g.fee, at: now });
-            charged = g.fee;
+            charged = g.fee; hostShare = share;
         }
         if (isHost) member.host = true;
         t.set(membersCol(sid).doc(uid), member);
-        return { cap: g.cap, kind: g.kind, charged, host: isHost, title: g.title, mode: g.mode, hostUid: g.hostUid };
+        return { cap: g.cap, kind: g.kind, charged, hostShare, host: isHost, title: g.title, mode: g.mode, hostUid: g.hostUid };
     });
+    const { hostShare, ...reply } = out;
     if (out.charged) {
-        const sh = splitCoins(out.charged);
-        await bump('privateJoins'); await bump('privateCoins', out.charged); await bump('hostShareCoins', sh.host); await bump('platformShareCoins', sh.platform);
+        await bump('privateJoins'); await bump('privateCoins', out.charged); await bump('hostShareCoins', hostShare); await bump('platformShareCoins', out.charged - hostShare);
     }
-    return { gid: sid, ...out };
+    return { gid: sid, ...reply };
 });
 
 export const endLive = onCall(callOpts(), async request => {
@@ -348,14 +360,13 @@ export const sendLiveGift = onCall(callOpts(), async request => {
         const sent = (Array.isArray(w.sent) ? w.sent : []).filter(x => typeof x === 'number' && x > now - HOUR);
         if (sent.length >= GIFT_HOURLY_CAP) throw new HttpsError('resource-exhausted', 'That’s a lot of gifts for one hour. Try again later.');
         if (coins < price) throw new HttpsError('failed-precondition', 'Not enough coins.');
-        const { host: share, platform } = splitCoins(price);
+        const { host: share, platform, bought } = earningSplit(w, price);
         t.set(walletRef(uid), { ...afterSpend(w, price), sent: [...sent, now] }, { merge: true });
-        creditHost(t, g.hostUid, hw.data(), share, { type: 'gift', fromUid: uid, sid, gift, total: price, platformShare: platform }, now);
+        creditHost(t, g.hostUid, hw.data(), share, { type: 'gift', fromUid: uid, sid, gift, total: price, boughtCoins: bought, platformShare: platform }, now);
         t.set(publicCol(`groups/${sid}/events`).doc(), { kind: 'gift', gift, price, nick: mineDoc?.data().nick || nickGiven || 'Someone', at: now });
         return { coins: coins - price, hostShare: share };
     });
-    const sh = splitCoins(price);
-    await bump('liveGifts'); await bump('liveGiftCoins', price); await bump('hostShareCoins', sh.host); await bump('platformShareCoins', sh.platform);
+    await bump('liveGifts'); await bump('liveGiftCoins', price); await bump('hostShareCoins', res.hostShare); await bump('platformShareCoins', price - res.hostShare);
     return { coins: res.coins };
 });
 
