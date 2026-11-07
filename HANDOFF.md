@@ -4,9 +4,25 @@ OhMyGoal: random video / voice / text chat (WebRTC P2P, Firestore signalling, Fi
 Read `README.md` first (files, deploy, privacy design). Tests: `tests/README.md`.
 
 ## State
-- `main` holds the v2 redesign (new UI, games, voice, themes, likes, approximate distance, relay-only IP hiding, tightened rules).
+- `main` holds the v2 redesign (new UI, games, voice, themes, likes, approximate distance, relay-only IP hiding, tightened rules), group rooms, Live sessions with host payouts, coin gifting between users, and interface languages (see below).
 - Production needs `bash deploy.sh` (functions, then rules, then hosting) from Google Cloud Shell after every merge.
 - All test suites passed on the last run: unit (~1,300), UI (v2, hardening, distance, failclosed), emulator (fixes, friends, bans 58, premium 22, privacy, likes 52).
+
+## Live sessions, payouts and coin gifting (current rules)
+Full description: `README.md` (*Live sessions*, *Gifting coins*). The real numbers live in `functions/live.js` and `functions/gifts.js`; `js/live.js` holds a display-only copy and a unit test keeps the two equal. All money moves on the server in transactions.
+- **Who can host:** anyone signed in with Google, no approval. Voice rooms hold 8 people, video rooms 4. A session closes by itself after 3 hours, or when the host has been silent for 3 minutes. Max 12 starts per account per day.
+- **Prices:** going live costs **49 coins**; **each account's first session is free**. Public sessions are free for guests; in a private session each guest pays **200 coins**.
+- **Shares:** the host earns **70%** of every gift and private fee (rounded down), the platform **30%**.
+- **Payouts:** an earned coin is worth **₹0.75**; the minimum payout is **300 earned coins** (about ₹225). Payouts are **manual**: the host enters a UPI ID or bank details, an admin pays outside the app and marks it paid with a reference (Admin → Hosts). Rejecting a request returns the coins. Admins can suspend or reinstate hosts there too.
+- **Coin gifting between users** (`functions/coingifts.js`, constants in `functions/gifts.js`): only **bought** coins can be gifted; the platform keeps **30%** and the recipient gets **70%** as spend-only coins (cannot be cashed out or gifted again). **10 to 500 coins per gift, 1,000 coins per day, 20 gifts per hour.** Only to someone you are with now (open one-to-one chat, or the same running live session); the recipient must be signed in with Google.
+- **Coins and gifts:** packs 60 / 200 / 500 coins (₹49 / ₹149 / ₹349); free daily coins 2 (5 for Premium); gifts 5 to 50 coins; at most 30 gifts per hour; wallet cap 100,000 coins.
+- **Deploy:** any change to these rules is in `functions/` (and `firestore.rules` for the private tree), so run `bash deploy.sh`.
+
+## Interface languages
+- English is the source text in the HTML and JS. `js/i18n.js` translates by exact English string; each language is `js/i18n/<code>.js` (see the header of `js/i18n.js`). A key containing `{}` is a template; the first matching key wins, so put specific templates **before** generic ones such as `"{} coins"`.
+- Complete: hi, es, pt, ar (right to left), id, tr, ru, fr, de. These nine must have identical key sets in the same order (`tests/unit/i18n.test.mjs`).
+- Only partly translated (about 110 keys, none of the Live sessions or coin-gifting texts yet): bn, ta, te, mr, gu, kn, ml, pa. Untranslated text simply stays English.
+- When you add English text to the UI: add the key to all nine complete files. Text that other people wrote (nicknames, session titles, chat) must sit in an element with `data-no-i18n`. `<option>` text, `confirm()` boxes and server messages are translated only because the code passes them through `ctx.t` (`i18n.t`).
 
 ## Still open
 1. `config.js` → `business` (email, phone, address): empty. Razorpay's live-mode review and `legal.html` need them.
