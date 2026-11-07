@@ -1,3 +1,2 @@
-# ads.txt for ohmygoal.app (https://iabtechlab.com/ads-txt/)
-# When Google AdSense approves the site, replace this comment with the line AdSense shows you, for example:
-# google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0
+# ads.txt for ohmygoal.app (https://iabtechlab.com/ads-txt/): the only seller allowed to sell ads on this site.
+google.com, pub-1906508266789405, DIRECT, f08c47fec0942fa0

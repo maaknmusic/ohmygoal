@@ -116,7 +116,8 @@ test('the page, config, ads.txt and Privacy Policy are wired up', () => {
     // the waiting banner is in the chat panel (above the messages), not on the video stage
     assert.ok(html.indexOf('id="adWaiting"') > html.indexOf('id="gameDock"') && html.indexOf('id="adWaiting"') < html.indexOf('id="messages"'));
     assert.match(read('config.js'), /ads: \{ client: '', slots: \{ home: '', waiting: '' \} \}/);
-    assert.match(read('ads.txt'), /^# ads\.txt/m);
+    assert.match(read('ads.txt'), /^google\.com, pub-1906508266789405, DIRECT, f08c47fec0942fa0$/m);
+    assert.match(html, /<meta name="google-adsense-account" content="ca-pub-1906508266789405">/, 'AdSense site verification');
     assert.match(read('legal.html'), /<b>Ads:<\/b>[^<]*Google AdSense[\s\S]*Premium members see no ads/);
     const app = read('js/app.js');
     assert.match(app, /ads\.show\('waiting', phase === 'searching' \|\| phase === 'ended'\)/);
