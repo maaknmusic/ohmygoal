@@ -11,6 +11,7 @@ import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { FieldValue } from 'firebase-admin/firestore';
 import { privateDoc, publicDoc, publicCol } from './common.js';
+import { saveMapCells } from './worldmap.js';
 
 const IST_MS = 330 * 60000;
 export const istDay = ms => new Date(ms + IST_MS).toISOString().slice(0, 10);
@@ -97,4 +98,6 @@ export async function saveOnlineCount(now = Date.now()) {
 
 export const countOnline = onSchedule({ schedule: 'every 1 minutes', timeoutSeconds: 60, maxInstances: 1, retryCount: 0 }, async () => {
     try { await saveOnlineCount(); } catch (e) { logger.warn('online count failed', { message: e?.message }); }
+    // The live world map, every other minute (functions/worldmap.js): one read per person who chose to be on it.
+    if (Math.floor(Date.now() / 60000) % 2 === 0) try { await saveMapCells(); } catch (e) { logger.warn('map count failed', { message: e?.message }); }
 });

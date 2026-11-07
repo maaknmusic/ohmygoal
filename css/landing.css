@@ -833,3 +833,38 @@
 /* Language names written in their own script use the phone's own font, so English visitors never download the 118 KB Devanagari
    web font just for the language picker and the footer links. */
 #uiLang, #uiLang option, .lp-foot-langs a { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', sans-serif; }
+
+/* ---------- Live world map (js/worldmap.js) ---------- */
+.map-view { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: #05060c; color: #f3f4fb; }
+.map-view.hidden { display: none; }
+body.map-open { overflow: hidden; }
+.map-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px 10px 16px; padding-top: max(10px, env(safe-area-inset-top));
+    background: linear-gradient(180deg, rgba(5, 6, 12, 0.95), rgba(5, 6, 12, 0.7)); position: relative; z-index: 2; }
+.map-head { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 17px; }
+.map-head b { white-space: nowrap; }
+.map-total { color: #a2a8c3; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.map-close { flex: none; width: 44px; height: 44px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(255, 255, 255, 0.06);
+    color: inherit; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.map-close .lp-i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.map-canvas { flex: 1; min-height: 0; position: relative; background: radial-gradient(circle at 50% 45%, #151a33 0, #05060c 70%); }
+.map-msg { position: absolute; left: 50%; top: 76px; transform: translateX(-50%); z-index: 3; max-width: min(420px, calc(100% - 32px)); text-align: center;
+    padding: 10px 16px; border-radius: 14px; background: rgba(21, 23, 41, 0.92); border: 1px solid rgba(255, 255, 255, 0.12); font-size: 14.5px; }
+.map-msg.hidden { display: none; }
+.map-panel { padding: 12px 16px; padding-bottom: max(14px, env(safe-area-inset-bottom)); background: rgba(10, 11, 20, 0.96); border-top: 1px solid rgba(255, 255, 255, 0.1); }
+.map-switch { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; max-width: 720px; margin: 0 auto; }
+.map-switch input { flex: none; appearance: none; width: 46px; height: 28px; border-radius: 999px; background: #3a3d55; position: relative; margin: 2px 0 0; cursor: pointer; transition: background .2s; }
+.map-switch input::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.map-switch input:checked { background: #d9266c; }
+.map-switch input:checked::after { transform: translateX(18px); }
+.map-switch input:focus-visible { outline: 3px solid rgba(217, 38, 108, 0.6); outline-offset: 2px; }
+.map-switch-text { display: grid; gap: 3px; }
+.map-switch-text b { font-size: 16px; }
+.map-note { font-size: 13.5px; color: #a2a8c3; line-height: 1.45; }
+.map-count { pointer-events: none; font: 700 12px/1 system-ui, sans-serif; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
+.map-pop { color: #15162a; font: 15px/1.4 system-ui, sans-serif; }
+.map-pop p { margin: 0 0 10px; font-weight: 600; padding-right: 14px; }
+.map-talk { min-height: 40px; width: 100%; border: 0; border-radius: 999px; background: linear-gradient(180deg, #d9266c, #c11e5d); color: #fff; font-weight: 700; cursor: pointer; }
+.map-view .maplibregl-ctrl-attrib { font-size: 11px; }
+.map-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6); }
+@media (prefers-reduced-motion: no-preference) { .map-dot { animation: mapLive 2s infinite; } }
+@keyframes mapLive { 70% { box-shadow: 0 0 0 9px rgba(34, 197, 94, 0); } 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }

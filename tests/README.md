@@ -22,6 +22,7 @@ node tests/e2e/payout-safety-emulator.mjs <scratch>   # 7-day hold, refunds and 
 node tests/e2e/transactions-emulator.mjs <scratch>   # every kind of transaction leaves its ledger entry; histories add up; admin views and export (needs the emulators and mockrzp)
 node tests/e2e/fraud-controls-emulator.mjs <scratch>   # host verification, new-host hold and monthly cap, trusted hosts, buyer blocks and limits, device-change warning (needs the emulators and mockrzp)
 node tests/e2e/scale-emulator.mjs <scratch>   # busy-site safeguards: random place in the matching queue (rules and a real match), sharded chat counter, server-counted "people online" and its fallback
+node tests/e2e/worldmap-emulator.mjs <scratch> # live world map: off by default, 18+ only, only a ~28 km square leaves the phone, pins unreadable and unforgeable, server publishes counts only, off removes you, phone fit (needs npm i maplibre-gl@5.24.0 in <scratch>/ml)
 node tests/e2e/ads-emulator.mjs <scratch>   # ad places with a fake AdSense script: home ad, waiting banner only while waiting, none for Premium (no script either), none in the demo, phone fit
 node tests/e2e/rounds-demo.mjs <scratch>   # Quick rounds (demo mode, ~75 s): announced, 10-second warning, both see "Time’s up" with how to turn it off, never "Stranger disconnected"
 node tests/e2e/seo-pages.mjs   # the 24 search pages on a phone (structured data, one h1, no sideways scroll), ?lang= opens the app in that language, home footer links

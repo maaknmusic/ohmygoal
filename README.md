@@ -283,6 +283,16 @@ the crowd is matching, the "people online" number, the daily counters and the se
   relay credentials, wallet, group join, translation). Copies only cost money while they serve requests.
 - Set a **budget alert** in Google Cloud (Billing → Budgets) so a sudden crowd or an attack cannot surprise you.
 
+## Live world map
+
+The home page has a **Live world map** button: a spinning globe (MapLibre GL on OpenStreetMap tiles) with glowing bubbles that show how many people are online around each city. Tap a bubble to see the count and a **Talk to someone** button.
+
+- **Off by default.** People appear only after turning on **Show me on the map**, and only if they ticked 18+ and passed the age check. Turning it off, or leaving the page, deletes their pin at once. After a reload they are put back without a prompt, and only if location permission is still granted.
+- **Only counts are shown, never people.** The phone rounds its position to a 0.25° square (about 28 km) and writes only that square to `mapPins/{uid}`. No phone can read `mapPins`, not even the person's own pin (see `firestore.rules`). `countOnline` (functions/stats.js) runs `saveMapCells` (functions/worldmap.js) every other minute and publishes only `counters/map = { at, total, c: [x, y, n, ...] }`. The map stops at zoom 9, which is about city level.
+- **Cost:** each count reads one document per person who is on the map. Someone who has the map open reads one document every 2 minutes. Nothing is read while the map is closed.
+- **Tiles:** OpenStreetMap's own tile servers are free for light use, as long as the attribution (shown on the map) is kept. If the site gets busy, move to a tile provider such as MapTiler or Stadia Maps: set `map: { tiles: 'https://…/{z}/{x}/{y}.png?key=…', attribution: '…' }` in config.js.
+- Tests: `tests/unit/worldmap.test.mjs` and `tests/e2e/worldmap-emulator.mjs`. The e2e test needs `npm i maplibre-gl@5.24.0` in `SP/ml`.
+
 ## Privacy design
 
 What strangers can and can't learn about each other, and what we store:

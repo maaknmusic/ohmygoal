@@ -30,6 +30,7 @@ import { createLiveTranslate } from './livetranslate.js';
 import { ProfileSync, firestoreIo, googleIdentity } from './profile.js';
 import { getApproxCell, parseLocMessage, locMessage, distanceBetweenCells, describeDistance } from './location.js';
 import { createAds } from './ads.js';
+import { createWorldMap, firestoreMapIo, demoMapIo, MAP_CELL_DEG } from './worldmap.js';
 
 // =====================================================================
 // Config
@@ -3059,6 +3060,35 @@ el.groupBtn.onclick = async () => {
     groupUi.open();
 };
 
+// =====================================================================
+// Live world map (js/worldmap.js): off unless the person turns it on; only a count per ~28 km area is ever shown.
+// =====================================================================
+let mapIo = null, mapIoFor = null;
+const worldMap = createWorldMap({
+    cfg: {
+        libUrl: 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js',
+        cssUrl: 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css',
+        tiles: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        attribution: '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a>',
+        ...(CFG.map || {}),
+    },
+    getIo: () => {
+        if (!S.transport) return null;
+        if (mapIoFor !== S.transport) { mapIoFor = S.transport; mapIo = S.transport.kind === 'firebase' ? firestoreMapIo(S.transport) : demoMapIo(); }
+        return mapIo;
+    },
+    getCell: () => getApproxCell({ cellDeg: MAP_CELL_DEG }),
+    canShow: () => {
+        if (!el.ageCheck.checked) return 'Please confirm you are 18+ to continue.';
+        if (ageLockedUntil()) return 'This service is for adults only.';
+        if (!ageVerified()) return 'Verify your age first: press “Start chatting” once.';
+        return '';
+    },
+    onTalk: () => { if (!el.startBtn.disabled) el.startBtn.click(); },
+    toast, store,
+});
+$('mapBtn').onclick = () => worldMap.open();
+
 el.leaveBtn.onclick = () => {
     S.searchAbort?.abort();
     S.searchAbort = null;
@@ -3772,6 +3802,7 @@ try {
         : createLocalTransport();
     el.demoNote.classList.toggle('hidden', S.transport.kind !== 'local');
     el.startBtn.textContent = 'Start chatting';
+    worldMap.connected();
     refreshOnline();
     setTimeout(refreshOnline, 4000); // again once our own presence ping has been saved
     setInterval(refreshOnline, S.transport.kind === 'local' ? 3000 : ONLINE_REFRESH_MS);

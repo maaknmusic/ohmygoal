@@ -225,6 +225,19 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // ---------------- Live world map (functions/worldmap.js) ----------------
+      // Only the person's own ~28 km square (MAP_CELL_DEG 0.25: 1440 x 720 squares), written by them, and only if they chose to be
+      // on the map. Nobody can read pins: the server counts them into counters/map, which holds only "n people in this square".
+      match /mapPins/{uid} {
+        allow read: if false;
+        allow create, update: if request.auth != null && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['x', 'y', 'ts']) && request.resource.data.keys().hasAll(['x', 'y', 'ts'])
+          && request.resource.data.x is int && request.resource.data.x >= 0 && request.resource.data.x < 1440
+          && request.resource.data.y is int && request.resource.data.y >= 0 && request.resource.data.y < 720
+          && recentTs(request.resource.data.ts);
+        allow delete: if request.auth != null && request.auth.uid == uid;
+      }
+
       // ---------------- Presence ("people online") ----------------
       match /presence/{uid} {
         allow read: if request.auth != null;

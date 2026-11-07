@@ -41,6 +41,11 @@ window.APP_CONFIG = {
     // with the chat partner and only if both turned it on. Never stored. Larger = more private.
     location: { cellDeg: 0.05 },
 
+    // Live world map (js/worldmap.js). Defaults: MapLibre from jsDelivr and OpenStreetMap's own tiles, which are free for light
+    // use with the attribution shown. If the site gets busy, OpenStreetMap asks you to move to a tile provider (MapTiler,
+    // Stadia Maps, ...): paste its raster tile URL here, e.g. map: { tiles: 'https://.../{z}/{x}/{y}.png?key=...', attribution: '...' }.
+    map: {},
+
     // Face-based age estimation (runs on-device; no image ever leaves the browser).
     // Video effects (background blur/replacement, face masks). Loaded only when a user opens the effects panel.
     effects: {

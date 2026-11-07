@@ -104,6 +104,7 @@
         <symbol id="lp-i-headset" viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4.5" height="6.5" rx="2"/><rect x="16.5" y="14" width="4.5" height="6.5" rx="2"/></symbol>
         <symbol id="lp-i-gamepad" viewBox="0 0 24 24"><rect x="2.5" y="7" width="19" height="11" rx="5.5"/><path d="M7.5 10.5v4M5.5 12.5h4"/><circle cx="15.6" cy="11.6" r=".8"/><circle cx="18" cy="13.6" r=".8"/></symbol>
         <symbol id="lp-i-hash" viewBox="0 0 24 24"><path d="M5 9h14M4 15h14M10 3 8 21M16 3l-2 18"/></symbol>
+        <symbol id="lp-i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol>
         <symbol id="lp-i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
         <symbol id="lp-i-tag" viewBox="0 0 24 24"><path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r=".6"/></symbol>
         <symbol id="lp-i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
@@ -207,6 +208,12 @@
                     <button type="button" id="groupBtn" class="lp-prefs">
                         <svg class="lp-i lp-prefs-ico" aria-hidden="true"><use href="#lp-i-users"/></svg>
                         <span class="lp-prefs-main"><b>Group rooms</b><span class="lp-prefs-sum">Up to 8 people on voice · 4 on video</span></span>
+                        <svg class="lp-i lp-chev" aria-hidden="true"><use href="#lp-i-chev"/></svg>
+                    </button>
+
+                    <button type="button" id="mapBtn" class="lp-prefs" aria-haspopup="dialog">
+                        <svg class="lp-i lp-prefs-ico" aria-hidden="true"><use href="#lp-i-globe"/></svg>
+                        <span class="lp-prefs-main"><b>Live world map</b><span class="lp-prefs-sum">See where people are online right now</span></span>
                         <svg class="lp-i lp-chev" aria-hidden="true"><use href="#lp-i-chev"/></svg>
                     </button>
 
@@ -1300,6 +1307,22 @@
     </div>
 
     <div id="toasts" role="region" aria-label="Notifications"></div>
+
+    <!-- Live world map (js/worldmap.js): counts of people online per ~25 km area, from people who chose to be shown. -->
+    <div id="mapView" class="map-view hidden" role="dialog" aria-modal="true" aria-labelledby="mapTitle">
+        <div class="map-top">
+            <div class="map-head"><span class="map-dot" aria-hidden="true"></span><b id="mapTitle">Live world map</b><span id="mapTotal" class="map-total" aria-live="polite"></span></div>
+            <button type="button" id="mapClose" class="map-close" aria-label="Close map"><svg class="lp-i" aria-hidden="true"><use href="#lp-i-x"/></svg></button>
+        </div>
+        <div id="mapCanvas" class="map-canvas" role="region" aria-label="World map of people online"></div>
+        <div id="mapMsg" class="map-msg hidden" role="status"></div>
+        <div class="map-panel">
+            <label class="map-switch">
+                <input type="checkbox" id="mapShowMe" role="switch">
+                <span class="map-switch-text"><b>Show me on the map</b><span class="map-note">Off unless you turn it on. People see only a count for your area (about 25 km), never your name, profile or exact spot. Turn it off any time.</span></span>
+            </label>
+        </div>
+    </div>
 
     <script type="module" src="js/app.js"></script>
 </body>
