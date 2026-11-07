@@ -297,11 +297,22 @@ const ACCENTS = [
     { id: 'mumbai', name: 'Mumbai', sw: 'linear-gradient(135deg,#3d5cff,#2dd4bf)' },
 ];
 const currentAccent = () => document.documentElement.dataset.accent || 'rani';
+// Without Premium checks (local demo, or Premium switched off) everything is unlocked: put back the saved colour straight away.
+if (!premiumExpected) { const saved = store.get('accent', null); if (saved && saved !== currentAccent()) queueMicrotask(() => applyAccent(saved, { save: false })); }
 function applyAccent(id, { save = true } = {}) {
     if (id === 'rani') delete document.documentElement.dataset.accent;
     else document.documentElement.dataset.accent = id;
     if (save) store.set('accent', id);
     renderAccents();
+}
+/** Once Premium is known: show the saved colour if it is allowed, the free one if not (the saved choice is kept either way), and
+ *  remember the answer for a week so the next visit paints the right colour before anything loads (see the script in index.html). */
+function syncProAccent() {
+    const pro = isPremium();
+    store.set('proUntil', pro ? Date.now() + 7 * 864e5 : 0);
+    const saved = ACCENTS.find(x => x.id === store.get('accent', 'rani'));
+    const want = saved && (saved.free || pro) ? saved.id : 'rani';
+    if (want !== currentAccent()) applyAccent(want, { save: false });
 }
 function renderAccents() {
     el.accentGrid.replaceChildren(...ACCENTS.map(a => {
@@ -3206,9 +3217,8 @@ function initFriends() {
         premium.waitReady().then(() => {
             premiumReady = true;
             ads.update({ premiumKnown: true, premium: isPremium() });
-            const a = ACCENTS.find(x => x.id === currentAccent());
-            // Show the free colour, but keep the saved choice: the Premium answer may just be slow.
-            if (a && !a.free && !isPremium()) applyAccent('rani', { save: false });
+            syncProAccent();
+            premium.onChange(syncProAccent);
         });
         el.premiumBtn.classList.remove('hidden', 'late');
         renderPremium();
