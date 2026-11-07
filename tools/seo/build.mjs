@@ -52,8 +52,14 @@ function section(s) {
     for (const p of s.p || []) parts.push(`<p>${rich(p)}</p>`);
     if (s.list) parts.push(`<ul>${s.list.map(li => `<li>${rich(li)}</li>`).join('')}</ul>`);
     if (s.steps) parts.push(`<ol>${s.steps.map(li => `<li>${rich(li)}</li>`).join('')}</ol>`);
+    if (s.table) {
+        // a comparison table; it scrolls sideways inside its own box on a phone, never the page
+        const [head, ...rows] = s.table;
+        parts.push(`<div class="table-wrap" role="region" aria-label="${esc(s.h)}" tabindex="0"><table><thead><tr>${head.map((c, i) => `<th scope="col"${i === 0 ? ' class="rowh"' : ''}>${esc(c)}</th>`).join('')}</tr></thead>`
+            + `<tbody>${rows.map(r => `<tr>${r.map((c, i) => (i === 0 ? `<th scope="row" class="rowh">${esc(c)}</th>` : `<td>${rich(c)}</td>`)).join('')}</tr>`).join('')}</tbody></table></div>`);
+    }
     for (const p of s.after || []) parts.push(`<p>${rich(p)}</p>`);
-    return `<section>${parts.join('\n')}</section>`;
+    return `<section${s.cls ? ` class="${s.cls}"` : ''}>${parts.join('\n')}</section>`;
 }
 
 export function render(page, { inCluster }) {
@@ -175,10 +181,12 @@ export function homeBlocks(html) {
         `    <script type="application/ld+json">${JSON.stringify(ld)}</script>`,
         '    <!-- seo:end -->',
     ].join('\n');
+    const explore = '<!-- seo:explore (written by tools/seo/build.mjs) -->' + TOPICS.map(p => `<a href="/${p.slug}/">${esc(p.crumb)}</a>`).join('') + '<!-- seo:explore-end -->';
     const langs = '<!-- seo:langs (written by tools/seo/build.mjs) -->' + LANGS.map(p => `<a href="/${p.slug}/" lang="${p.lang}" hreflang="${p.lang}">${esc(p.native)}</a>`).join('') + '<!-- seo:langs-end -->';
     return html
         .replace(/<!-- seo:start[\s\S]*?<!-- seo:end -->/, () => head)
-        .replace(/<!-- seo:langs \(written[\s\S]*?<!-- seo:langs-end -->/, () => langs);
+        .replace(/<!-- seo:langs \(written[\s\S]*?<!-- seo:langs-end -->/, () => langs)
+        .replace(/<!-- seo:explore \(written[\s\S]*?<!-- seo:explore-end -->/, () => explore);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

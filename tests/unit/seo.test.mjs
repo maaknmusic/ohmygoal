@@ -22,8 +22,8 @@ test('the committed pages are exactly what the generator builds (run node tools/
     assert.equal(read('sitemap.xml'), sitemap(pages, today), 'sitemap.xml is out of date');
 });
 
-test('24 pages: 7 English topics and one per interface language (17)', () => {
-    assert.equal(TOPICS.length, 7);
+test('35 pages: 18 English topics and one per interface language (17)', () => {
+    assert.equal(TOPICS.length, 18);
     const ui = read('js/i18n.js').match(/code: '([a-z]{2})'/g).map(s => s.slice(7, 9)).filter(c => c !== 'en');
     assert.deepEqual(LANGS.map(p => p.lang).sort(), ui.sort(), 'a page for every interface language');
 });
@@ -98,4 +98,16 @@ test('internal links point at pages that exist; the home footer links every page
     assert.match(app, /new URLSearchParams\(location\.search\)\.get\('lang'\)/);
     assert.match(read('firebase.json'), /"tools\/\*\*"/);
     assert.ok(fs.statSync(new URL('icons/og-card.png', root)).size > 20000);
+});
+
+test('comparison pages: a table that scrolls inside its own box, and the sources of every claim about other apps', () => {
+    for (const slug of ['sites-like-omegle', 'ometv-alternative', 'monkey-alternative', 'chatroulette-alternative', 'azar-alternative']) {
+        const html = read(`${slug}/index.html`);
+        assert.match(html, /<div class="table-wrap" role="region" aria-label="[^"]+" tabindex="0"><table>/, slug);
+        assert.match(html, /<section class="sources"><h2>Sources<\/h2>/, slug);
+        assert.match(html, /Checked in November 2026/, slug);
+        assert.match(html, /rel="noopener">/, slug);
+    }
+    assert.equal((read('sites-like-omegle/index.html').match(/<th scope="col"/g) || []).length, 6, 'all five services in the full table');
+    assert.equal((read('ometv-alternative/index.html').match(/<th scope="col"/g) || []).length, 3, 'one service at a time on its own page');
 });

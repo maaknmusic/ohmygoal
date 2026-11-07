@@ -24,7 +24,7 @@ for (const s of slugs) {
   });
   if (!res.ok() || r.sw > r.iw || r.h1 !== 1 || r.ld !== 1 || r.cta !== `/?lang=${s.length === 2 ? s : 'en'}`) bad.push({ s, status: res.status(), ...r });
 }
-step(`1. all ${slugs.length} search pages load, fit a phone, have one h1, valid structured data and the right app button`, slugs.length === 24 && bad.length === 0, JSON.stringify(bad.slice(0, 3)));
+step(`1. all ${slugs.length} search pages load, fit a phone, have one h1, valid structured data and the right app button`, slugs.length === 35 && bad.length === 0, JSON.stringify(bad.slice(0, 3)));
 
 // ---- 2. the Hindi page's button opens the app in Hindi, and it stays Hindi on the next visit
 await p.goto('http://localhost:8765/hi/');
@@ -48,7 +48,7 @@ const home = await p.evaluate(() => ({
   ld: JSON.parse(document.querySelector('script[type="application/ld+json"]').textContent)['@graph'].length,
   alts: document.querySelectorAll('link[rel="alternate"][hreflang]').length,
 }));
-step('3a. the home footer links the 7 topic pages (kept in English) and the 17 language pages', home.explore.length === 7 && home.explore.includes('/omegle-alternative/|Omegle alternative') && home.langs.length === 17, JSON.stringify(home.explore.slice(0, 2)));
+step('3a. the home footer links the 18 topic pages (kept in English) and the 17 language pages', home.explore.length === 18 && home.explore.includes('/omegle-alternative/|Omegle alternative') && home.langs.length === 17, JSON.stringify(home.explore.slice(0, 2)));
 step('3b. the home page has its structured data and 19 language alternates', home.ld === 4 && home.alts === 19, JSON.stringify({ ld: home.ld, alts: home.alts }));
 step('4. no page errors', errors.length === 0, JSON.stringify(errors.slice(0, 3)));
 await browser.close();
