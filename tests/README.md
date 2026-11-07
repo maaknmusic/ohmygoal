@@ -23,6 +23,7 @@ node tests/e2e/admin-analytics.mjs <scratch>   # admin Dashboard, Premium, Payme
 node tests/e2e/hardening.mjs          # hostile peer (floods, oversize frames, extra channels)
 node tests/e2e/distance.mjs           # approximate distance
 node tests/e2e/world-languages.mjs <scratch>   # the 8 world languages on the landing page, Arabic right-to-left, phone and desktop
+node tests/e2e/mobile-fit.mjs <scratch>       # every main screen at 320-430 px with real phone emulation: nothing wider than the screen (needs the emulators)
 node tests/e2e/world-narrow.mjs <scratch>      # the language picker fits at 320-390 px in every language
 node tests/e2e/reactions.mjs          # drawn reactions: tap, hold burst, Premium pack, hostile peer, phone
 node tests/e2e/failclosed.mjs         # masks never fall back to the raw camera; distance toggle race
