@@ -557,6 +557,9 @@ async function syncEffects() {
 
 function renderFxPanel() {
     el.fxBtn.classList.toggle('on', fxActive());
+    // The options (with their drawn preview pictures) are only built while the panel is open: drawing every background at start-up
+    // cost a phone about half a second. Opening the panel builds them (el.fxBtn.onclick).
+    if (el.fxPanel.classList.contains('hidden')) return;
     const lists = { background: BACKGROUNDS, mask: MASKS, filter: FILTERS };
     el.fxPanel.querySelectorAll('.fx-opts').forEach(box => {
         const kind = box.dataset.kind;
@@ -3748,7 +3751,22 @@ renderTags();
 renderAgeStatus();
 detectCountry(store).then(code => { S.country = code; renderCountryFilter(); });
 el.startBtn.textContent = 'Connecting…';
+/**
+ * Firebase and App Check (Google's bot check, the single biggest piece of work on this page: about 1.5 s of a mid-range phone's
+ * time) start on the first tap, key press or scroll, or after 3 seconds, whichever is first, so the page answers straight away while
+ * people read it. Nothing reaches our servers before they have started. Tests with the emulators start at once.
+ */
+const wakeUp = () => new Promise(resolve => {
+    if (!firebaseConfig || CFG.emulators) return resolve();
+    const events = ['pointerdown', 'keydown', 'touchstart', 'scroll', 'focusin'];
+    let done = false;
+    const go = () => { if (done) return; done = true; events.forEach(e => removeEventListener(e, go, true)); resolve(); };
+    events.forEach(e => addEventListener(e, go, { capture: true, passive: true }));
+    const later = () => setTimeout(go, 3000);
+    if (document.readyState === 'complete') later(); else addEventListener('load', later, { once: true });
+});
 try {
+    await wakeUp();
     S.transport = firebaseConfig
         ? await createFirebaseTransport({ firebaseConfig, appId, initialAuthToken, emulators: CFG.emulators, appCheck: CFG.appCheck })
         : createLocalTransport();

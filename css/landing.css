@@ -830,3 +830,6 @@
 /* Footer links to the search pages (tools/seo/build.mjs) */
 #welcome .lp-foot-explore a, #welcome .lp-foot-langs a { font-weight: 500; font-size: 14px; }
 #welcome .lp-foot-langs { gap: 4px 16px; }
+/* Language names written in their own script use the phone's own font, so English visitors never download the 118 KB Devanagari
+   web font just for the language picker and the footer links. */
+#uiLang, #uiLang option, .lp-foot-langs a { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', sans-serif; }
