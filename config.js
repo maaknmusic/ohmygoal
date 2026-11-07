@@ -58,10 +58,10 @@ window.APP_CONFIG = {
     // Shown on legal.html (Terms, Privacy, Refunds, Delivery, Contact). Razorpay requires these
     // details on your website before it activates live payments.
     business: {
-        name: 'OhMyGoal',
-        email: '',      // support email, e.g. 'support@yourdomain.com'
-        phone: '',
-        address: '',    // city, state, country
+        name: 'Mayank Gupta (trading as OhMyGoal)',
+        email: 'support@ohmygoal.app',
+        phone: '',      // optional: left empty, the Contact section shows no phone line
+        address: 'Delhi 110084, India',
         policiesUpdated: '7 November 2026',
     },
 

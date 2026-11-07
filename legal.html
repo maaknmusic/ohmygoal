@@ -96,7 +96,7 @@
         <p>
             <b data-field="business"></b><br>
             Email: <span data-field="email"></span><br>
-            Phone: <span data-field="phone"></span><br>
+            <span data-optional="phone">Phone: <span data-field="phone"></span><br></span>
             Address: <span data-field="address"></span>
         </p>
 
@@ -139,6 +139,8 @@
                         a.textContent = value;
                         el.replaceChildren(a);
                     } else el.textContent = value;
+                } else if (el.closest('[data-optional]')) {
+                    el.closest('[data-optional]').remove(); // optional details left empty are simply not shown
                 } else {
                     el.textContent = '[set business.' + el.dataset.field + ' in config.js]';
                     el.classList.add('placeholder');
