@@ -1093,7 +1093,11 @@ function attachChannel(sess, dc) {
         el.avatar.textContent = (sess.friend?.name || 'S')[0].toUpperCase();
         el.avatar.style.background = '';
         if (sess.friend && sess.role === 'offerer') friends?.clearCall(sess.friend.id);
-        sendData({ t: 'hello', nick: S.nick, avatar: S.avatar, loc: locOffer(), interests: S.interests, country: S.country, gender: S.gender, timed: S.timed, premium: isPremium(), ...(S.lang ? { lang: S.lang } : {}), ...(S.theme === 'langx' && S.learn ? { learn: S.learn } : {}), ...(AGE.enabled && ageVerified() ? { age: 'checked' } : {}) });
+        const hello = { t: 'hello', nick: S.nick, avatar: S.avatar, loc: locOffer(), interests: S.interests, country: S.country, gender: S.gender, timed: S.timed, premium: isPremium(), ...(S.lang ? { lang: S.lang } : {}), ...(S.theme === 'langx' && S.learn ? { learn: S.learn } : {}), ...(AGE.enabled && ageVerified() ? { age: 'checked' } : {}) };
+        sendData(hello);
+        // A greeting sent the moment the channel opens is now and then lost on the other side (they would see "Stranger" with no
+        // nickname, country or language). Send it again a little later; the other side keeps only the first one it gets.
+        for (const ms of [1000, 3000]) setTimeout(() => { if (!sess.ended && sess === S.session) sendData(hello); }, ms);
         if (S.timed && !sess.friend) startRound(sess);
         sendData({ t: 'av', muted: S.muted, camOff: S.camOff });
         sess.games = createGamesUi({
