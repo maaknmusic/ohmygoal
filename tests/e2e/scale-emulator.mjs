@@ -118,6 +118,7 @@ const { execFileSync } = await import('child_process');
 let out5 = '';
 try {
   out5 = execFileSync('node', ['-e', `import('./stats.js').then(async m => { const { publicDoc } = await import('./common.js'); const now = Date.now();
+    const others = await publicDoc('presence/x').parent.get(); for (const d of others.docs) await d.ref.delete(); // only this check's users, so people leaving from earlier tests cannot change the number
     for (let i = 0; i < 3; i++) await publicDoc('presence/scale-' + now + '-' + i).set({ ts: now - i * 1000 });
     await publicDoc('presence/scale-old-' + now).set({ ts: now - 5 * 60000 });
     const r1 = await m.saveOnlineCount(now); const s = (await m.onlineRef().get()).data();
