@@ -62,7 +62,8 @@ export function createLiveUi({ pane, ctx, enter }) {
         const av = h('div', 'avatar live-avatar');
         ctx.applyAvatar?.(av, { avatar: s.hostAvatar, nick: s.hostName });
         const who = h('div', 'live-who');
-        who.append(h('b', '', s.title), h('span', '', `Hosted by ${s.hostName}`));
+        const titleEl = h('b', '', s.title); titleEl.setAttribute('data-no-i18n', '');   // written by the host: never translated
+        who.append(titleEl, h('span', '', `Hosted by ${s.hostName}`));
         head.append(av, who);
         const tags = h('div', 'live-tags');
         tags.append(h('span', 'live-tag live-dot', 'Live'), h('span', 'live-tag', seatsText(s)));
