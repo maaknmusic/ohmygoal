@@ -1,5 +1,449 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://ohmygoal.app/</loc></url>
-  <url><loc>https://ohmygoal.app/legal.html</loc></url>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://ohmygoal.app/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ohmygoal.app/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://ohmygoal.app/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://ohmygoal.app/bn/"/>
+    <xhtml:link rel="alternate" hreflang="ta" href="https://ohmygoal.app/ta/"/>
+    <xhtml:link rel="alternate" hreflang="te" href="https://ohmygoal.app/te/"/>
+    <xhtml:link rel="alternate" hreflang="mr" href="https://ohmygoal.app/mr/"/>
+    <xhtml:link rel="alternate" hreflang="gu" href="https://ohmygoal.app/gu/"/>
+    <xhtml:link rel="alternate" hreflang="kn" href="https://ohmygoal.app/kn/"/>
+    <xhtml:link rel="alternate" hreflang="ml" href="https://ohmygoal.app/ml/"/>
+    <xhtml:link rel="alternate" hreflang="pa" href="https://ohmygoal.app/pa/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://ohmygoal.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://ohmygoal.app/pt/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://ohmygoal.app/ar/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://ohmygoal.app/id/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://ohmygoal.app/tr/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://ohmygoal.app/ru/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://ohmygoal.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://ohmygoal.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ohmygoal.app/"/>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/hi/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ohmygoal.app/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://ohmygoal.app/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://ohmygoal.app/bn/"/>
+    <xhtml:link rel="alternate" hreflang="ta" href="https://ohmygoal.app/ta/"/>
+    <xhtml:link rel="alternate" hreflang="te" href="https://ohmygoal.app/te/"/>
+    <xhtml:link rel="alternate" hreflang="mr" href="https://ohmygoal.app/mr/"/>
+    <xhtml:link rel="alternate" hreflang="gu" href="https://ohmygoal.app/gu/"/>
+    <xhtml:link rel="alternate" hreflang="kn" href="https://ohmygoal.app/kn/"/>
+    <xhtml:link rel="alternate" hreflang="ml" href="https://ohmygoal.app/ml/"/>
+    <xhtml:link rel="alternate" hreflang="pa" href="https://ohmygoal.app/pa/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://ohmygoal.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://ohmygoal.app/pt/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://ohmygoal.app/ar/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://ohmygoal.app/id/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://ohmygoal.app/tr/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://ohmygoal.app/ru/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://ohmygoal.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://ohmygoal.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ohmygoal.app/"/>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/bn/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ohmygoal.app/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://ohmygoal.app/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://ohmygoal.app/bn/"/>
+    <xhtml:link rel="alternate" hreflang="ta" href="https://ohmygoal.app/ta/"/>
+    <xhtml:link rel="alternate" hreflang="te" href="https://ohmygoal.app/te/"/>
+    <xhtml:link rel="alternate" hreflang="mr" href="https://ohmygoal.app/mr/"/>
+    <xhtml:link rel="alternate" hreflang="gu" href="https://ohmygoal.app/gu/"/>
+    <xhtml:link rel="alternate" hreflang="kn" href="https://ohmygoal.app/kn/"/>
+    <xhtml:link rel="alternate" hreflang="ml" href="https://ohmygoal.app/ml/"/>
+    <xhtml:link rel="alternate" hreflang="pa" href="https://ohmygoal.app/pa/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://ohmygoal.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://ohmygoal.app/pt/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://ohmygoal.app/ar/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://ohmygoal.app/id/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://ohmygoal.app/tr/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://ohmygoal.app/ru/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://ohmygoal.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://ohmygoal.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ohmygoal.app/"/>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/ta/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ohmygoal.app/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://ohmygoal.app/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://ohmygoal.app/bn/"/>
+    <xhtml:link rel="alternate" hreflang="ta" href="https://ohmygoal.app/ta/"/>
+    <xhtml:link rel="alternate" hreflang="te" href="https://ohmygoal.app/te/"/>
+    <xhtml:link rel="alternate" hreflang="mr" href="https://ohmygoal.app/mr/"/>
+    <xhtml:link rel="alternate" hreflang="gu" href="https://ohmygoal.app/gu/"/>
+    <xhtml:link rel="alternate" hreflang="kn" href="https://ohmygoal.app/kn/"/>
+    <xhtml:link rel="alternate" hreflang="ml" href="https://ohmygoal.app/ml/"/>
+    <xhtml:link rel="alternate" hreflang="pa" href="https://ohmygoal.app/pa/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://ohmygoal.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://ohmygoal.app/pt/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://ohmygoal.app/ar/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://ohmygoal.app/id/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://ohmygoal.app/tr/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://ohmygoal.app/ru/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://ohmygoal.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://ohmygoal.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ohmygoal.app/"/>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/te/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ohmygoal.app/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://ohmygoal.app/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://ohmygoal.app/bn/"/>
+    <xhtml:link rel="alternate" hreflang="ta" href="https://ohmygoal.app/ta/"/>
+    <xhtml:link rel="alternate" hreflang="te" href="https://ohmygoal.app/te/"/>
+    <xhtml:link rel="alternate" hreflang="mr" href="https://ohmygoal.app/mr/"/>
+    <xhtml:link rel="alternate" hreflang="gu" href="https://ohmygoal.app/gu/"/>
+    <xhtml:link rel="alternate" hreflang="kn" href="https://ohmygoal.app/kn/"/>
+    <xhtml:link rel="alternate" hreflang="ml" href="https://ohmygoal.app/ml/"/>
+    <xhtml:link rel="alternate" hreflang="pa" href="https://ohmygoal.app/pa/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://ohmygoal.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://ohmygoal.app/pt/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://ohmygoal.app/ar/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://ohmygoal.app/id/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://ohmygoal.app/tr/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://ohmygoal.app/ru/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://ohmygoal.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://ohmygoal.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ohmygoal.app/"/>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/mr/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ohmygoal.app/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://ohmygoal.app/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://ohmygoal.app/bn/"/>
+    <xhtml:link rel="alternate" hreflang="ta" href="https://ohmygoal.app/ta/"/>
+    <xhtml:link rel="alternate" hreflang="te" href="https://ohmygoal.app/te/"/>
+    <xhtml:link rel="alternate" hreflang="mr" href="https://ohmygoal.app/mr/"/>
+    <xhtml:link rel="alternate" hreflang="gu" href="https://ohmygoal.app/gu/"/>
+    <xhtml:link rel="alternate" hreflang="kn" href="https://ohmygoal.app/kn/"/>
+    <xhtml:link rel="alternate" hreflang="ml" href="https://ohmygoal.app/ml/"/>
+    <xhtml:link rel="alternate" hreflang="pa" href="https://ohmygoal.app/pa/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://ohmygoal.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://ohmygoal.app/pt/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://ohmygoal.app/ar/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://ohmygoal.app/id/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://ohmygoal.app/tr/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://ohmygoal.app/ru/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://ohmygoal.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://ohmygoal.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ohmygoal.app/"/>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/gu/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ohmygoal.app/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://ohmygoal.app/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://ohmygoal.app/bn/"/>
+    <xhtml:link rel="alternate" hreflang="ta" href="https://ohmygoal.app/ta/"/>
+    <xhtml:link rel="alternate" hreflang="te" href="https://ohmygoal.app/te/"/>
+    <xhtml:link rel="alternate" hreflang="mr" href="https://ohmygoal.app/mr/"/>
+    <xhtml:link rel="alternate" hreflang="gu" href="https://ohmygoal.app/gu/"/>
+    <xhtml:link rel="alternate" hreflang="kn" href="https://ohmygoal.app/kn/"/>
+    <xhtml:link rel="alternate" hreflang="ml" href="https://ohmygoal.app/ml/"/>
+    <xhtml:link rel="alternate" hreflang="pa" href="https://ohmygoal.app/pa/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://ohmygoal.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://ohmygoal.app/pt/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://ohmygoal.app/ar/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://ohmygoal.app/id/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://ohmygoal.app/tr/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://ohmygoal.app/ru/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://ohmygoal.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://ohmygoal.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ohmygoal.app/"/>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/kn/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ohmygoal.app/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://ohmygoal.app/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://ohmygoal.app/bn/"/>
+    <xhtml:link rel="alternate" hreflang="ta" href="https://ohmygoal.app/ta/"/>
+    <xhtml:link rel="alternate" hreflang="te" href="https://ohmygoal.app/te/"/>
+    <xhtml:link rel="alternate" hreflang="mr" href="https://ohmygoal.app/mr/"/>
+    <xhtml:link rel="alternate" hreflang="gu" href="https://ohmygoal.app/gu/"/>
+    <xhtml:link rel="alternate" hreflang="kn" href="https://ohmygoal.app/kn/"/>
+    <xhtml:link rel="alternate" hreflang="ml" href="https://ohmygoal.app/ml/"/>
+    <xhtml:link rel="alternate" hreflang="pa" href="https://ohmygoal.app/pa/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://ohmygoal.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://ohmygoal.app/pt/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://ohmygoal.app/ar/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://ohmygoal.app/id/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://ohmygoal.app/tr/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://ohmygoal.app/ru/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://ohmygoal.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://ohmygoal.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ohmygoal.app/"/>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/ml/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ohmygoal.app/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://ohmygoal.app/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://ohmygoal.app/bn/"/>
+    <xhtml:link rel="alternate" hreflang="ta" href="https://ohmygoal.app/ta/"/>
+    <xhtml:link rel="alternate" hreflang="te" href="https://ohmygoal.app/te/"/>
+    <xhtml:link rel="alternate" hreflang="mr" href="https://ohmygoal.app/mr/"/>
+    <xhtml:link rel="alternate" hreflang="gu" href="https://ohmygoal.app/gu/"/>
+    <xhtml:link rel="alternate" hreflang="kn" href="https://ohmygoal.app/kn/"/>
+    <xhtml:link rel="alternate" hreflang="ml" href="https://ohmygoal.app/ml/"/>
+    <xhtml:link rel="alternate" hreflang="pa" href="https://ohmygoal.app/pa/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://ohmygoal.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://ohmygoal.app/pt/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://ohmygoal.app/ar/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://ohmygoal.app/id/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://ohmygoal.app/tr/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://ohmygoal.app/ru/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://ohmygoal.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://ohmygoal.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ohmygoal.app/"/>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/pa/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ohmygoal.app/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://ohmygoal.app/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://ohmygoal.app/bn/"/>
+    <xhtml:link rel="alternate" hreflang="ta" href="https://ohmygoal.app/ta/"/>
+    <xhtml:link rel="alternate" hreflang="te" href="https://ohmygoal.app/te/"/>
+    <xhtml:link rel="alternate" hreflang="mr" href="https://ohmygoal.app/mr/"/>
+    <xhtml:link rel="alternate" hreflang="gu" href="https://ohmygoal.app/gu/"/>
+    <xhtml:link rel="alternate" hreflang="kn" href="https://ohmygoal.app/kn/"/>
+    <xhtml:link rel="alternate" hreflang="ml" href="https://ohmygoal.app/ml/"/>
+    <xhtml:link rel="alternate" hreflang="pa" href="https://ohmygoal.app/pa/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://ohmygoal.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://ohmygoal.app/pt/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://ohmygoal.app/ar/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://ohmygoal.app/id/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://ohmygoal.app/tr/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://ohmygoal.app/ru/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://ohmygoal.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://ohmygoal.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ohmygoal.app/"/>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/es/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ohmygoal.app/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://ohmygoal.app/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://ohmygoal.app/bn/"/>
+    <xhtml:link rel="alternate" hreflang="ta" href="https://ohmygoal.app/ta/"/>
+    <xhtml:link rel="alternate" hreflang="te" href="https://ohmygoal.app/te/"/>
+    <xhtml:link rel="alternate" hreflang="mr" href="https://ohmygoal.app/mr/"/>
+    <xhtml:link rel="alternate" hreflang="gu" href="https://ohmygoal.app/gu/"/>
+    <xhtml:link rel="alternate" hreflang="kn" href="https://ohmygoal.app/kn/"/>
+    <xhtml:link rel="alternate" hreflang="ml" href="https://ohmygoal.app/ml/"/>
+    <xhtml:link rel="alternate" hreflang="pa" href="https://ohmygoal.app/pa/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://ohmygoal.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://ohmygoal.app/pt/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://ohmygoal.app/ar/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://ohmygoal.app/id/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://ohmygoal.app/tr/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://ohmygoal.app/ru/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://ohmygoal.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://ohmygoal.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ohmygoal.app/"/>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/pt/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ohmygoal.app/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://ohmygoal.app/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://ohmygoal.app/bn/"/>
+    <xhtml:link rel="alternate" hreflang="ta" href="https://ohmygoal.app/ta/"/>
+    <xhtml:link rel="alternate" hreflang="te" href="https://ohmygoal.app/te/"/>
+    <xhtml:link rel="alternate" hreflang="mr" href="https://ohmygoal.app/mr/"/>
+    <xhtml:link rel="alternate" hreflang="gu" href="https://ohmygoal.app/gu/"/>
+    <xhtml:link rel="alternate" hreflang="kn" href="https://ohmygoal.app/kn/"/>
+    <xhtml:link rel="alternate" hreflang="ml" href="https://ohmygoal.app/ml/"/>
+    <xhtml:link rel="alternate" hreflang="pa" href="https://ohmygoal.app/pa/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://ohmygoal.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://ohmygoal.app/pt/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://ohmygoal.app/ar/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://ohmygoal.app/id/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://ohmygoal.app/tr/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://ohmygoal.app/ru/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://ohmygoal.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://ohmygoal.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ohmygoal.app/"/>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/ar/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ohmygoal.app/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://ohmygoal.app/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://ohmygoal.app/bn/"/>
+    <xhtml:link rel="alternate" hreflang="ta" href="https://ohmygoal.app/ta/"/>
+    <xhtml:link rel="alternate" hreflang="te" href="https://ohmygoal.app/te/"/>
+    <xhtml:link rel="alternate" hreflang="mr" href="https://ohmygoal.app/mr/"/>
+    <xhtml:link rel="alternate" hreflang="gu" href="https://ohmygoal.app/gu/"/>
+    <xhtml:link rel="alternate" hreflang="kn" href="https://ohmygoal.app/kn/"/>
+    <xhtml:link rel="alternate" hreflang="ml" href="https://ohmygoal.app/ml/"/>
+    <xhtml:link rel="alternate" hreflang="pa" href="https://ohmygoal.app/pa/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://ohmygoal.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://ohmygoal.app/pt/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://ohmygoal.app/ar/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://ohmygoal.app/id/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://ohmygoal.app/tr/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://ohmygoal.app/ru/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://ohmygoal.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://ohmygoal.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ohmygoal.app/"/>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/id/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ohmygoal.app/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://ohmygoal.app/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://ohmygoal.app/bn/"/>
+    <xhtml:link rel="alternate" hreflang="ta" href="https://ohmygoal.app/ta/"/>
+    <xhtml:link rel="alternate" hreflang="te" href="https://ohmygoal.app/te/"/>
+    <xhtml:link rel="alternate" hreflang="mr" href="https://ohmygoal.app/mr/"/>
+    <xhtml:link rel="alternate" hreflang="gu" href="https://ohmygoal.app/gu/"/>
+    <xhtml:link rel="alternate" hreflang="kn" href="https://ohmygoal.app/kn/"/>
+    <xhtml:link rel="alternate" hreflang="ml" href="https://ohmygoal.app/ml/"/>
+    <xhtml:link rel="alternate" hreflang="pa" href="https://ohmygoal.app/pa/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://ohmygoal.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://ohmygoal.app/pt/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://ohmygoal.app/ar/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://ohmygoal.app/id/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://ohmygoal.app/tr/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://ohmygoal.app/ru/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://ohmygoal.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://ohmygoal.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ohmygoal.app/"/>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/tr/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ohmygoal.app/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://ohmygoal.app/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://ohmygoal.app/bn/"/>
+    <xhtml:link rel="alternate" hreflang="ta" href="https://ohmygoal.app/ta/"/>
+    <xhtml:link rel="alternate" hreflang="te" href="https://ohmygoal.app/te/"/>
+    <xhtml:link rel="alternate" hreflang="mr" href="https://ohmygoal.app/mr/"/>
+    <xhtml:link rel="alternate" hreflang="gu" href="https://ohmygoal.app/gu/"/>
+    <xhtml:link rel="alternate" hreflang="kn" href="https://ohmygoal.app/kn/"/>
+    <xhtml:link rel="alternate" hreflang="ml" href="https://ohmygoal.app/ml/"/>
+    <xhtml:link rel="alternate" hreflang="pa" href="https://ohmygoal.app/pa/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://ohmygoal.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://ohmygoal.app/pt/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://ohmygoal.app/ar/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://ohmygoal.app/id/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://ohmygoal.app/tr/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://ohmygoal.app/ru/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://ohmygoal.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://ohmygoal.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ohmygoal.app/"/>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/ru/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ohmygoal.app/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://ohmygoal.app/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://ohmygoal.app/bn/"/>
+    <xhtml:link rel="alternate" hreflang="ta" href="https://ohmygoal.app/ta/"/>
+    <xhtml:link rel="alternate" hreflang="te" href="https://ohmygoal.app/te/"/>
+    <xhtml:link rel="alternate" hreflang="mr" href="https://ohmygoal.app/mr/"/>
+    <xhtml:link rel="alternate" hreflang="gu" href="https://ohmygoal.app/gu/"/>
+    <xhtml:link rel="alternate" hreflang="kn" href="https://ohmygoal.app/kn/"/>
+    <xhtml:link rel="alternate" hreflang="ml" href="https://ohmygoal.app/ml/"/>
+    <xhtml:link rel="alternate" hreflang="pa" href="https://ohmygoal.app/pa/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://ohmygoal.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://ohmygoal.app/pt/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://ohmygoal.app/ar/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://ohmygoal.app/id/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://ohmygoal.app/tr/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://ohmygoal.app/ru/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://ohmygoal.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://ohmygoal.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ohmygoal.app/"/>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/fr/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ohmygoal.app/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://ohmygoal.app/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://ohmygoal.app/bn/"/>
+    <xhtml:link rel="alternate" hreflang="ta" href="https://ohmygoal.app/ta/"/>
+    <xhtml:link rel="alternate" hreflang="te" href="https://ohmygoal.app/te/"/>
+    <xhtml:link rel="alternate" hreflang="mr" href="https://ohmygoal.app/mr/"/>
+    <xhtml:link rel="alternate" hreflang="gu" href="https://ohmygoal.app/gu/"/>
+    <xhtml:link rel="alternate" hreflang="kn" href="https://ohmygoal.app/kn/"/>
+    <xhtml:link rel="alternate" hreflang="ml" href="https://ohmygoal.app/ml/"/>
+    <xhtml:link rel="alternate" hreflang="pa" href="https://ohmygoal.app/pa/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://ohmygoal.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://ohmygoal.app/pt/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://ohmygoal.app/ar/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://ohmygoal.app/id/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://ohmygoal.app/tr/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://ohmygoal.app/ru/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://ohmygoal.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://ohmygoal.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ohmygoal.app/"/>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/de/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://ohmygoal.app/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://ohmygoal.app/hi/"/>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://ohmygoal.app/bn/"/>
+    <xhtml:link rel="alternate" hreflang="ta" href="https://ohmygoal.app/ta/"/>
+    <xhtml:link rel="alternate" hreflang="te" href="https://ohmygoal.app/te/"/>
+    <xhtml:link rel="alternate" hreflang="mr" href="https://ohmygoal.app/mr/"/>
+    <xhtml:link rel="alternate" hreflang="gu" href="https://ohmygoal.app/gu/"/>
+    <xhtml:link rel="alternate" hreflang="kn" href="https://ohmygoal.app/kn/"/>
+    <xhtml:link rel="alternate" hreflang="ml" href="https://ohmygoal.app/ml/"/>
+    <xhtml:link rel="alternate" hreflang="pa" href="https://ohmygoal.app/pa/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://ohmygoal.app/es/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://ohmygoal.app/pt/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://ohmygoal.app/ar/"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://ohmygoal.app/id/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://ohmygoal.app/tr/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://ohmygoal.app/ru/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://ohmygoal.app/fr/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://ohmygoal.app/de/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://ohmygoal.app/"/>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/random-video-chat/</loc>
+    <lastmod>2026-11-07</lastmod>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/omegle-alternative/</loc>
+    <lastmod>2026-11-07</lastmod>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/talk-to-strangers/</loc>
+    <lastmod>2026-11-07</lastmod>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/video-chat-india/</loc>
+    <lastmod>2026-11-07</lastmod>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/safe-video-chat/</loc>
+    <lastmod>2026-11-07</lastmod>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/text-chat/</loc>
+    <lastmod>2026-11-07</lastmod>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/voice-chat/</loc>
+    <lastmod>2026-11-07</lastmod>
+  </url>
+  <url>
+    <loc>https://ohmygoal.app/legal.html</loc>
+    <lastmod>2026-11-07</lastmod>
+  </url>
 </urlset>

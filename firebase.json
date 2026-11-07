@@ -16,6 +16,7 @@
             "_preview/**",
             "parts/**",
             "tests/**",
+            "tools/**",
             "HANDOFF.md"
         ],
         "cleanUrls": false,

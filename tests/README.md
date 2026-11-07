@@ -24,6 +24,7 @@ node tests/e2e/fraud-controls-emulator.mjs <scratch>   # host verification, new-
 node tests/e2e/scale-emulator.mjs <scratch>   # busy-site safeguards: random place in the matching queue (rules and a real match), sharded chat counter, server-counted "people online" and its fallback
 node tests/e2e/ads-emulator.mjs <scratch>   # ad places with a fake AdSense script: home ad, waiting banner only while waiting, none for Premium (no script either), none in the demo, phone fit
 node tests/e2e/rounds-demo.mjs <scratch>   # Quick rounds (demo mode, ~75 s): announced, 10-second warning, both see "Time’s up" with how to turn it off, never "Stranger disconnected"
+node tests/e2e/seo-pages.mjs   # the 24 search pages on a phone (structured data, one h1, no sideways scroll), ?lang= opens the app in that language, home footer links
 node tests/e2e/safety-brief.mjs                       # the first-chat safety sheet (demo mode)
 node tests/e2e/admin-hosts.mjs <scratch>     # admin Hosts tab: usage, live now, suspend, payouts (needs the emulators)
 node tests/e2e/admin-analytics.mjs <scratch>   # admin Dashboard, Premium, Payments, People, CSV (needs the emulators)

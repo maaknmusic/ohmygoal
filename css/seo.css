@@ -1,0 +1,60 @@
+/* The search pages (tools/seo/build.mjs): small, fast, readable. Same colours as the app. */
+:root {
+    --bg: #090a12; --panel: #151729; --border: rgba(255, 255, 255, 0.1); --text: #f3f4fb; --muted: #a2a8c3;
+    --primary: #d9266c; --primary-2: #c11e5d; --link: #ff7aa8;
+    --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+    color-scheme: dark;
+}
+[data-theme="light"] {
+    --bg: #f6f5fb; --panel: #ffffff; --border: rgba(20, 20, 50, 0.12); --text: #15162a; --muted: #555b78;
+    --primary: #d11b64; --primary-2: #b0154f; --link: #b0154f; color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+    margin: 0; font: 17px/1.65 var(--font); color: var(--text);
+    background: radial-gradient(900px 500px at 0% -10%, color-mix(in srgb, var(--primary) 20%, transparent), transparent 60%), var(--bg);
+}
+a { color: var(--link); text-underline-offset: 3px; }
+.wrap { max-width: 860px; margin: 0 auto; padding: 0 16px; }
+.top { position: sticky; top: 0; z-index: 5; backdrop-filter: blur(10px); background: color-mix(in srgb, var(--bg) 82%, transparent); border-bottom: 1px solid var(--border); }
+.top-in { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 60px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; color: var(--text); text-decoration: none; }
+.brand img { border-radius: 9px; }
+.btn {
+    display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 22px; border-radius: 999px;
+    background: linear-gradient(180deg, var(--primary), var(--primary-2)); color: #fff; font-weight: 700; text-decoration: none;
+    box-shadow: 0 10px 30px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+.btn:hover { filter: brightness(1.08); }
+.btn:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary) 60%, transparent); outline-offset: 3px; }
+.btn-sm { min-height: 40px; padding: 0 16px; font-size: 15px; box-shadow: none; }
+.crumbs { display: flex; gap: 8px; flex-wrap: wrap; margin: 22px 0 0; font-size: 14px; color: var(--muted); }
+.crumbs a { color: var(--muted); }
+.hero { padding: 18px 0 8px; }
+h1 { font-size: clamp(30px, 6vw, 46px); line-height: 1.12; letter-spacing: -0.02em; margin: 10px 0 14px; }
+h2 { font-size: clamp(22px, 4vw, 27px); line-height: 1.25; margin: 40px 0 10px; letter-spacing: -0.01em; }
+.lede { font-size: 19px; color: var(--muted); margin: 0 0 22px; max-width: 62ch; }
+.cta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin: 0; }
+.note { font-size: 14px; color: var(--muted); }
+.points { list-style: none; padding: 0; margin: 30px 0 0; display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.points li { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; display: grid; gap: 4px; }
+.points b { font-size: 16.5px; }
+.points span { font-size: 15px; color: var(--muted); line-height: 1.55; }
+section p, section li { max-width: 68ch; }
+section ul, section ol { padding-inline-start: 22px; }
+section li { margin: 6px 0; }
+.faq details { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 4px 18px; margin: 10px 0; }
+.faq summary { cursor: pointer; font-weight: 700; padding: 12px 0; min-height: 44px; }
+.faq details p { margin: 0 0 14px; color: var(--muted); }
+.cta-end { margin: 44px 0 0; padding: 26px; border-radius: 20px; background: var(--panel); border: 1px solid var(--border); text-align: center; }
+.cta-end p { font-size: 20px; font-weight: 700; margin: 0 0 14px; }
+.more h2 { font-size: 18px; margin: 34px 0 10px; }
+.links { display: flex; flex-wrap: wrap; gap: 8px; }
+.links a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel); color: var(--text); text-decoration: none; font-size: 15px; }
+.links a:hover { border-color: var(--primary); }
+.foot { margin-top: 56px; padding: 26px 0 40px; border-top: 1px solid var(--border); font-size: 14.5px; color: var(--muted); }
+.foot-links { display: flex; flex-wrap: wrap; gap: 6px 20px; }
+.foot-links a { color: var(--muted); min-height: 32px; display: inline-flex; align-items: center; }
+.help b { color: var(--text); }
+@media (max-width: 520px) { body { font-size: 16.5px; } .lede { font-size: 17.5px; } .cta-row .btn { width: 100%; } }

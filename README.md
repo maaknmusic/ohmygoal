@@ -238,6 +238,23 @@ The page also shows **your IP as the server sees it**. Check that it matches you
 2. Create a JSON key for it.
 3. In GitHub, add the key as the repository secret **FIREBASE_SERVICE_ACCOUNT**.
 
+## Search (SEO)
+Plain HTML pages that search engines read without running JavaScript, built by `node tools/seo/build.mjs` from
+`tools/seo/pages-en.mjs` (7 English topic pages: random video chat, Omegle alternative, talk to strangers, video chat India,
+safety guide, text chat, voice chat) and `tools/seo/pages-langs.mjs` (one page per interface language: /hi/, /ta/, /es/…).
+The build also writes `sitemap.xml` and the generated parts of `index.html` (language alternates, structured data: WebSite,
+Organization, WebApplication and the FAQ read from the page itself, and the footer language links). `tests/unit/seo.test.mjs`
+fails if the committed output is out of date, so run the build after editing a page. A page's button opens the app in its
+language (`/?lang=hi`). The share image is `icons/og-card.png` (render with `node tools/seo/og-card.mjs`).
+
+Once after deploying (owner steps):
+1. **Google Search Console** (search.google.com/search-console): add the *Domain* property `ohmygoal.app`, verify with the TXT
+   record it gives you in Cloudflare DNS, then Sitemaps → submit `https://ohmygoal.app/sitemap.xml`. Use URL inspection →
+   Request indexing for `/`, `/hi/` and `/omegle-alternative/`.
+2. **Bing Webmaster Tools** (bing.com/webmasters): import from Search Console. Bing also feeds DuckDuckGo, Yahoo and ChatGPT search.
+3. Links from other sites matter most: list the site on AlternativeTo (as an Omegle alternative), Product Hunt, Reddit
+   communities where it is allowed, and your own Instagram/YouTube/X bios.
+
 ## Ads (Google AdSense)
 Two ad places, built and switched off: below the start box on the welcome page, and a small 320×100 banner at the top of the
 chat panel while looking for someone and between chats (not on the video stage, where it would cover the call buttons). Never during a chat, never for Premium members (nothing loads until the Premium state is known),

@@ -3719,8 +3719,12 @@ const i18n = createI18n({ loadTable: code => import(`./i18n/${code}.js`).then(m 
 const uiLangSelect = $('uiLang');
 for (const l of UI_LANGS) uiLangSelect.add(new Option(l.native, l.code));
 {
+    // ?lang=hi (from a language page such as /hi/) picks that language and remembers it, like choosing it in the menu
+    const asked = new URLSearchParams(location.search).get('lang');
+    const fromLink = asked && UI_LANGS.some(l => l.code === asked) ? asked : null;
+    if (fromLink) store.set('uiLang', fromLink);
     const saved = store.get('uiLang', null);
-    const first = sanitizeUiLang(saved ?? guessUiLang(navigator.languages));
+    const first = sanitizeUiLang(fromLink ?? saved ?? guessUiLang(navigator.languages));
     uiLangSelect.value = first;
     i18n.set(first).then(l => { uiLangSelect.value = l; });
 }

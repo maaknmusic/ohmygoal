@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<!-- The 1200x630 share image (icons/og-card.png). Render: node tools/seo/og-card.mjs -->
+<style>
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif; color: #f3f4fb; display: flex; align-items: center;
+    background: radial-gradient(700px 500px at 10% 0%, rgba(217,38,108,.45), transparent 60%), radial-gradient(600px 500px at 100% 100%, rgba(124,58,237,.35), transparent 60%), #090a12;
+  }
+  .wrap { padding: 0 80px; display: grid; grid-template-columns: 1fr 330px; gap: 50px; align-items: center; width: 100%; }
+  .brand { display: flex; align-items: center; gap: 16px; font-size: 34px; font-weight: 800; }
+  .brand img { width: 64px; height: 64px; border-radius: 16px; }
+  h1 { font-size: 66px; line-height: 1.05; letter-spacing: -0.03em; margin: 28px 0 22px; font-weight: 800; }
+  h1 em { font-style: normal; color: #ff5c9a; }
+  p { font-size: 27px; color: #c7cbe0; margin: 0; line-height: 1.4; }
+  .chips { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
+  .chips span { font-size: 21px; font-weight: 700; padding: 10px 18px; border-radius: 999px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); }
+  .phone { height: 500px; border-radius: 40px; background: linear-gradient(160deg, #2a1240, #120a22); border: 2px solid rgba(255,255,255,.18); box-shadow: 0 30px 80px rgba(0,0,0,.5); position: relative; overflow: hidden; }
+  .face { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); width: 170px; height: 170px; border-radius: 50%; background: radial-gradient(circle at 50% 40%, #f2b48a 0 45%, transparent 46%), radial-gradient(circle at 50% 120%, #d9266c 0 60%, transparent 61%); }
+  .bubble { position: absolute; left: 24px; right: 24px; padding: 14px 18px; border-radius: 18px; font-size: 22px; font-weight: 600; }
+  .b1 { top: 262px; background: #23263f; }
+  .b2 { top: 352px; background: #d6246a; text-align: right; }
+  .next { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); background: linear-gradient(180deg,#d9266c,#c11e5d); padding: 12px 40px; border-radius: 999px; font-size: 22px; font-weight: 800; }
+</style></head>
+<body><div class="wrap">
+  <div>
+    <div class="brand"><img src="../../icons/icon-192.png" alt="">OhMyGoal</div>
+    <h1>Random video chat.<br><em>Safe by design.</em></h1>
+    <p>Meet someone new in one tap. Free, no sign-up, 18+.</p>
+    <div class="chips"><span>Video · Voice · Text</span><span>Never recorded</span><span>18 languages</span></div>
+  </div>
+  <div class="phone"><div class="face"></div><div class="bubble b1">Hi! Where are you from? 👋</div><div class="bubble b2">Pune! You?</div><div class="next">Next</div></div>
+</div></body></html>
