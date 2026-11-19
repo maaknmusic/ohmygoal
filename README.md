@@ -293,6 +293,17 @@ The home page has a **Live world map** button: a spinning globe (MapLibre GL on 
 - **Tiles:** OpenStreetMap's own tile servers are free for light use, as long as the attribution (shown on the map) is kept. If the site gets busy, move to a tile provider such as MapTiler or Stadia Maps: set `map: { tiles: 'https://…/{z}/{x}/{y}.png?key=…', attribution: '…' }` in config.js.
 - Tests: `tests/unit/worldmap.test.mjs` and `tests/e2e/worldmap-emulator.mjs`. The e2e test needs `npm i maplibre-gl@5.24.0` in `SP/ml`.
 
+## Visit log (fraud and abuse)
+
+The admin page's **Visits** tab lists every check-in from the website for the last 90 days. Each row shows the time, the IP address the server saw (IPv4 or IPv6, which a visitor can't fake), any IP address the device reported for its other protocol (looked up in the browser through ipify, so marked "reported by the device"), the approximate place and network, the device ID, the browser and device type, the account, and the Google email for signed-in accounts.
+
+- Search by an IP address, email, device ID or account ID to see every account it was used with. Tap any address, device or account in a row to follow it. Each row has ban buttons.
+- **One row per account + address + device per half hour**, with a check-in count, so busy visitors don't fill the log.
+- **Private:** rows are in `private/data/visits`. No Firestore rule allows a client to read or write them; only the `admin` function (`action: 'visits'`) reads them, for Google accounts in `ADMIN_EMAILS`.
+- **Places** come from IPinfo's free API (1,000 lookups a day without a key). They're looked up only when the log is opened and cached for 30 days (`private/data/ipgeo`). They're approximate: mobile networks and VPNs often show another city.
+- **Retention:** rows are deleted 90 days after the visit and places after 30 days, by `sweepOldRecords` (functions/moderation.js). The Privacy Policy ("Visit log") says all of this. Keep it up to date if the log changes.
+- Code: `functions/visits.js`, `js/admin-visits.js`, and the browser lookup in `js/access.js`. Tests: `tests/unit/visits.test.mjs` and `tests/e2e/visits-admin.mjs`.
+
 ## Privacy design
 
 What strangers can and can't learn about each other, and what we store:

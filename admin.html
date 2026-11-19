@@ -28,6 +28,10 @@
         .item { border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin: 10px 0; background: var(--bg-2); }
         .item-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: 13px; color: var(--muted); }
         .item-head b { color: var(--text); font-size: 14px; }
+        .visit-ip { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin: 8px 0 4px; font-size: 13px; }
+        .visit-ip .muted, .kv .muted { color: var(--muted); }
+        .linkish { border: 0; padding: 0; background: none; color: var(--text); font: 600 13px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; word-break: break-all; text-align: start; }
+        .linkish:hover { color: var(--primary, #e0286f); }
         .item-msg { margin: 10px 0; white-space: pre-wrap; word-break: break-word; }
         .kv { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--muted); }
         .kv code { color: var(--text); font-size: 12px; word-break: break-all; }
@@ -130,6 +134,7 @@
                 <button data-tab="premium">Premium</button>
                 <button data-tab="payments">Payments</button>
                 <button data-tab="people">People</button>
+                <button data-tab="visits">Visits</button>
                 <button data-tab="inbox">Inbox<span class="count" id="countInbox">0</span></button>
                 <button data-tab="requests">Unban requests<span class="count" id="countRequests">0</span></button>
                 <button data-tab="bans">Active bans<span class="count" id="countBans">0</span></button>
@@ -195,6 +200,20 @@
                     </form>
                 </div>
                 <div id="personResult"></div>
+            </section>
+
+            <section data-view="visits" class="hidden">
+                <div class="card">
+                    <b>Visit log</b>
+                    <p class="help">Every check-in from the website for the last 90 days: when, the IP address the server saw (IPv4 or IPv6) and the ones the device reported, the approximate place, the device and the account. Search an IP address, Google email, device ID or account ID to see everyone it was used with. Tap any address, device or account in a row to follow it. Places are approximate (mobile networks and VPNs often show another city).</p>
+                    <form id="visitsForm" class="form-grid" style="margin-top: 10px">
+                        <div><label for="visitsQuery">IP address, email, device ID or account ID</label><input id="visitsQuery" class="input" autocomplete="off" placeholder="49.36.12.7 · 2401:4900::1 · name@gmail.com"></div>
+                        <div><button class="btn btn-primary" type="submit" style="width: 100%">Search</button></div>
+                        <div><button class="btn btn-ghost" type="button" id="visitsLatest" style="width: 100%">Latest visits</button></div>
+                    </form>
+                </div>
+                <div id="visitsList"></div>
+                <p class="help">IP address data powered by <a href="https://ipinfo.io" target="_blank" rel="noopener">IPinfo</a>.</p>
             </section>
 
             <section data-view="inbox" class="hidden">

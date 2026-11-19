@@ -1,9 +1,9 @@
-// Mock Razorpay API (+ a test endpoint the fake checkout uses to "pay"), Cloudflare TURN and Vertex AI (Gemini) for the translateText function.
+// Mock Razorpay API (+ a test endpoint the fake checkout uses to "pay"), Cloudflare TURN, Vertex AI (Gemini) for the translateText function and IPinfo for the visit log.
 import http from 'node:http';
 import crypto from 'node:crypto';
 const SECRET = 'test_key_secret';
 const orders = new Map(), payments = new Map(), disputes = new Map();
-let n = 0, cfIssued = 0, vertexCalls = 0, vertexLast = null;
+let n = 0, cfIssued = 0, vertexCalls = 0, vertexLast = null, ipinfoCalls = 0;
 const send = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' }); res.end(JSON.stringify(obj)); };
 http.createServer((req, res) => {
   let body = ''; req.on('data', c => body += c); req.on('end', () => {
@@ -19,6 +19,15 @@ http.createServer((req, res) => {
       return send(res, 201, { iceServers: [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.cloudflare.com:53', 'turn:turn.cloudflare.com:3478?transport=udp', 'turn:turn.cloudflare.com:53?transport=udp', 'turns:turn.cloudflare.com:443?transport=tcp'], username: 'cfuser' + cfIssued, credential: 'cfpass' + cfIssued, ttl: json.ttl }] });
     }
     if (req.method === 'GET' && url === '/test/cf-count') return send(res, 200, { issued: cfIssued });
+    // Mock IPinfo for the visit log (functions/visits.js uses it in the emulator): a fixed place per address, and a call count.
+    let geo;
+    if (req.method === 'GET' && (geo = url.match(/^\/ipinfo\/([^/]+)\/json$/))) {
+      ipinfoCalls++;
+      const ip = decodeURIComponent(geo[1]);
+      return send(res, 200, ip.includes(':') ? { ip, city: 'Mumbai', region: 'Maharashtra', country: 'IN', org: 'AS55836 Reliance Jio Infocomm', timezone: 'Asia/Kolkata' }
+        : { ip, city: 'New Delhi', region: 'Delhi', country: 'IN', org: 'AS24560 Bharti Airtel', timezone: 'Asia/Kolkata' });
+    }
+    if (req.method === 'GET' && url === '/test/ipinfo-count') return send(res, 200, { calls: ipinfoCalls });
     // Mock Vertex AI (Gemini generateContent) for the translateText function (TRANSLATE_API=http://127.0.0.1:7777). It must be reached WITHOUT
     // credentials (the function sends none to a non-Google host), so an Authorization header is answered with 401. Deterministic: the message is
     // read from the user turn and answered as '[<target>] <message>', source 'hi' if it contains Devanagari, else 'en'. A message that is

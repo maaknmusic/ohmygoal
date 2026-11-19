@@ -62,7 +62,7 @@ window.APP_CONFIG = {
         email: 'support@ohmygoal.app',
         phone: '',      // optional: left empty, the Contact section shows no phone line
         address: 'Delhi 110084, India',
-        policiesUpdated: '7 November 2026',
+        policiesUpdated: '19 November 2026',
     },
 
     // Premium = signed in with Google + a pass bought through Razorpay (verified by the Cloud Functions

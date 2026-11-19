@@ -1,5 +1,5 @@
 // =====================================================================
-// Admin page: dashboard, Premium members, payments, people, inbox, unban requests, bans, the IP whitelist and reports.
+// Admin page: dashboard, Premium members, payments, people, the visit log, inbox, unban requests, bans, the IP whitelist and reports.
 // Moderation goes through the `admin` Cloud Function (functions/moderation.js) and the numbers through `adminAnalytics`
 // (functions/analytics.js); both only answer Google accounts listed in the ADMIN_EMAILS secret.
 // =====================================================================
@@ -8,6 +8,7 @@ const V = '11.6.1';
 import { createAnalytics } from './admin-analytics.js';
 import { startAppCheck } from './appcheck.js';
 import { createHosts } from './admin-hosts.js';
+import { createVisits } from './admin-visits.js';
 
 const [appMod, authMod, fnMod] = await Promise.all([
     import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`),
@@ -125,9 +126,10 @@ const analytics = createAnalytics({
 });
 
 const hosts = createHosts({ $, h, toast, button, empty, kv, when, short, fn: hostsFn });
+const visits = createVisits({ $, h, toast, button, empty, when, short, call: (action, payload) => call(action, payload), act: (...a) => act(...a) });
 
 let data = null;
-const TABS = ['dashboard', 'hosts', 'premium', 'payments', 'people', 'inbox', 'requests', 'bans', 'whitelist', 'reports'];
+const TABS = ['dashboard', 'hosts', 'premium', 'payments', 'people', 'visits', 'inbox', 'requests', 'bans', 'whitelist', 'reports'];
 let tab = TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'dashboard';
 
 async function load() {
@@ -166,6 +168,7 @@ function render() {
     renderReports();
     analytics.show(tab);
     if (tab === 'hosts') hosts.show();
+    visits.show(tab);
 }
 
 // ---------------- unban requests ----------------
@@ -391,7 +394,7 @@ document.querySelectorAll('#tabs button').forEach(b => (b.onclick = () => {
     history.replaceState(null, '', '#' + tab);
     render();
 }));
-$('refreshBtn').onclick = async () => { $('refreshBtn').disabled = true; await load(); analytics.refresh(tab); if (tab === 'hosts') hosts.refresh(); $('refreshBtn').disabled = false; };
+$('refreshBtn').onclick = async () => { $('refreshBtn').disabled = true; await load(); analytics.refresh(tab); if (tab === 'hosts') hosts.refresh(); visits.refresh(tab); $('refreshBtn').disabled = false; };
 
 $('signInBtn').onclick = async () => {
     const provider = new authMod.GoogleAuthProvider();

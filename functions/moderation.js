@@ -19,6 +19,7 @@ import { defineSecret } from 'firebase-functions/params';
 import { Timestamp } from 'firebase-admin/firestore';
 import { db, publicDoc, privateDoc, privateCol, publicCol, callOpts, BUSY } from './common.js';
 import { markActive } from './stats.js';
+import { recordVisit, listVisits, plainIp, VISIT_KEEP_MS, GEO_KEEP_MS } from './visits.js';
 
 export const ADMIN_EMAILS = defineSecret('ADMIN_EMAILS'); // comma-separated Google emails
 
@@ -84,19 +85,22 @@ export function normalizeIp(raw) {
  * The caller's IP. Google's front end appends the real client address to X-Forwarded-For,
  * so the right-most public entry is the one a client can't fake.
  */
-function clientIp(req) {
+function clientAddress(req) {
     const xff = String(req.headers['x-forwarded-for'] || '').split(',').map(s => s.trim()).filter(Boolean);
     for (let i = xff.length - 1; i >= 0; i--) {
         const ip = xff[i].replace(/^\[|\]$/g, '').replace(/:\d+$/, m => (net.isIP(xff[i]) ? m : ''));
-        if (isPublicIp(ip) && !isGoogleProxy(ip)) return normalizeIp(ip);
+        if (isPublicIp(ip) && !isGoogleProxy(ip)) return plainIp(ip);
     }
-    return normalizeIp(req.ip || req.socket?.remoteAddress || '');
+    return plainIp(req.ip || req.socket?.remoteAddress || '');
 }
+/** The caller's address as bans use it (IPv6 as its /64). */
+const clientIp = req => normalizeIp(clientAddress(req));
 
 function identity(request) {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Please reload the page.');
     const fp = typeof request.data?.fp === 'string' && /^[a-f0-9]{16,64}$/.test(request.data.fp) ? request.data.fp : '';
-    return { uid: request.auth.uid, ip: clientIp(request.rawRequest), fp };
+    const addr = clientAddress(request.rawRequest);
+    return { uid: request.auth.uid, ip: normalizeIp(addr), addr, fp };
 }
 
 async function isWhitelisted(ip) {
@@ -212,6 +216,9 @@ export const checkAccess = onCall(callOpts(BUSY), async request => {
     const who = identity(request);
     const status = await refreshAccess(who);
     if (status?.allowed) await markActive(who.uid);
+    // The visit log (functions/visits.js): never in the way of the check itself.
+    await recordVisit({ uid: who.uid, ip: who.addr, fp: who.fp, token: request.auth.token, req: request.rawRequest, reported: request.data?.ips })
+        .catch(e => logger.warn('visit log failed', { message: e.message }));
     // A little housekeeping on a small share of visits, so cleanup never depends on the admin page being opened.
     if (Math.random() < 0.03) await sweepOldRecords().catch(e => logger.warn('sweep failed', { message: e.message }));
     return status;
@@ -311,6 +318,8 @@ async function unbanIdentity(id) {
 const RETENTION = [
     ['unbanRequests', 'createdAt', 90 * DAY],   // appeals: 90 days
     ['clients', 'lastSeen', 90 * DAY],          // IP / device record of a visit: 90 days since the last visit
+    ['visits', 'last', VISIT_KEEP_MS],          // the visit log (functions/visits.js): 90 days
+    ['ipgeo', 'at', GEO_KEEP_MS],               // looked-up places of addresses: 30 days
     ['bans', 'until', 30 * DAY],                // bans are removed 30 days after they expired
     ['counters', 'windowStart', 7 * DAY],       // strike / try / appeal counters
     ['likeCounters', 'times', null],            // (kept: tiny, self-trimming)
@@ -412,6 +421,10 @@ export const admin = onCall(callOpts({ secrets: [ADMIN_EMAILS] }), async request
             if (uid) await publicDoc(`access/${uid}`).delete().catch(() => {});
             await log('ban', { uid, ip, fp, hours, scope, reason });
             return { ok: true };
+        }
+        case 'visits': {
+            // The visit log: the latest visits, or everything for one IP address, email, device or account.
+            return listVisits(request.data.q);
         }
         case 'whitelistAdd': {
             const ip = normalizeIp(request.data.ip);
