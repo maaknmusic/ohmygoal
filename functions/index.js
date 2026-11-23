@@ -26,6 +26,7 @@ export { giftCoins } from './coingifts.js';
 export { myHost, startLive, joinLive, endLive, kickLive, listLive, sendLiveGift, requestPayout, saveHostKyc, adminHosts } from './live.js';
 // Bans, access passes, unban requests and the admin API.
 export { checkAccess, reportViolation, requestUnban, admin } from './moderation.js';
+export { onVisitWritten } from './visits.js';
 // "Good vibe" likes after a chat.
 export { likeUser } from './likes.js';
 // Short-lived relay (Cloudflare TURN) credentials.

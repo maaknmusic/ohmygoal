@@ -300,8 +300,8 @@ The admin page's **Visits** tab lists every check-in from the website for the la
 - Search by an IP address, email, device ID or account ID to see every account it was used with. Tap any address, device or account in a row to follow it. Each row has ban buttons.
 - **One row per account + address + device per half hour**, with a check-in count, so busy visitors don't fill the log.
 - **Private:** rows are in `private/data/visits`. No Firestore rule allows a client to read or write them; only the `admin` function (`action: 'visits'`) reads them, for Google accounts in `ADMIN_EMAILS`.
-- **Places** come from IPinfo's free API (1,000 lookups a day without a key). They're looked up only when the log is opened and cached for 30 days (`private/data/ipgeo`). They're approximate: mobile networks and VPNs often show another city.
-- **Retention:** rows are deleted 90 days after the visit and places after 30 days, by `sweepOldRecords` (functions/moderation.js). The Privacy Policy ("Visit log") says all of this. Keep it up to date if the log changes.
+- **Places** come from IPinfo's free API (1,000 lookups a day without a key) and are **saved into each row at visit time** by `onVisitWritten`, just after the check-in, so visitors never wait (`g` for the address the server saw, `g4`/`g6` for the reported ones). One address is looked up at most once a week (`private/data/ipgeo` caches lookups for 7 days). If a lookup fails, the admin page looks it up when the log is opened instead. Places are approximate: mobile networks and VPNs often show another city.
+- **Retention:** rows (with their saved places) are deleted 90 days after the visit, and cached lookups after 7 days, by `sweepOldRecords` (functions/moderation.js). The Privacy Policy ("Visit log") says all of this. Keep it up to date if the log changes.
 - Code: `functions/visits.js`, `js/admin-visits.js`, and the browser lookup in `js/access.js`. Tests: `tests/unit/visits.test.mjs` and `tests/e2e/visits-admin.mjs`.
 
 ## Privacy design

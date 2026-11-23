@@ -73,6 +73,21 @@ const peek = await asha.p.evaluate(async () => {
 });
 step('1. a visitor cannot read or write the log, or ask the admin service for it', peek.list === 'permission-denied' && peek.write === 'permission-denied' && /permission-denied/.test(peek.adminCall), JSON.stringify(peek));
 
+// ---- the place is saved into the row at visit time (onVisitWritten), read straight from the database
+const FS = 'http://127.0.0.1:8080/v1/projects/demo-ohmygoal/databases/(default)/documents/artifacts/anon-connect/private/data/visits?pageSize=1000';
+const rowsOf = async uid => {
+  const j = await (await fetch(FS, { headers: { Authorization: 'Bearer owner' } })).json();
+  const plain = v => (v.mapValue ? Object.fromEntries(Object.entries(v.mapValue.fields || {}).map(([k, x]) => [k, plain(x)])) : v.stringValue ?? (v.integerValue !== undefined ? Number(v.integerValue) : v.booleanValue));
+  return (j.documents || []).map(d => Object.fromEntries(Object.entries(d.fields).map(([k, v]) => [k, plain(v)]))).filter(r => r.uid === uid);
+};
+let saved = [];
+for (let i = 0; i < 30 && !(saved[0]?.g && saved[0]?.g6); i++) { await new Promise(r => setTimeout(r, 500)); saved = await rowsOf(asha.uid); }
+const sg = saved[0] || {};
+step('1b. just after the visit, the place of each address is saved in the row (seen and reported)',
+  sg.g?.ip === A4 && sg.g.city === 'New Delhi' && sg.g.org === 'AS24560 Bharti Airtel' && sg.g6?.ip === A6 && sg.g6.city === 'Mumbai' && typeof sg.g.at === 'number', JSON.stringify({ g: sg.g, g6: sg.g6 }));
+for (let i = 0; i < 30; i++) { const c = (await rowsOf(chen.uid))[0]; if (c?.g && c?.g4) break; await new Promise(r => setTimeout(r, 500)); }
+const callsBeforeOpen = await ipinfoCalls();
+
 // ---- the admin page
 const ctx = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1280, height: 900 } });
 await routes(ctx, { seen: '198.51.100.7', v4: '', v6: '' });
@@ -89,6 +104,7 @@ await p.click('#tabs button[data-tab="visits"]');
 await p.waitForFunction(() => document.querySelectorAll('#visitsList .visit').length > 0, null, { timeout: 20000 }).catch(() => {});
 const latest = await p.textContent('#visitsList');
 step('2. the Visits tab opens on the latest visits', latest.includes(A4) && latest.includes(C6) && /The latest visits: \d+ rows/.test(latest), latest.slice(0, 200));
+step('2b. opening the log uses the places saved at visit time: no new lookups', (await ipinfoCalls()) === callsBeforeOpen, `${callsBeforeOpen} -> ${await ipinfoCalls()}`);
 
 const rowOf = (uid) => p.evaluate(u => [...document.querySelectorAll('#visitsList .visit')].map(x => x.innerText).find(t => t.includes(u.slice(0, 8))) || '', uid);
 const a = await rowOf(asha.uid);

@@ -4,16 +4,21 @@
 // account + address + device per 30 minutes: when, the address the server saw (IPv4 or IPv6, the one a visitor cannot
 // fake), the addresses the device says it has on the other protocol (looked up in the browser, so marked as reported), the
 // device identifier, the browser, and the Google email for signed-in accounts. Rows live in the private tree (no client can
-// read or write them) and are deleted 90 days after the last visit (moderation.js sweepOldRecords). The approximate place is
-// looked up from the address only when the admin opens the log, and cached for 30 days.
+// read or write them) and are deleted 90 days after the last visit (moderation.js sweepOldRecords).
+// The approximate place of each address is saved into the row at visit time (onVisitWritten, just after the check-in, so the
+// visitor never waits for it): g for the address the server saw, g4 / g6 for the reported ones. Looked-up places are cached
+// for 7 days, so one address is asked about at most once a week. If a lookup fails (IPinfo's free limit is 1,000 a day), the
+// admin page looks the place up when the log is opened instead.
 import crypto from 'node:crypto';
 import net from 'node:net';
+import { logger } from 'firebase-functions/v2';
+import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { FieldValue } from 'firebase-admin/firestore';
 import { privateCol, privateDoc } from './common.js';
 
 export const VISIT_BUCKET_MS = 30 * 60000;
 export const VISIT_KEEP_MS = 90 * 24 * 3600000;
-export const GEO_KEEP_MS = 30 * 24 * 3600000;
+export const GEO_KEEP_MS = 7 * 24 * 3600000; // a place looked up for an address is reused for a week
 const GEO_TIMEOUT_MS = 2500;
 const MAX_GEO_LOOKUPS = 40; // per page of the log
 // IPinfo's free API (city, region, country, network): 1,000 a day without a key. The emulator tests use a local stand-in.
@@ -165,6 +170,29 @@ export function parseQuery(raw) {
     return { type: 'invalid' };
 }
 
+// ---------------- the place, saved at visit time ----------------
+
+/** The places a row still needs: [field, address] for each address whose saved place is missing or belongs to another address. */
+export function placesWanted(row) {
+    if (!row) return [];
+    return [['g', row.ip], ['g4', row.r4], ['g6', row.r6]].filter(([k, ip]) => ip && isPublic(ip) && row[k]?.ip !== ip);
+}
+
+/** Runs after a check-in wrote its row: saves the place of its addresses into it. Writing the place triggers this again, which then has nothing to do. */
+export const onVisitWritten = onDocumentWritten({ document: 'artifacts/anon-connect/private/data/visits/{visitId}', retry: false }, async event => {
+    const row = event.data?.after?.data();
+    const want = placesWanted(row);
+    if (!want.length) return;
+    try {
+        const places = await placesFor(want.map(([, ip]) => ip));
+        const patch = {};
+        for (const [k, ip] of want) if (places[ip]) patch[k] = { ...places[ip], ip, at: Date.now() };
+        if (Object.keys(patch).length) await event.data.after.ref.update(patch);
+    } catch (e) {
+        logger.warn('visit place failed', { message: e.message });
+    }
+});
+
 const LIMIT = 200;
 
 /** Rows for the admin page, newest first, each with the approximate place of its addresses. */
@@ -180,6 +208,7 @@ export async function listVisits(raw, opts = {}) {
     const seen = new Map();
     for (const s of snaps) for (const d of s.docs) seen.set(d.id, { id: d.id, ...d.data() });
     const visits = [...seen.values()].sort((a, b) => b.last - a.last).slice(0, LIMIT);
-    const places = await placesFor(visits.flatMap(v => [v.ip, v.r4, v.r6]), opts);
+    // Places saved at visit time are used as they are; only addresses still without one are looked up now.
+    const places = await placesFor(visits.flatMap(v => placesWanted(v).map(([, ip]) => ip)), opts);
     return { query: q, visits, places };
 }

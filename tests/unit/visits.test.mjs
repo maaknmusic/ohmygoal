@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { plainIp, isPublic, reportedIps, deviceText, visitId, geoFrom, parseQuery, VISIT_BUCKET_MS, VISIT_KEEP_MS, GEO_KEEP_MS } from '../../functions/visits.js';
+import { plainIp, isPublic, reportedIps, deviceText, visitId, geoFrom, parseQuery, placesWanted, VISIT_BUCKET_MS, VISIT_KEEP_MS, GEO_KEEP_MS } from '../../functions/visits.js';
 
 const read = p => fs.readFileSync(new URL('../../' + p, import.meta.url), 'utf8');
 
@@ -77,9 +77,20 @@ test('places: only the place and the network are kept from IPinfo, cleaned and c
     assert.equal(geoFrom({ city: 'A\u0000\u001bB'.padEnd(500, 'x') }).city.length, 60);
 });
 
-test('kept 90 days (places 30), swept with the other records; only the server can touch them', () => {
+test('places saved at visit time: each address of a row gets one, a changed address gets a new one, private ones none', () => {
+    assert.deepEqual(placesWanted({ ip: '49.36.12.7', r6: '2401:4900::1' }), [['g', '49.36.12.7'], ['g6', '2401:4900::1']]);
+    assert.deepEqual(placesWanted({ ip: '49.36.12.7', g: { ip: '49.36.12.7', city: 'Delhi' } }), [], 'already saved: nothing to do (so saving it does not loop)');
+    assert.deepEqual(placesWanted({ ip: '49.36.12.7', r4: '1.1.1.1', g4: { ip: '8.8.8.8' } }), [['g', '49.36.12.7'], ['g4', '1.1.1.1']], 'the device reported a new address: its place again');
+    assert.deepEqual(placesWanted({ ip: '10.0.0.1' }), []);
+    assert.deepEqual(placesWanted(null), []);
+    const v = read('functions/visits.js');
+    assert.match(v, /export const onVisitWritten = onDocumentWritten\(\{ document: 'artifacts\/anon-connect\/private\/data\/visits\/\{visitId\}', retry: false \}/);
+    assert.match(read('functions/index.js'), /export \{ onVisitWritten \} from '\.\/visits\.js';/);
+});
+
+test('kept 90 days (cached places 7), swept with the other records; only the server can touch them', () => {
     assert.equal(VISIT_KEEP_MS, 90 * 86400000);
-    assert.equal(GEO_KEEP_MS, 30 * 86400000);
+    assert.equal(GEO_KEEP_MS, 7 * 86400000);
     const mod = read('functions/moderation.js');
     assert.match(mod, /\['visits', 'last', VISIT_KEEP_MS\]/);
     assert.match(mod, /\['ipgeo', 'at', GEO_KEEP_MS\]/);
@@ -105,7 +116,7 @@ test('wiring: every check-in is logged without ever blocking it; the admin actio
 
 test('the Privacy Policy says what is logged, why, who sees it, the services used and how long it is kept', () => {
     const legal = read('legal.html');
-    assert.match(legal, /<li><b>Visit log \(fraud and abuse prevention\):<\/b>[^<]*IP address our server sees[^<]*ipify[^<]*device identifier[^<]*email[^<]*Only the site’s administrators[^<]*IPinfo[^<]*deleted 90 days[^<]*30 days\.<\/li>/);
+    assert.match(legal, /<li><b>Visit log \(fraud and abuse prevention\):<\/b>[^<]*IP address our server sees[^<]*ipify[^<]*device identifier[^<]*email[^<]*Only the site’s administrators[^<]*IPinfo and saved with the record[^<]*deleted 90 days after the visit\.<\/li>/);
     assert.match(legal, /ipify \(tells your device its own IPv4 and IPv6 address, for the visit log\) and IPinfo/);
     assert.match(read('config.js'), /policiesUpdated: '19 November 2026'/);
 });

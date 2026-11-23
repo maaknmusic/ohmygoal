@@ -33,10 +33,11 @@ export function createVisits({ $, h, toast, button, empty, when, short, call, ac
         return b;
     };
 
-    function addressLine(label, ip, places, note) {
+    function addressLine(label, ip, places, note, saved) {
         const line = h('div', 'visit-ip');
         line.append(h('span', 'pill', label), link(ip, ip));
-        const g = places[ip];
+        // the place saved at visit time when there is one; else the one looked up just now
+        const g = saved?.ip === ip ? saved : places[ip];
         if (g) line.append(h('span', '', place(g)), ...(g.org ? [h('span', 'muted', g.org)] : []));
         if (note) line.append(h('span', 'muted', note));
         return line;
@@ -49,9 +50,9 @@ export function createVisits({ $, h, toast, button, empty, when, short, call, ac
         if (v.count > 1) head.append(h('span', '', `${v.count} check-ins since ${new Date(v.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`));
         head.append(h('span', 'pill', v.account === 'google' ? 'Google' : 'Anonymous'));
         item.append(head);
-        item.append(addressLine(v.v === 6 ? 'IPv6' : 'IPv4', v.ip, places, 'seen by the server'));
-        if (v.r4) item.append(addressLine('IPv4', v.r4, places, 'reported by the device'));
-        if (v.r6) item.append(addressLine('IPv6', v.r6, places, 'reported by the device'));
+        item.append(addressLine(v.v === 6 ? 'IPv6' : 'IPv4', v.ip, places, 'seen by the server', v.g));
+        if (v.r4) item.append(addressLine('IPv4', v.r4, places, 'reported by the device', v.g4));
+        if (v.r6) item.append(addressLine('IPv6', v.r6, places, 'reported by the device', v.g6));
         const who = h('div', 'kv');
         const pair = (label, node) => { const s = h('span', '', `${label}: `); s.append(node); who.append(s); };
         pair('Account', link(short(v.uid), v.uid, v.uid));
